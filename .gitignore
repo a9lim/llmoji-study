@@ -1,0 +1,18 @@
+# build / editable install artifacts
+*.egg-info/
+dist/
+build/
+__pycache__/
+*.pyc
+
+# pilot outputs — committed so findings are readable from the repo,
+# regenerable with the scripts for anyone with the model cached.
+
+# local envs
+.venv/
+.env
+
+# editor cruft
+.DS_Store
+.idea/
+.vscode/
