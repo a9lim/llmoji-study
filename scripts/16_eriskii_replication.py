@@ -30,6 +30,7 @@ import pandas as pd
 from llmoji.claude_faces import EMBED_MODEL, load_embeddings
 from llmoji.config import (
     CLAUDE_FACES_EMBED_DESCRIPTION_PATH,
+    CLAUDE_KAOMOJI_PATH,
     DATA_DIR,
     ERISKII_AXES,
     ERISKII_AXES_TSV,
@@ -206,6 +207,90 @@ def section_clusters(
     return df_clusters
 
 
+def _heatmap(
+    df_long: pd.DataFrame,
+    *,
+    group_col: str,
+    value_col: str,
+    out_path: Path,
+    title: str,
+):
+    """Pivot long-form to (group × axis), draw heatmap, save."""
+    import matplotlib.pyplot as plt
+    pivot = df_long.pivot(index=group_col, columns="axis", values=value_col)
+    # preserve canonical axis order
+    pivot = pivot[ERISKII_AXES]
+    pivot = pivot.sort_index()  # alphabetical groups; tweak if needed
+
+    fig, ax = plt.subplots(figsize=(13, max(2, 0.5 * len(pivot) + 2)))
+    vmin, vmax = float(np.nanmin(pivot.values)), float(np.nanmax(pivot.values))
+    if value_col == "mean":
+        # diverging: center at 0
+        vabs = max(abs(vmin), abs(vmax))
+        cmap = "RdBu_r"
+        im = ax.imshow(pivot.values, cmap=cmap, vmin=-vabs, vmax=vabs, aspect="auto")
+    else:
+        cmap = "viridis"
+        im = ax.imshow(pivot.values, cmap=cmap, vmin=vmin, vmax=vmax, aspect="auto")
+    ax.set_xticks(range(len(ERISKII_AXES)))
+    ax.set_xticklabels(ERISKII_AXES, rotation=45, ha="right")
+    ax.set_yticks(range(len(pivot)))
+    ax.set_yticklabels(pivot.index)
+    ax.set_title(title)
+    fig.colorbar(im, ax=ax, shrink=0.8)
+    # annotate cells
+    for i in range(pivot.shape[0]):
+        for j in range(pivot.shape[1]):
+            ax.text(j, i, f"{pivot.values[i, j]:+.2f}", ha="center", va="center",
+                    fontsize=7, color="black")
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"wrote {out_path}")
+
+
+def section_per_model(rows: pd.DataFrame, axes_df: pd.DataFrame) -> pd.DataFrame:
+    from llmoji.config import ERISKII_PER_MODEL_TSV
+    from llmoji.eriskii import weighted_group_axis_stats
+    cc = rows[rows["source"] == "claude-code"].copy()
+    cc["model"] = cc["model"].fillna("(unknown)")
+    df = weighted_group_axis_stats(
+        cc, axes_df,
+        group_col="model", axis_names=ERISKII_AXES, min_emissions=10,
+    )
+    df.to_csv(ERISKII_PER_MODEL_TSV, sep="\t", index=False)
+    print(f"wrote {ERISKII_PER_MODEL_TSV}")
+    if not df.empty:
+        _heatmap(df, group_col="model", value_col="mean",
+                 out_path=FIGURES_DIR / "eriskii_per_model_axes_mean.png",
+                 title="per-model axis mean (claude-code only, n≥10 emissions)")
+        _heatmap(df, group_col="model", value_col="std",
+                 out_path=FIGURES_DIR / "eriskii_per_model_axes_std.png",
+                 title="per-model axis std (range)")
+    return df
+
+
+def section_per_project(rows: pd.DataFrame, axes_df: pd.DataFrame) -> pd.DataFrame:
+    from llmoji.config import ERISKII_PER_PROJECT_TSV
+    from llmoji.eriskii import weighted_group_axis_stats
+    cc = rows[rows["source"] == "claude-code"].copy()
+    df = weighted_group_axis_stats(
+        cc, axes_df,
+        group_col="project_slug", axis_names=ERISKII_AXES,
+        min_emissions=10,
+    )
+    df.to_csv(ERISKII_PER_PROJECT_TSV, sep="\t", index=False)
+    print(f"wrote {ERISKII_PER_PROJECT_TSV}")
+    if not df.empty:
+        _heatmap(df, group_col="project_slug", value_col="mean",
+                 out_path=FIGURES_DIR / "eriskii_per_project_axes_mean.png",
+                 title="per-project axis mean (n≥10 emissions)")
+        _heatmap(df, group_col="project_slug", value_col="std",
+                 out_path=FIGURES_DIR / "eriskii_per_project_axes_std.png",
+                 title="per-project axis std (range)")
+    return df
+
+
 def main() -> None:
     if not CLAUDE_FACES_EMBED_DESCRIPTION_PATH.exists():
         print(f"no embeddings at {CLAUDE_FACES_EMBED_DESCRIPTION_PATH}; "
@@ -243,6 +328,12 @@ def main() -> None:
                 continue
             descriptions_by_fw[r["first_word"]] = r["synthesized"]
     section_clusters(fw, n, E, descriptions_by_fw)
+
+    print("\n=== Section: per-model ===")
+    rows = pd.read_json(CLAUDE_KAOMOJI_PATH, lines=True)
+    section_per_model(rows, df_axes)
+    print("\n=== Section: per-project ===")
+    section_per_project(rows, df_axes)
 
 
 if __name__ == "__main__":

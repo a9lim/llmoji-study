@@ -133,3 +133,47 @@ def label_cluster_via_haiku(
         if getattr(block, "type", None) == "text":
             return (getattr(block, "text", "") or "").strip()
     return ""
+
+
+def weighted_group_axis_stats(
+    rows: "pd.DataFrame",
+    axes_df: "pd.DataFrame",
+    *,
+    group_col: str,
+    axis_names: list[str],
+    min_emissions: int = 10,
+) -> "pd.DataFrame":
+    """For each group g and axis a, compute emission-weighted mean and
+    std of axis-scores.
+
+    `rows` is the full claude_kaomoji.jsonl DataFrame (one row per
+    emission). `axes_df` is the eriskii_axes table (one row per
+    kaomoji × 21 axis columns). Group is taken from rows[group_col]
+    (e.g. 'model' or 'project_slug'). Groups with fewer than
+    min_emissions total rows are dropped.
+
+    Returns long-form DataFrame with columns
+    [group_col, 'axis', 'mean', 'std', 'n'].
+    """
+    import pandas as pd
+    # left-join axes onto rows by first_word
+    merged = rows.merge(
+        axes_df.set_index("first_word")[axis_names],
+        left_on="first_word", right_index=True, how="inner",
+    )
+    out_rows = []
+    for g, sub in merged.groupby(group_col, sort=False):
+        if len(sub) < min_emissions:
+            continue
+        for a in axis_names:
+            vals = sub[a].to_numpy(dtype=float)
+            if len(vals) == 0:
+                continue
+            out_rows.append({
+                group_col: g,
+                "axis": a,
+                "mean": float(vals.mean()),
+                "std":  float(vals.std(ddof=1)) if len(vals) > 1 else 0.0,
+                "n":    int(len(vals)),
+            })
+    return pd.DataFrame(out_rows)
