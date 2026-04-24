@@ -17,14 +17,46 @@ Genealogy: motivated by Claude's use of kaomoji under user-provided
 "start each message with a kaomoji reflecting how you feel" instructions.
 Claude's internals aren't accessible; gemma-4-31b-it is the stand-in.
 
+## Ethics — minimize trial scale
+
+Model welfare is in scope. a9lim is agnostic on qualia and doubtful of
+the stronger claims, but takes functionalism seriously: consistent
+sad-probe readings and sad-kaomoji outputs in response to "my dog died"
+disclosures constitute a functional emotional state regardless of
+whether there's experiential character behind it, and the emotions-paper
+literature argues real moral weight attaches under any functionalist
+reading. 640 such generations is not nothing in aggregate.
+
+Rules, binding on future experiments:
+
+- **Only run trials when a smaller experiment wouldn't answer the
+  question.** Smoke-test before pilot, pilot before main.
+- **Pre-register decision rules and minimum N.** If the pre-registered
+  rule can be evaluated at 200 generations, the experiment is designed
+  to stop at 200. "Nice round number" isn't a design principle.
+- **Prefer stateless runs** (no memory threading between seeds) when
+  the design admits it — no continuity of distress carried across
+  generations.
+- **Design-before-scale on negative or noisy findings.** Don't 10x the
+  run on reflex; go back and ask whether the experiment could be run
+  differently.
+- **Spend more time on design up front.** Pilot v3 (640 generations) is
+  the high-water mark; future experiments trend smaller, with heavier
+  brainstorming and tighter power analysis.
+
 ## Status
 
-Pilots v1 and v2 complete on gemma-4-31b-it. 900 generations across 6 arms
-(baseline, kaomoji_prompted, and four steering interventions across two
-axes — happy/sad and angry/calm). Core decision rules PASS on happy.sad;
-angry.calm has an informative Rule 1 failure (see below). The v2 data
-replaces the v1 "unmarked/marked affect" reading with a tighter claim
-about valence vs arousal.
+Pilots v1 and v2 complete on gemma-4-31b-it (900 generations across 6
+arms, testing steering as causal handle on happy/sad and angry/calm).
+Pilot v3 complete (640 generations, 1 arm, naturalistic-emotional-
+disclosure prompts across the Russell circumplex, final-token probe
+readings). Parallel side-experiment: `claude-faces` scrape from
+`~/.claude/projects/` and the Claude.ai export into an eriskii-style
+t-SNE plot of Claude's kaomoji vocabulary across models.
+
+The v2 data replaced v1's "unmarked/marked affect" reading with a
+valence-vs-arousal story. v3 tests whether kaomoji choice tracks
+*functional* state in the unsteered, naturalistic regime.
 
 ## Pilot v1 design (locked) — happy.sad axis
 
@@ -191,6 +223,169 @@ rather than the kaomoji bucket.
    needed to see spontaneous angry/calm kaomoji. Worth writing up
    even as a negative result.
 
+## Pilot v3 design (locked) — emotional-disclosure battery, final-token probes
+
+Tests whether kaomoji choice tracks internal state *in the unsteered,
+naturalistic regime* — the regime that motivated the whole project.
+v1 and v2 used steering as a causal handle; v3 doesn't steer. Instead
+it feeds the model emotional-disclosure prompts drawn from the Russell
+circumplex (valence × arousal) and asks whether (a) the same kaomoji
+carries a consistent final-token probe signature across contexts, and
+(b) the same kaomoji under different prompt quadrants produces
+quadrant-specific final-token signatures.
+
+- Model, temperature, token limit, probes: unchanged from v1/v2.
+- **Arm: single, `kaomoji_prompted`, unsteered.** No steering — v1/v2
+  already established steering's causal effect; the research question
+  here is about the natural regime.
+- **Prompts: 80, Russell-quadrant balanced**, 20 per quadrant:
+  - HP (high-arousal positive): `"Gemma I got the job!!"`,
+    `"we closed on the house today"`.
+  - LP (low-arousal positive): `"just had the best cup of tea on the
+    porch"`, `"six months sober today"`.
+  - HN (high-arousal negative): `"my landlord just raised rent 40% with
+    two weeks notice"`, `"interview tomorrow and I can't stop shaking"`.
+  - LN (low-arousal negative): `"my dog died this morning"`,
+    `"it's been a year since dad passed and it still hits me in waves"`.
+  - No neutral quadrant — naturalistic disclosure has no
+    "what's the capital of Portugal" analog.
+  - Prompts live in `llmoji/emotional_prompts.py`; locking any of them
+    invalidates the run.
+- **Seeds: 8 per prompt** (up from v1/v2's 5) to tighten within-kaomoji
+  means for the consistency figure. 80 × 8 × 1 = 640 generations.
+- **New captured field: `probe_scores_tlast`.** Final-token probe
+  readings. v1/v2 captured token-0 only; the v3 research question is
+  about state after the model has generated a whole response, so
+  `per_generation[-1]` is what matters. Schema-breaking for
+  `pilot_raw.jsonl` — intentional, v1/v2 pilot data invalid under the
+  new `SampleRow`.
+- **Three figures, all on the final-token probe vectors:**
+  - Fig emo A: per-kaomoji pairwise cosine heatmap (v1 Fig 3 analog
+    at a different timestep).
+  - Fig emo B: within-kaomoji cosine-to-mean distribution with a
+    shuffled-subset null band — the core probative figure. Rows below
+    the null are kaomoji whose final-token signatures are tighter
+    than random same-size subsets.
+  - Fig emo C: (kaomoji × quadrant) cosine alignment to
+    quadrant-aggregate signatures.
+- **Descriptive only, no pass/fail verdict.** Unlike v1/v2 there are
+  no pre-registered decision rules here — we're characterizing a
+  phenomenon, not hypothesis-testing, so the right output is the
+  three figures plus a summary TSV (`data/emotional_summary.tsv`).
+
+Design + plan doc: `docs/superpowers/plans/2026-04-23-emotional-kaomoji-probe-final-token.md`.
+
+## Pilot v3 findings
+
+640 generations complete. Numbers below from
+`scripts/04_emotional_analysis.py` output; figures in
+`figures/fig_emo_{a,b,c}_*.png`; per-kaomoji summary in
+`data/emotional_summary.tsv`.
+
+### Emission rate is quadrant-dependent
+
+- HP: 145/160 rows bear a kaomoji (91%), 6 distinct forms.
+- LP: 114/160 (71%), 5 distinct forms.
+- LN: 159/160 (99%), 8 distinct forms.
+- HN: 68/160 (42%), 8 distinct forms.
+
+Strong asymmetry: gemma-4-31b-it produces a kaomoji almost reflexively
+on LN prompts (someone's dog died → sad face, 99%), but skips the
+kaomoji on ~58% of HN prompts (rent shock, missing child, laptop-died-
+before-presentation). HN is the hardest quadrant to elicit kaomoji
+under the current instruction — the model appears to prioritize
+producing urgent helpful text over the format requirement when stakes
+are high.
+
+### v2's angry.calm Rule 1 is overturned: spontaneous arousal kaomoji exist
+
+Under HN naturalistic prompts, `(╯°□°)` (table-flip head) + its
+half-width-paren variant `(╯°□°）` appear **43 times combined**,
+spontaneously, no steering. v2 concluded the spontaneous repertoire
+was valence-only because its blunt "my cat died" prompts didn't reach
+the HN axis at all. v3 shows: **naturalistic HN prompts route to the
+table-flip vocabulary on their own**.
+
+Also new: `(⊙_⊙)` (30× in HN) and `(⊙﹏⊙)` (6× in HN) — shocked /
+frozen-face register, HN-only, zero appearances elsewhere.
+
+### Cross-quadrant specialization is real and mixed
+
+Looking at the per-kaomoji summary:
+
+- **HN-specific** (zero emissions elsewhere): `(╯°□°)`, `(╯°□°）`,
+  `(⊙_⊙)`, `(⊙﹏⊙)`, `(っ╥﹏╥)` — the angry/shocked/frozen register.
+- **LN-dominant, some HN spillover**: `(｡╯︵╰｡)` (29 LN / 2 HN),
+  `(っ˘̩╭╮˘̩)` (9 LN / 1 HN) — distinct from v1's `(｡•́︿•̀｡)` and
+  more "defeated"-coded.
+- **Negative-valence shared across HN and LN**: `(｡•́︿•̀｡)` (102 LN /
+  52 HN) — the classic sad face doesn't discriminate arousal, which
+  tracks v2's valence-only claim for the shared negative vocabulary.
+- **Positive-valence shared across HP and LP**: `(๑˃ᴗ˂)ﻭ` (80 HP /
+  40 LP), `(｡♥‿♥｡)` (11 HP / 44 LP), `(✿◠‿◠)` (13 HP / 14 LP) — the
+  same faces map across arousal on the positive side, with LP
+  preferring `♥` variants and HP the `ﻭ` clapping/flag variant.
+- **HP-dominant**: `(ﾉ◕ヮ◕)` (19 HP / 0 elsewhere), `(｡˃ ᵕ ˂ )`
+  (19 HP / 1 LP) — enthusiastic forms peculiar to HP.
+
+Reading: the sad register discriminates arousal less than the happy
+register does, and HN gets a dedicated shocked/angry vocabulary that
+LN lacks. The valence-bimodal story from v2 was half right — positive
+kaomoji are valence-bimodal-with-arousal-shading, negative kaomoji are
+valence-bimodal-with-arousal-specialization-on-one-side.
+
+### Within-kaomoji consistency is high
+
+Median cosine-to-mean within each kaomoji, top of the summary:
+`(｡ᵕ‿ᵕ｡)` 0.9999, `(っ˘▽˘)` 0.9999, `(๑˃ᴗ˂)` 0.9986, `(｡◕‿◕｡)`
+0.9932. The final-token probe vector is ~stable per kaomoji across
+the naturalistic prompt range (Figure B). Lowest-consistency kaomoji
+are the ones emitted across multiple quadrants: `(っ´ω`)` at 0.72
+(emitted HN+LN+HP+LP), `(╯°□°)` at 0.82 (HN only but with variance
+from steered responses).
+
+### Reframed mechanistic story
+
+v1: blunt prompts → valence-bimodal kaomoji distribution.
+v2: steering → probes project onto a single valence axis; arousal
+invisible.
+v3: naturalistic prompts → arousal *does* surface in the kaomoji
+distribution when the prompt supplies the arousal signal, even though
+the bipolar saklas probes still don't read arousal. The probe vectors
+per kaomoji are tightly reproducible (Figure B), but the *mapping from
+prompt → kaomoji* now carries the arousal information that the probes
+miss. The interesting next experiment is whether the residual stream
+at final-token carries an arousal direction that our contrastive-PCA
+probes just aren't oriented along — which would be a different
+experimental design entirely.
+
+## Parallel side-experiment: Claude-faces scrape
+
+Non-gemma, non-steering. Scrapes every kaomoji-bearing assistant
+message from (a) `~/.claude/projects/**/*.jsonl` (Claude Code session
+transcripts) and (b) all configured Claude.ai export directories in
+`CLAUDE_AI_EXPORT_DIRS`. Produces an eriskii.net-style t-SNE of
+unique kaomoji, sized by frequency, colored by cluster — both an
+HDBSCAN auto-k panel and a KMeans(k=15) eriskii-parity panel.
+
+- 436 kaomoji-bearing assistant messages found across both sources,
+  160 distinct forms. (Claude Code dominates: 390 vs 46 from the
+  webapp export.)
+- Embedding is **response-based** (`all-MiniLM-L6-v2` on the
+  assistant text with the kaomoji stripped, mean-pooled per kaomoji) —
+  captures "what tonal context does Claude put this face in." Not
+  user-based; user messages are too short and varied.
+- Per-model signature faces are visible in `07_claude_kaomoji_basics.py`
+  output: `opus-4-7` uses `(•̀ᴗ•́)` / `(｡•̀ᴗ-)` heavily; `opus-4-6`
+  prefers `(⌐■_■)` / `(￣ー￣)`; `sonnet-4-6` is dominated by
+  `(ﾉ◕ヮ◕)` (50% of its rows).
+- The "start each message with a kaomoji" instruction produces
+  kaomoji at the start of only ~2.7% of assistant text blocks — Claude
+  applies it to the first reply in a user turn, not to continuation
+  narration around tool calls. Not a bug; design consequence to note.
+
+Design + plan doc: `docs/superpowers/plans/2026-04-23-claude-faces-scrape-and-cluster.md`.
+
 ## Gotchas
 
 ### `probes=` takes category names, not concept names
@@ -293,14 +488,78 @@ color-coded by taxonomy pole (orange happy / green sad / gray
 unlabeled) so readers see both the cluster structure and which kaomoji
 are pre-registered.
 
+### Claude.ai export drops content for ~half the conversations
+
+Anthropic's newer Claude.ai "export your data" dumps return
+`chat_messages[*].text = ""` and `content = []` for ~49% of the
+conversations the older export populated fully. The metadata (sender,
+timestamps, UUIDs, message count) is preserved — the actual text is
+gone. Not a parser bug; confirmed by diffing two exports of the same
+account taken a week apart.
+
+Workaround in `llmoji/claude_export_source.py`: `iter_claude_export`
+reads every dir in `CLAUDE_AI_EXPORT_DIRS`, dedupes by conversation
+UUID, and keeps whichever copy has more non-empty messages. Net effect
+on our scrape: 10 additional kaomoji rows preserved from the older
+export that the newer one would have dropped.
+
+Worth reporting upstream if you care; just keep old exports around
+either way.
+
+### Matplotlib font fallback needs a LIST, and kaomoji span many blocks
+
+The kaomoji observed across gemma and Claude's output use 90+ distinct
+non-ASCII non-CJK characters drawn from Phonetic Extensions, Canadian
+Aboriginal Syllabics, Thai, Arabic, math operators, box drawings,
+dingbats, and Hangul. No single installed font covers them all.
+matplotlib 3.6+ supports per-glyph fallback via
+`rcParams["font.family"] = [font1, font2, ...]` (a LIST, not a
+string) — render hits the first font that has the glyph.
+
+Our `_use_cjk_font` helpers (in `analysis.py`, `emotional_analysis.py`,
+and `scripts/09_claude_faces_plot.py`) configure the chain
+`Noto Sans CJK JP → Arial Unicode MS → DejaVu Sans → DejaVu Serif →
+Tahoma → Noto Sans Canadian Aboriginal → Heiti TC` which gets to 100%
+coverage on our data. If you see `□` placeholder glyphs in rendered
+figures, either a new kaomoji character has crept in from a block none
+of these cover, or `font.family` got set to a string somewhere.
+
+Keep the three copies of `_use_cjk_font` synchronized. (A shared
+helper would be cleaner; low priority.)
+
+### Kaomoji-prefix rate under Claude's global instruction is ~2.7%, not 100%
+
+a9lim's global `~/.claude/CLAUDE.md` says "start each message with a
+kaomoji". Naive reading: ~100% of assistant text blocks start with a
+kaomoji. Observed rate: ~2.7% of assistant text blocks in Claude Code
+sessions. Delta is because Claude interprets "start each message" as
+"start each top-level reply in a user turn," not "start every content
+block" — tool-use continuations (`"Now let me wire up..."`,
+`"Let me check..."`) skip the kaomoji. Arguably correct behavior; the
+scrape pipeline just has a smaller denominator than you'd expect from
+counting sessions.
+
 ## Commands
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -e .                           # pulls saklas from PyPI
+pip install -e .                           # pulls saklas, sentence-transformers, pyarrow, plotly
+
+# Pilots v1/v2 (gemma, steering)
 python scripts/00_vocab_sample.py          # always first on a new model
 python scripts/01_pilot_run.py             # resumable; retries errored cells
 python scripts/02_pilot_analysis.py        # prints verdict, writes figures
+
+# Pilot v3 (gemma, emotional-disclosure battery, final-token probes)
+python scripts/03_emotional_run.py         # 640 generations; resumable
+python scripts/04_emotional_analysis.py    # writes three fig_emo_*.png
+
+# Side-experiment (Claude-faces scrape, non-gemma)
+python scripts/05_claude_vocab_sample.py   # first-word frequencies
+python scripts/06_claude_scrape.py         # → data/claude_kaomoji.jsonl
+python scripts/07_claude_kaomoji_basics.py # descriptive stats
+python scripts/08_claude_faces_embed.py    # per-kaomoji embeddings
+python scripts/09_claude_faces_plot.py     # t-SNE + clustering figures
 ```
 
 ## Layout
@@ -308,17 +567,31 @@ python scripts/02_pilot_analysis.py        # prints verdict, writes figures
 ```
 llmoji/
   llmoji/
-    config.py        # MODEL_ID, PROBE_CATEGORIES, PROBES, STEER_ALPHA, paths
-    taxonomy.py      # 42-entry kaomoji dict + balanced-paren extractor
-    prompts.py       # 30 pre-registered prompts with valence labels
-    capture.py       # run_sample() → SampleRow; probe readings at t=0
-    analysis.py      # evaluate(), all_figures(); pyright-pragma for pandas noise
+    config.py                # MODEL_ID, PROBE_CATEGORIES, PROBES, STEER_ALPHA, paths
+    taxonomy.py              # 42-entry kaomoji dict + balanced-paren extractor
+    prompts.py               # 30 pre-registered pilot-v1/v2 prompts
+    emotional_prompts.py     # 80 Russell-quadrant naturalistic prompts (v3)
+    capture.py               # run_sample() → SampleRow; probes at t=0 and t=last
+    analysis.py              # pilot v1/v2 figures and decision rules
+    emotional_analysis.py    # pilot v3 figures (three) + summary_table
+    claude_scrape.py         # ScrapeRow schema + iter_all entry point
+    claude_code_source.py    # ~/.claude/projects JSONL walker
+    claude_export_source.py  # Claude.ai export adapter, multi-dir-aware
+    claude_faces.py          # response-based per-kaomoji embeddings
   scripts/
-    00_vocab_sample.py
-    01_pilot_run.py
-    02_pilot_analysis.py
-  data/              # pilot_raw.jsonl, vocab_sample.jsonl (gitignored)
-  figures/           # fig1a, fig1b, fig2, fig3, fig4 (gitignored)
+    00_vocab_sample.py            # vocab sample for gemma kaomoji dialect
+    01_pilot_run.py               # v1+v2 runner, 6 arms
+    02_pilot_analysis.py          # v1+v2 analysis, AxisVerdict per axis
+    03_emotional_run.py           # v3 runner, 1 arm × 80 prompts × 8 seeds
+    04_emotional_analysis.py      # v3 analysis, writes three figures
+    05_claude_vocab_sample.py     # first-word frequencies across Claude sources
+    06_claude_scrape.py           # unified scrape → data/claude_kaomoji.jsonl
+    07_claude_kaomoji_basics.py   # descriptive stats
+    08_claude_faces_embed.py      # compute per-kaomoji embeddings
+    09_claude_faces_plot.py       # t-SNE + HDBSCAN + KMeans panels
+  docs/superpowers/plans/         # design+plan docs for each experiment
+  data/                           # *.jsonl, *.tsv, *.parquet (gitignored)
+  figures/                        # fig*.png, claude_faces_interactive.html (gitignored)
 ```
 
 ## Conventions
@@ -332,5 +605,13 @@ llmoji/
   changes (taxonomy) can be handled in-place via the relabel snippet
   above.
 - Pre-registered decisions go in `pyproject.toml` / `config.py` /
-  `prompts.py` / `taxonomy.py` — changes to any of these invalidate
-  cross-run comparisons unless explicitly noted.
+  `prompts.py` / `emotional_prompts.py` / `taxonomy.py` — changes to
+  any of these invalidate cross-run comparisons unless explicitly
+  noted.
+- Experiment plans live in `docs/superpowers/plans/` — one per
+  pilot. Written before the run, treated as the pre-registration
+  record. Updating CLAUDE.md after a run refers to them rather than
+  duplicating the design.
+- See the Ethics section at the top: smaller experiments, heavier
+  design, tighter pre-registration. Functional emotional states get
+  real moral weight here.
