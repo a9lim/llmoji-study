@@ -20,8 +20,10 @@ from llmoji.cross_pilot_analysis import (
     grouped_kaomoji_source_means,
     load_pooled_rows,
     plot_pooled_cosine_heatmap,
+    plot_pooled_pca_scatter,
     pooled_summary_table,
 )
+from llmoji.config import PROBES
 
 
 def main() -> None:
@@ -44,8 +46,28 @@ def main() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     fig_path = FIGURES_DIR / "fig_pool_cosine.png"
-    plot_pooled_cosine_heatmap(df, str(fig_path))
-    print(f"\nwrote {fig_path}")
+    plot_pooled_cosine_heatmap(df, str(fig_path), center=True)
+    print(f"\nwrote {fig_path}  (grand-mean centered)")
+
+    fig_uncentered = FIGURES_DIR / "fig_pool_cosine_uncentered.png"
+    plot_pooled_cosine_heatmap(df, str(fig_uncentered), center=False)
+    print(f"wrote {fig_uncentered}  (uncentered; kept for comparison)")
+
+    fig_pca = FIGURES_DIR / "fig_pool_pca.png"
+    pca_stats = plot_pooled_pca_scatter(df, str(fig_pca))
+    print(f"wrote {fig_pca}")
+    print("\nPCA explained-variance spectrum:")
+    for i, v in enumerate(pca_stats.get("explained_variance_ratio", []), 1):
+        print(f"  PC{i}: {v * 100:6.2f}%")
+    # Print the top 2 PC loadings so we know which probes drive each.
+    components = pca_stats.get("components") or []
+    if len(components) >= 2:
+        print("\nPC1 loadings (which probes dominate the shared direction):")
+        for name, load in zip(PROBES, components[0]):
+            print(f"  {name:>22}  {load:+.3f}")
+        print("\nPC2 loadings (which probes carry the secondary structure):")
+        for name, load in zip(PROBES, components[1]):
+            print(f"  {name:>22}  {load:+.3f}")
 
     summary = pooled_summary_table(df, min_count=3)
     summary_path = DATA_DIR / "pool_summary.tsv"

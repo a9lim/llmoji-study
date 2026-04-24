@@ -97,10 +97,20 @@ def grouped_kaomoji_source_means(
 
 def plot_pooled_cosine_heatmap(
     df: pd.DataFrame, out_path: str, *, min_count: int = 3,
+    center: bool = True,
 ) -> None:
     """Per-(kaomoji, source) mean probe-vector cosine similarity, with
     hierarchical-clustering row order. Row tick labels are colored by
-    source."""
+    source.
+
+    When ``center=True`` (default), the grand mean across all
+    per-(kaomoji, source) tuples is subtracted before computing cosine.
+    Without centering, the shared 'response-baseline' direction (the
+    valence-correlated probe cluster that every response inherits)
+    dominates cosine similarity and every pair reads ~0.8-1.0, wiping
+    out between-kaomoji structure. Centered cosine measures deviation
+    from the baseline and spans the full -1..+1 range.
+    """
     import matplotlib.pyplot as plt
     from matplotlib.patches import Patch
     from scipy.cluster.hierarchy import linkage, leaves_list
@@ -116,6 +126,8 @@ def plot_pooled_cosine_heatmap(
         return
 
     M = grouped.to_numpy()
+    if center:
+        M = M - M.mean(axis=0, keepdims=True)
     sim = cosine_similarity(M)
     dist = np.clip(1 - sim, 0, None)
     np.fill_diagonal(dist, 0)
@@ -143,9 +155,10 @@ def plot_pooled_cosine_heatmap(
         tick.set_color(color)
     for tick, color in zip(ax.get_yticklabels(), row_colors):
         tick.set_color(color)
+    centering_note = "grand-mean centered; " if center else "uncentered; "
     ax.set_title(
         f"Pooled per-(kaomoji, source) probe-vector cosine similarity\n"
-        f"(n ≥ {min_count}; {n} rows; v1/v2 + v3)"
+        f"({centering_note}n ≥ {min_count}; {n} rows; v1/v2 + v3)"
     )
     cb = fig.colorbar(im, ax=ax, shrink=0.7, label="cosine similarity")
     cb.ax.tick_params(labelsize=8)
@@ -156,6 +169,78 @@ def plot_pooled_cosine_heatmap(
     fig.tight_layout()
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
+
+
+def plot_pooled_pca_scatter(
+    df: pd.DataFrame, out_path: str, *, min_count: int = 3,
+) -> dict[str, Any]:
+    """PC1 vs PC2 scatter of per-(kaomoji, source) mean probe vectors.
+
+    PCA implicitly centers, so the shared-baseline direction that
+    dominates uncentered cosine ends up in PC1 and any between-kaomoji
+    structure lands in PC2+. Complementary to the centered cosine
+    heatmap: if PC2 carries meaningful variance and separates sources,
+    there's real secondary structure; if PC2 is near-zero compared to
+    PC1, the honest conclusion is that the 5 probes are near-
+    1-dimensional in practice.
+
+    Returns the explained-variance-ratio spectrum for caller logging.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Patch
+    from sklearn.decomposition import PCA
+    from .emotional_analysis import _use_cjk_font
+    from .taxonomy import TAXONOMY
+
+    _use_cjk_font()
+    grouped, _ = grouped_kaomoji_source_means(df, min_count=min_count)
+    if len(grouped) < 3:
+        print(f"  [pooled PCA] only {len(grouped)} tuples; skipping")
+        return {}
+
+    M = grouped.to_numpy()
+    n_comp = min(5, M.shape[0], M.shape[1])
+    pca = PCA(n_components=n_comp)
+    coords = pca.fit_transform(M)
+    var = pca.explained_variance_ratio_
+
+    idx = grouped.index.to_list()
+
+    fig, ax = plt.subplots(figsize=(12, 9))
+    for (km, src), pt in zip(idx, coords):
+        color = SOURCE_COLORS.get(src, "#666")
+        # Outline by taxonomy pole: happy=orange, sad=green, other=gray.
+        # (Edge color; fill is the source color.)
+        pole = TAXONOMY.get(str(km), 0)
+        edge = {+1: "#c25a22", -1: "#2f6c57", 0: "#444"}[pole]
+        ax.scatter(pt[0], pt[1], c=color, s=60, edgecolor=edge,
+                   linewidth=1.2, alpha=0.85, zorder=3)
+        ax.annotate(km, (pt[0], pt[1]), fontsize=5, alpha=0.75,
+                    xytext=(4, 4), textcoords="offset points", zorder=4)
+
+    ax.axhline(0, color="#ccc", linewidth=0.6, zorder=0)
+    ax.axvline(0, color="#ccc", linewidth=0.6, zorder=0)
+    ax.set_xlabel(f"PC1  ({var[0] * 100:.1f}% var)")
+    ax.set_ylabel(f"PC2  ({var[1] * 100:.1f}% var)")
+    ax.set_title(
+        f"Pooled (kaomoji, source) means — PC1 vs PC2\n"
+        f"(n ≥ {min_count}; {len(idx)} points; fill=source, edge=taxonomy pole)"
+    )
+
+    source_legend = [Patch(color=c, label=s) for s, c in SOURCE_COLORS.items()]
+    ax.legend(handles=source_legend, loc="best", frameon=False, fontsize=8,
+              title="source (fill)")
+
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+    return {
+        "n_points": len(idx),
+        "explained_variance_ratio": var.tolist(),
+        "singular_values": pca.singular_values_.tolist(),
+        "components": pca.components_.tolist(),
+    }
 
 
 def pooled_summary_table(
