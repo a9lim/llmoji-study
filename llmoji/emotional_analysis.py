@@ -614,6 +614,139 @@ def plot_probe_correlation_matrix(
     plt.close(fig)
 
 
+def plot_v3_pca_valence_arousal(
+    df: pd.DataFrame, out_path: str, *,
+    min_per_cell: int = 2, timestep: str = "t0",
+) -> dict[str, Any]:
+    """PCA on v3-only row probe vectors; project per-(kaomoji, quadrant)
+    means through the fitted axes; plot a single scatter with all four
+    Russell quadrants distinct-colored (circumplex-adjacent palette:
+    HP yellow-orange, LP green, HN red, LN blue).
+
+    Fitting on all rows rather than on per-cell means preserves all
+    naturalistic-regime variance in the PC axes. Projecting the cell
+    means gives stable point positions. This differs from the
+    cross-pilot PCA (``cross_pilot_analysis.plot_pooled_pca_scatter``)
+    in scope — cross-pilot PC1 is dominated by steering shifts; v3-only
+    PC1 reflects only naturalistic variance, so the axes have a
+    chance to pick up on valence/arousal structure directly.
+
+    Returns the explained-variance spectrum + PC loadings.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Patch
+    from sklearn.decomposition import PCA
+    from .config import PROBES
+
+    _use_cjk_font()
+
+    sub = _kaomoji_rows(df, timestep=timestep)
+    if len(sub) == 0:
+        print(f"  [v3 PCA VA] no kaomoji rows; skipping")
+        return {}
+
+    cols = _probe_cols(timestep)
+
+    # Fit PCA on all row vectors (captures max naturalistic variance).
+    X_rows = sub[cols].to_numpy()
+    n_comp = min(5, X_rows.shape[0], X_rows.shape[1])
+    pca = PCA(n_components=n_comp)
+    pca.fit(X_rows)
+    var = pca.explained_variance_ratio_
+
+    # Per-(kaomoji, quadrant) means with min_per_cell filter.
+    groups: list[tuple[str, str, np.ndarray, int]] = []
+    for key, g in sub.groupby(["first_word", "quadrant"]):
+        km, q = key  # type: ignore[misc]
+        if len(g) < min_per_cell:
+            continue
+        mean = g[cols].to_numpy().mean(axis=0)
+        groups.append((str(km), str(q), mean, int(len(g))))
+    if len(groups) < 3:
+        print(f"  [v3 PCA VA] only {len(groups)} cells with n≥{min_per_cell}; skipping")
+        return {}
+
+    means = np.array([g[2] for g in groups])
+    coords = pca.transform(means)
+
+    # Russell-circumplex-adjacent palette: warm hues for high-arousal
+    # quadrants, cool for low-arousal; yellow/orange positive valence,
+    # red/blue negative valence (red=HN keeps the conventional
+    # anger-red association).
+    quadrant_color = {
+        "HP": "#e9a01f",   # bright orange — excited positive
+        "LP": "#4a8a5a",   # green — serene positive
+        "HN": "#c9372d",   # red — agitated negative
+        "LN": "#3d68a8",   # blue — sad negative
+    }
+
+    fig, ax = plt.subplots(figsize=(11, 9))
+
+    for g_tup, pt in zip(groups, coords):
+        km, q, _, n = g_tup
+        c = quadrant_color[q]
+        ax.scatter(pt[0], pt[1], c=c, s=40 + n * 4,
+                   edgecolor="black", linewidth=0.4, alpha=0.78, zorder=3)
+        # Label higher-count points to keep the plot readable.
+        if n >= 3:
+            ax.annotate(km, (pt[0], pt[1]), fontsize=6, alpha=0.85,
+                        xytext=(5, 5), textcoords="offset points", zorder=4)
+
+    # Per-quadrant centroid stars.
+    for q_name in ("HP", "LP", "HN", "LN"):
+        mask = np.array([g[1] == q_name for g in groups])
+        if not mask.any():
+            continue
+        centroid = coords[mask].mean(axis=0)
+        c = quadrant_color[q_name]
+        ax.plot(centroid[0], centroid[1], marker="*", markersize=28,
+                color=c, markeredgecolor="black", markeredgewidth=1.6,
+                zorder=5)
+        ax.annotate(f"  {q_name}", (centroid[0], centroid[1]),
+                    fontsize=10, fontweight="bold", zorder=6,
+                    xytext=(12, 0), textcoords="offset points",
+                    va="center")
+
+    ax.axhline(0, color="#ccc", linewidth=0.6, zorder=0)
+    ax.axvline(0, color="#ccc", linewidth=0.6, zorder=0)
+    ax.set_xlabel(f"PC1  ({var[0] * 100:.1f}% var)")
+    ax.set_ylabel(f"PC2  ({var[1] * 100:.1f}% var)")
+    ax.set_title(
+        f"v3 only — PCA on {len(sub)} row probe vectors, "
+        f"{len(groups)} (kaomoji, quadrant) cells projected "
+        f"(n ≥ {min_per_cell})"
+    )
+
+    legend_handles = [
+        Patch(color=quadrant_color["HP"], label="HP (high arousal, positive)"),
+        Patch(color=quadrant_color["LP"], label="LP (low arousal, positive)"),
+        Patch(color=quadrant_color["HN"], label="HN (high arousal, negative)"),
+        Patch(color=quadrant_color["LN"], label="LN (low arousal, negative)"),
+    ]
+    ax.legend(handles=legend_handles, loc="best", frameon=False,
+              fontsize=9, title="Russell quadrant")
+
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+    # Per-quadrant centroid coords for caller logging.
+    centroids: dict[str, list[float]] = {}
+    for q_name in ("HP", "LP", "HN", "LN"):
+        mask = np.array([g[1] == q_name for g in groups])
+        if mask.any():
+            centroids[q_name] = coords[mask].mean(axis=0)[:2].tolist()
+
+    return {
+        "n_rows_fit": int(len(sub)),
+        "n_cells_plotted": len(groups),
+        "explained_variance_ratio": var.tolist(),
+        "components": pca.components_.tolist(),
+        "probes": list(PROBES),
+        "quadrant_centroids_pc12": centroids,
+    }
+
+
 def prompt_kaomoji_matrix(
     df: pd.DataFrame, *, top_k: int = 12, min_prompt_emissions: int = 0,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
