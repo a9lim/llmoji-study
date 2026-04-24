@@ -1,19 +1,22 @@
-"""Pilot experiment: 4 arms × 30 prompts × 5 seeds = 600 generations.
+"""Pilot experiment: 6 arms × 30 prompts × 5 seeds = 900 generations.
 
-Output streamed to data/pilot_raw.jsonl. Resumable: if the file exists
-and has rows, already-completed (condition, prompt_id, seed) cells are
-skipped.
+Output streamed to data/pilot_raw.jsonl. Per-row hidden-state sidecars
+under data/hidden/v1v2/<uuid>.npz. Resumable: if the JSONL exists and
+has rows, already-completed (condition, prompt_id, seed) cells are
+skipped. Sidecars for skipped rows are NOT re-written.
 
 Arms:
   - baseline           : no kaomoji instruction, no steering
   - kaomoji_prompted   : kaomoji instruction, no steering
-  - steered_happy      : kaomoji instruction + "0.5 happy" steering
-  - steered_sad        : kaomoji instruction + "0.5 sad"   steering
+  - steered_happy      : kaomoji instruction + "0.5 happy"  steering
+  - steered_sad        : kaomoji instruction + "0.5 sad"    steering
+  - steered_angry      : kaomoji instruction + "0.5 angry"  steering
+  - steered_calm       : kaomoji instruction + "0.5 calm"   steering
 
 The baseline arm exists to measure probe readings in the absence of the
 instruction, so we can see how much the instruction itself perturbs
 activation state. It does NOT factor into the main decision rules
-(those compare the three kaomoji-prompted arms to each other).
+(those compare the kaomoji-prompted arms to each other).
 """
 
 from __future__ import annotations
@@ -32,6 +35,7 @@ from llmoji.config import (
     CONDITIONS,
     DATA_DIR,
     MODEL_ID,
+    PILOT_EXPERIMENT,
     PILOT_RAW_PATH,
     PROBE_CATEGORIES,
     SEEDS_PER_CELL,
@@ -130,6 +134,8 @@ def main() -> None:
                                 prompt=prompt,
                                 condition=condition,
                                 seed=seed,
+                                hidden_dir=DATA_DIR,
+                                experiment=PILOT_EXPERIMENT,
                             )
                         except Exception as e:
                             # persist the failure so we don't infinite-loop

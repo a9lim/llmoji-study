@@ -79,11 +79,20 @@ PILOT_RAW_PATH = DATA_DIR / "pilot_raw.jsonl"
 PILOT_FEATURES_PATH = DATA_DIR / "pilot_features.parquet"
 
 # --- emotional-battery experiment (Russell quadrants, final-token probes) ---
-# Single arm: kaomoji-instructed, unsteered. 80 prompts × 8 seeds = 640 cells.
+# Single arm: kaomoji-instructed, unsteered. 100 prompts × 8 seeds = 800 cells
+# as of the NB-quadrant addition (was 80 × 8 = 640 pre-NB).
 EMOTIONAL_CONDITION = "kaomoji_prompted"
 EMOTIONAL_SEEDS_PER_CELL = 8
 EMOTIONAL_DATA_PATH = DATA_DIR / "emotional_raw.jsonl"
 EMOTIONAL_SUMMARY_PATH = DATA_DIR / "emotional_summary.tsv"
+
+# --- Hidden-state sidecar capture (post-refactor) ---
+# Pilot/emotional runners pass hidden_dir=DATA_DIR and experiment=... to
+# run_sample; sidecars land at DATA_DIR/hidden/<experiment>/<uuid>.npz.
+# Experiment name is separate from the data file name so smoke-test
+# captures don't collide with pilot captures.
+PILOT_EXPERIMENT = "v1v2"
+EMOTIONAL_EXPERIMENT = "v3"
 
 # --- claude-faces experiment (scrape + t-SNE cluster plot) ---
 CLAUDE_CODE_PROJECTS_DIR = Path.home() / ".claude" / "projects"

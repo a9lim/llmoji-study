@@ -8,6 +8,11 @@ __pycache__/
 # pilot outputs — committed so findings are readable from the repo,
 # regenerable with the scripts for anyone with the model cached.
 
+# hidden-state sidecars — ~50 MB per generation × ~1500 generations
+# = way too big for git. Regenerable from the pilot/emotional runners
+# with the model cached. Local-only by design.
+data/hidden/
+
 # local envs
 .venv/
 .env

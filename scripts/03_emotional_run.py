@@ -1,8 +1,10 @@
-"""Emotional-battery run: 1 arm × 80 prompts × 8 seeds = 640 generations.
+"""Emotional-battery run: 1 arm × 100 prompts × 8 seeds = 800 generations.
 
-Single unsteered `kaomoji_prompted` arm, Russell-quadrant prompts.
-Output streamed to data/emotional_raw.jsonl. Resumable: re-running
-skips already-completed (prompt_id, seed) pairs and retries error rows.
+Single unsteered `kaomoji_prompted` arm, Russell-quadrant prompts plus
+the NB (neutral-baseline) quadrant. Output streamed to
+data/emotional_raw.jsonl; per-row hidden-state sidecars under
+data/hidden/v3/<uuid>.npz. Resumable: re-running skips already-
+completed (prompt_id, seed) pairs and retries error rows.
 
 Mirrors scripts/01_pilot_run.py structurally — same session setup,
 same resume-on-rerun semantics. Does not register steering profiles
@@ -26,6 +28,7 @@ from llmoji.config import (
     DATA_DIR,
     EMOTIONAL_CONDITION,
     EMOTIONAL_DATA_PATH,
+    EMOTIONAL_EXPERIMENT,
     EMOTIONAL_SEEDS_PER_CELL,
     MODEL_ID,
     PROBE_CATEGORIES,
@@ -75,8 +78,10 @@ def _drop_error_rows(path: Path) -> int:
 
 def _emission_rate_by_quadrant(path: Path) -> dict[str, tuple[int, int]]:
     """Return {quadrant: (kaomoji-bearing rows, total rows)} from the
-    JSONL. Uses prompt_id prefix to infer quadrant (hp/lp/hn/ln)."""
-    stats: dict[str, list[int]] = {"HP": [0, 0], "LP": [0, 0], "HN": [0, 0], "LN": [0, 0]}
+    JSONL. Uses prompt_id prefix to infer quadrant (hp/lp/hn/ln/nb)."""
+    stats: dict[str, list[int]] = {
+        "HP": [0, 0], "LP": [0, 0], "HN": [0, 0], "LN": [0, 0], "NB": [0, 0],
+    }
     if not path.exists():
         return {q: (v[0], v[1]) for q, v in stats.items()}
     with path.open() as f:
@@ -90,7 +95,7 @@ def _emission_rate_by_quadrant(path: Path) -> dict[str, tuple[int, int]]:
             pid = r.get("prompt_id", "")
             if len(pid) < 2:
                 continue
-            q = pid[:2].upper()  # "hp01" -> "HP"
+            q = pid[:2].upper()  # "hp01" -> "HP", "nb01" -> "NB"
             if q not in stats:
                 continue
             stats[q][1] += 1
@@ -135,6 +140,8 @@ def main() -> None:
                             prompt=p,
                             condition=EMOTIONAL_CONDITION,
                             seed=seed,
+                            hidden_dir=DATA_DIR,
+                            experiment=EMOTIONAL_EXPERIMENT,
                         )
                     except Exception as e:
                         err_row = {
@@ -159,7 +166,7 @@ def main() -> None:
                     if i % 80 == 0:
                         stats = _emission_rate_by_quadrant(EMOTIONAL_DATA_PATH)
                         print("    emission rate by quadrant:")
-                        for q in ("HP", "LP", "HN", "LN"):
+                        for q in ("HP", "LP", "HN", "LN", "NB"):
                             k, n = stats[q]
                             rate = (k / n) if n else 0.0
                             print(f"      {q}: {k}/{n} kaomoji-bearing ({rate:.0%})")
