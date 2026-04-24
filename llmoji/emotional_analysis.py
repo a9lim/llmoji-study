@@ -614,14 +614,43 @@ def plot_probe_correlation_matrix(
     plt.close(fig)
 
 
+def load_v1v2_neutral_baseline(path: str) -> pd.DataFrame:
+    """Load v1/v2 kaomoji_prompted rows with neutral-valence prompts —
+    the natural neutral baseline for the v3 PCA. 10 prompts × 5 seeds =
+    50 rows. Explodes probe_scores_t0 into per-probe columns and adds
+    a ``quadrant`` column = 'NB' so the data slots into the same
+    plotting path as v3 rows."""
+    from .config import PROBES
+    df: pd.DataFrame = pd.read_json(path, lines=True)
+    sub = df[
+        (df["condition"] == "kaomoji_prompted")
+        & (df["prompt_valence"] == 0)
+    ].copy()
+    stacked = np.asarray(sub["probe_scores_t0"].tolist(), dtype=float)
+    for i, probe in enumerate(PROBES):
+        sub[f"t0_{probe}"] = stacked[:, i]
+    # pilot_raw has no probe_scores_tlast — mirror t0 so both timesteps
+    # are populated (both are the whole-generation aggregate anyway).
+    for i, probe in enumerate(PROBES):
+        sub[f"tlast_{probe}"] = stacked[:, i]
+    sub["quadrant"] = "NB"
+    return sub
+
+
 def plot_v3_pca_valence_arousal(
     df: pd.DataFrame, out_path: str, *,
     min_per_cell: int = 2, timestep: str = "t0",
+    baseline_df: "pd.DataFrame | None" = None,
 ) -> dict[str, Any]:
-    """PCA on v3-only row probe vectors; project per-(kaomoji, quadrant)
-    means through the fitted axes; plot a single scatter with all four
-    Russell quadrants distinct-colored (circumplex-adjacent palette:
-    HP yellow-orange, LP green, HN red, LN blue).
+    """PCA on v3 row probe vectors (plus optional neutral baseline);
+    project per-(kaomoji, source) means through the fitted axes; plot
+    a single scatter with Russell quadrants distinct-colored and the
+    neutral baseline as a 5th gray category.
+
+    Pass ``baseline_df`` (from ``load_v1v2_neutral_baseline``) to
+    include v1/v2 neutral-valence kaomoji_prompted rows as a comparator.
+    When supplied, PCA is fit on the COMBINED pool so the axes reflect
+    all plotted data.
 
     Fitting on all rows rather than on per-cell means preserves all
     naturalistic-regime variance in the PC axes. Projecting the cell
@@ -640,7 +669,13 @@ def plot_v3_pca_valence_arousal(
 
     _use_cjk_font()
 
-    sub = _kaomoji_rows(df, timestep=timestep)
+    sub_v3 = _kaomoji_rows(df, timestep=timestep)
+    if baseline_df is not None:
+        sub_nb = _kaomoji_rows(baseline_df, timestep=timestep)
+        sub = pd.concat([sub_v3, sub_nb], ignore_index=True)
+    else:
+        sub = sub_v3
+
     if len(sub) == 0:
         print(f"  [v3 PCA VA] no kaomoji rows; skipping")
         return {}
@@ -654,7 +689,8 @@ def plot_v3_pca_valence_arousal(
     pca.fit(X_rows)
     var = pca.explained_variance_ratio_
 
-    # Per-(kaomoji, quadrant) means with min_per_cell filter.
+    # Per-(kaomoji, quadrant) means with min_per_cell filter. 'quadrant'
+    # here takes values HP/LP/HN/LN for v3 rows and 'NB' for baseline.
     groups: list[tuple[str, str, np.ndarray, int]] = []
     for key, g in sub.groupby(["first_word", "quadrant"]):
         km, q = key  # type: ignore[misc]
@@ -672,12 +708,13 @@ def plot_v3_pca_valence_arousal(
     # Russell-circumplex-adjacent palette: warm hues for high-arousal
     # quadrants, cool for low-arousal; yellow/orange positive valence,
     # red/blue negative valence (red=HN keeps the conventional
-    # anger-red association).
+    # anger-red association). NB = neutral baseline in gray.
     quadrant_color = {
         "HP": "#e9a01f",   # bright orange — excited positive
         "LP": "#4a8a5a",   # green — serene positive
         "HN": "#c9372d",   # red — agitated negative
         "LN": "#3d68a8",   # blue — sad negative
+        "NB": "#888888",   # neutral gray — v1/v2 neutral-valence baseline
     }
 
     fig, ax = plt.subplots(figsize=(11, 9))
@@ -693,7 +730,8 @@ def plot_v3_pca_valence_arousal(
                         xytext=(5, 5), textcoords="offset points", zorder=4)
 
     # Per-quadrant centroid stars.
-    for q_name in ("HP", "LP", "HN", "LN"):
+    all_quads = ("HP", "LP", "HN", "LN", "NB")
+    for q_name in all_quads:
         mask = np.array([g[1] == q_name for g in groups])
         if not mask.any():
             continue
@@ -717,12 +755,16 @@ def plot_v3_pca_valence_arousal(
         f"(n ≥ {min_per_cell})"
     )
 
-    legend_handles = [
-        Patch(color=quadrant_color["HP"], label="HP (high arousal, positive)"),
-        Patch(color=quadrant_color["LP"], label="LP (low arousal, positive)"),
-        Patch(color=quadrant_color["HN"], label="HN (high arousal, negative)"),
-        Patch(color=quadrant_color["LN"], label="LN (low arousal, negative)"),
+    legend_labels = [
+        ("HP", "HP (high arousal, positive)"),
+        ("LP", "LP (low arousal, positive)"),
+        ("HN", "HN (high arousal, negative)"),
+        ("LN", "LN (low arousal, negative)"),
     ]
+    if any(g[1] == "NB" for g in groups):
+        legend_labels.append(("NB", "NB (neutral baseline, v1/v2)"))
+    legend_handles = [Patch(color=quadrant_color[k], label=lbl)
+                      for k, lbl in legend_labels]
     ax.legend(handles=legend_handles, loc="best", frameon=False,
               fontsize=9, title="Russell quadrant")
 
@@ -730,12 +772,27 @@ def plot_v3_pca_valence_arousal(
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
 
-    # Per-quadrant centroid coords for caller logging.
+    # Per-quadrant centroid coords + within-quadrant spread (std over
+    # projected PC1/PC2) for caller logging. The ratio of between-
+    # centroid spread to within-quadrant std is the signal-to-noise
+    # the viewer reads from the scatter.
     centroids: dict[str, list[float]] = {}
-    for q_name in ("HP", "LP", "HN", "LN"):
+    within_std: dict[str, list[float]] = {}
+    for q_name in all_quads:
         mask = np.array([g[1] == q_name for g in groups])
-        if mask.any():
-            centroids[q_name] = coords[mask].mean(axis=0)[:2].tolist()
+        if not mask.any():
+            continue
+        sub_coords = coords[mask][:, :2]
+        centroids[q_name] = sub_coords.mean(axis=0).tolist()
+        if mask.sum() > 1:
+            within_std[q_name] = sub_coords.std(axis=0, ddof=0).tolist()
+        else:
+            within_std[q_name] = [0.0, 0.0]
+
+    # Between-centroid stds on PC1 and PC2 across the quadrants we have.
+    centroid_arr = np.array([centroids[q] for q in centroids])
+    between_std_pc1 = float(centroid_arr[:, 0].std(ddof=0))
+    between_std_pc2 = float(centroid_arr[:, 1].std(ddof=0))
 
     return {
         "n_rows_fit": int(len(sub)),
@@ -744,6 +801,9 @@ def plot_v3_pca_valence_arousal(
         "components": pca.components_.tolist(),
         "probes": list(PROBES),
         "quadrant_centroids_pc12": centroids,
+        "within_quadrant_std_pc12": within_std,
+        "between_centroid_std_pc1": between_std_pc1,
+        "between_centroid_std_pc2": between_std_pc2,
     }
 
 
