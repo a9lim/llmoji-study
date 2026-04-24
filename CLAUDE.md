@@ -567,6 +567,68 @@ HDBSCAN auto-k panel and a KMeans(k=15) eriskii-parity panel.
 
 Design + plan doc: `docs/superpowers/plans/2026-04-23-claude-faces-scrape-and-cluster.md`.
 
+## Eriskii-replication on Claude-faces
+
+Description-based reanalysis of `data/claude_kaomoji.jsonl`,
+methodologically parallel to eriskii.net/projects/claude-faces. For
+each kaomoji: sample up to 4 instances (deterministic per-kaomoji
+seed via `INSTANCE_SAMPLE_CAP`/`INSTANCE_SAMPLE_SEED`), mask the
+leading kaomoji with `[FACE]`, prepend `surrounding_user` when
+non-empty, ask Haiku 4-5 to describe what the masked face conveyed.
+Then synthesize all per-instance descriptions per kaomoji into one
+canonical sentence (Stage B). Embed each synthesis with MiniLM,
+project onto 21 anchored semantic axes (Warmth, Energy, Confidence,
+Playfulness, Empathy, Technicality, Positivity, Curiosity, Approval,
+Apologeticness, Decisiveness, Wryness, Wetness, Surprise, Anger,
+Frustration, Hatefulness, Sadness, Hope, Aggression, Exhaustion).
+
+Wetness anchor reads "wet Claude" as emotionally-expressive/lyrical
+("waxing poetic about emotions, lyrical and self-expressive,
+philosophically introspective, emotionally articulate") vs "dry
+Claude" as helpful-assistant register ("helpful assistant tone,
+task-focused, businesslike, practical, matter-of-fact"). Eriskii
+left wetness undefined ("three seashells" joke); ours is a
+deliberate enrichment.
+
+Three breakouts eriskii didn't produce:
+  - per-model and per-project axis breakouts (mean + std,
+    operationalizes eriskii's qualitative "opus-4-6 had wider
+    range" claim — confirmed numerically on our data: opus-4-6
+    mean axis std 0.0667 > opus-4-7 0.0657 > sonnet-4-6 0.0625);
+  - surrounding_user → kaomoji axis correlation as a state-tracking
+    bridge, on the ~73% of rows where the parent-chain walk
+    resolved to a non-empty user message. 2/21 axes survive
+    Bonferroni at α=0.05/21 ≈ 0.00238: surprise (r=+0.199) and
+    curiosity (r=+0.181). Affective axes (warmth, positivity, …)
+    are null — MiniLM on user text picks up topic novelty/
+    unexpectedness, not valence-tracking.
+
+Top-20 frequency overlap with eriskii's published top-20: 16/20.
+Shared most-used kaomoji ((´・ω・`), (・ω・), (・∀・), (◕‿◕), …)
+appear in both corpora despite different users + different Claude
+deployment modes (Claude.ai webapp vs Claude Code).
+
+Pre-registered in
+`docs/superpowers/specs/2026-04-24-eriskii-replication-design.md`
+(anchor pairs, Haiku prompts, model id, mask token, sampling cap+seed).
+Implementation plan:
+`docs/superpowers/plans/2026-04-24-eriskii-replication.md`.
+
+Outputs:
+  - `data/claude_haiku_descriptions.jsonl` — Stage A, per-instance
+  - `data/claude_haiku_synthesized.jsonl` — Stage B, per-kaomoji
+  - `data/claude_faces_embed_description.parquet` — synthesized-
+    description embeddings (coexists with response-based
+    `claude_faces_embed.parquet`)
+  - `data/eriskii_axes.tsv`, `eriskii_clusters.tsv`,
+    `eriskii_per_model.tsv`, `eriskii_per_project.tsv`,
+    `eriskii_user_kaomoji_axis_corr.tsv`,
+    `eriskii_comparison.md`
+  - `figures/eriskii_axis_<name>.png` × 21,
+    `eriskii_clusters_tsne.png`,
+    `eriskii_per_{model,project}_axes_{mean,std}.png`,
+    `eriskii_user_kaomoji_axis_corr.png`
+
 ## Hidden-state refactor
 
 All feature-space analyses now operate on hidden-state vectors from
@@ -951,6 +1013,11 @@ python scripts/07_claude_kaomoji_basics.py # descriptive stats
 python scripts/08_claude_faces_embed.py    # per-kaomoji embeddings
 python scripts/09_claude_faces_plot.py     # t-SNE + clustering figures
 
+# Eriskii-replication (description-based; needs ANTHROPIC_API_KEY)
+python scripts/14_claude_haiku_describe.py             # 2-stage haiku, ~5-10 min, resumable
+python scripts/15_claude_faces_embed_description.py    # synthesized-description embeddings
+python scripts/16_eriskii_replication.py               # axes + clusters + breakouts + writeup
+
 # Cross-pilot + v3-specific feature-space analyses
 # (read JSONL metadata + sidecar hidden states)
 python scripts/10_cross_pilot_clustering.py        # pooled hidden-state cosine + PCA
@@ -982,6 +1049,8 @@ llmoji/
     claude_code_source.py    # ~/.claude/projects JSONL walker
     claude_export_source.py  # Claude.ai export adapter, multi-dir-aware
     claude_faces.py          # response-based per-kaomoji embeddings
+    eriskii_prompts.py       # locked Haiku prompts + 21-axis anchor pairs
+    eriskii.py               # axis projection + masking + haiku call primitives
   scripts/
     00_vocab_sample.py            # vocab sample for gemma kaomoji dialect
     01_pilot_run.py               # v1+v2 runner, 6 arms, writes hidden-state sidecars
@@ -997,6 +1066,9 @@ llmoji/
     11_emotional_probe_correlations.py  # v3 probe-collapse test (still probe-based)
     12_emotional_prompt_matrix.py       # v3 prompt × kaomoji emission matrix
     13_emotional_pca_valence_arousal.py # v3 hidden-state PCA + NB baseline
+    14_claude_haiku_describe.py         # 2-stage haiku descriptions per kaomoji
+    15_claude_faces_embed_description.py # synthesized-description embeddings
+    16_eriskii_replication.py           # axes + clusters + breakouts + writeup
     99_hidden_state_smoke.py      # smoke test for the capture pipeline
   docs/superpowers/plans/         # design+plan docs for each experiment
   data/                           # *.jsonl, *.tsv, *.parquet, *.json (tracked)
