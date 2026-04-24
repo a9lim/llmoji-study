@@ -291,6 +291,43 @@ def section_per_project(rows: pd.DataFrame, axes_df: pd.DataFrame) -> pd.DataFra
     return df
 
 
+def section_bridge(rows: pd.DataFrame, axes_df: pd.DataFrame) -> pd.DataFrame:
+    import matplotlib.pyplot as plt
+    from sentence_transformers import SentenceTransformer
+
+    from llmoji.config import ERISKII_USER_KAOMOJI_CORR_TSV
+    from llmoji.eriskii import user_kaomoji_axis_correlation
+
+    embedder = SentenceTransformer(EMBED_MODEL)
+    df = user_kaomoji_axis_correlation(
+        rows, axes_df,
+        embedder=embedder, axis_anchors=AXIS_ANCHORS, axis_order=ERISKII_AXES,
+    )
+    df.to_csv(ERISKII_USER_KAOMOJI_CORR_TSV, sep="\t", index=False)
+    print(f"wrote {ERISKII_USER_KAOMOJI_CORR_TSV}")
+
+    if df.empty:
+        print("  no rows with surrounding_user; skipping figure")
+        return df
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+    df_sorted = df.sort_values("r", ascending=True)
+    ax.barh(df_sorted["axis"], df_sorted["r"],
+            color=["#444" if pb < 0.05 else "#bbb"
+                   for pb in df_sorted["p_bonf"]])
+    ax.axvline(0, color="black", linewidth=0.5)
+    ax.set_xlabel("Pearson r (user-text axis projection × kaomoji axis projection)")
+    n_used = int(df["n"].iloc[0]) if len(df) else 0
+    ax.set_title(f"surrounding_user → kaomoji axis correlation\n"
+                 f"n={n_used}; dark bars: p_bonf < 0.05 (Bonferroni across 21 axes)")
+    fig.tight_layout()
+    out = FIGURES_DIR / "eriskii_user_kaomoji_axis_corr.png"
+    fig.savefig(out, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"wrote {out}")
+    return df
+
+
 def main() -> None:
     if not CLAUDE_FACES_EMBED_DESCRIPTION_PATH.exists():
         print(f"no embeddings at {CLAUDE_FACES_EMBED_DESCRIPTION_PATH}; "
@@ -334,6 +371,9 @@ def main() -> None:
     section_per_model(rows, df_axes)
     print("\n=== Section: per-project ===")
     section_per_project(rows, df_axes)
+
+    print("\n=== Section: mechanistic bridge ===")
+    section_bridge(rows, df_axes)
 
 
 if __name__ == "__main__":

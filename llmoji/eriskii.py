@@ -177,3 +177,59 @@ def weighted_group_axis_stats(
                 "n":    int(len(vals)),
             })
     return pd.DataFrame(out_rows)
+
+
+def user_kaomoji_axis_correlation(
+    rows: "pd.DataFrame",
+    axes_df: "pd.DataFrame",
+    *,
+    embedder: Any,
+    axis_anchors: dict[str, tuple[str, str]],
+    axis_order: list[str],
+) -> "pd.DataFrame":
+    """For rows with non-empty surrounding_user, correlate
+    user-text axis-projection with kaomoji axis-projection.
+
+    Embeds each surrounding_user with `embedder`, projects onto
+    the same 21 axes the kaomoji embeddings were projected onto,
+    then for each axis computes Pearson r between user-text and
+    kaomoji axis scores. p-values are Bonferroni-corrected across
+    all axes (`p_bonf = min(1, p * len(axis_order))`).
+
+    Returns long-form DataFrame [axis, r, p, p_bonf, n].
+    """
+    from scipy.stats import pearsonr
+
+    sub = rows.copy()
+    sub["surrounding_user"] = sub["surrounding_user"].fillna("")
+    sub = sub[sub["surrounding_user"].str.strip() != ""]
+    sub = sub.merge(
+        axes_df.set_index("first_word")[axis_order],
+        left_on="first_word", right_index=True, how="inner",
+        suffixes=("", "_kao"),
+    )
+    if len(sub) == 0:
+        return pd.DataFrame(columns=["axis", "r", "p", "p_bonf", "n"])
+
+    print(f"  embedding {len(sub)} user messages...")
+    user_emb = embedder.encode(
+        sub["surrounding_user"].tolist(),
+        normalize_embeddings=True,
+        show_progress_bar=True,
+    )
+    user_emb = np.asarray(user_emb)
+
+    axis_vecs = compute_axis_vectors(embedder, axis_anchors)
+    A = np.stack([axis_vecs[name] for name in axis_order], axis=1)
+    user_proj = user_emb @ A  # (n_rows, n_axes)
+
+    out = []
+    n_axes = len(axis_order)
+    for j, name in enumerate(axis_order):
+        u = user_proj[:, j]
+        k = sub[name].to_numpy(dtype=float)
+        r, p = pearsonr(u, k)
+        p_bonf = float(min(1.0, p * n_axes))
+        out.append({"axis": name, "r": float(r), "p": float(p),
+                    "p_bonf": p_bonf, "n": int(len(u))})
+    return pd.DataFrame(out)
