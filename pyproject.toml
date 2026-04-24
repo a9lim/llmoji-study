@@ -12,6 +12,7 @@ dependencies = [
     "pandas",
     "sentence-transformers",
     "pyarrow",
+    "plotly",
 ]
 
 [build-system]
