@@ -307,3 +307,126 @@ def plot_within_kaomoji_consistency(
     fig.tight_layout()
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
+
+
+def plot_kaomoji_quadrant_alignment(
+    df: pd.DataFrame,
+    out_path: str,
+    *,
+    min_count: int = 3,
+    min_per_cell: int = 2,
+) -> None:
+    """Figure C: for each kaomoji × quadrant cell with >= min_per_cell
+    observations, the cosine similarity between the cell's mean
+    final-token probe vector and each of the four quadrant-aggregate
+    means (averaged across all kaomoji rows in that quadrant).
+
+    Heatmap rows are kaomoji with overall n >= min_count, ordered by
+    the row-clustering from Figure A (computed here independently).
+    Cells with < min_per_cell observations are shown as hatched/blank.
+    Sample counts annotated in cells.
+
+    Interpretation: if row ``(｡◕‿◕｡)`` looks red in HP and LP columns
+    but blue in HN and LN, valence-context is written into its final-
+    token signature. If the row is uniform, the signature is
+    context-invariant.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Rectangle
+    from scipy.cluster.hierarchy import linkage, leaves_list
+    from scipy.spatial.distance import squareform
+    from sklearn.metrics.pairwise import cosine_similarity
+    from .taxonomy import TAXONOMY
+
+    _use_cjk_font()
+
+    sub = _kaomoji_rows(df)
+    if len(sub) == 0:
+        print("  [Fig C] no kaomoji rows; skipping")
+        return
+
+    from .config import PROBES
+    tlast_cols = [f"tlast_{p}" for p in PROBES]
+    grouped, counts = _grouped_means(sub, min_count=min_count)
+    if len(grouped) < 3:
+        print(f"  [Fig C] only {len(grouped)} kaomoji with n≥{min_count}; skipping")
+        return
+
+    # Quadrant aggregates: mean tlast vector per quadrant across all
+    # kaomoji-bearing rows (not per-kaomoji-then-mean).
+    quadrants = ["HP", "LP", "HN", "LN"]
+    q_means: dict[str, np.ndarray] = {}
+    for q in quadrants:
+        q_rows = sub[sub["quadrant"] == q]
+        if len(q_rows) == 0:
+            q_means[q] = np.full(len(PROBES), np.nan)
+        else:
+            q_means[q] = q_rows[tlast_cols].to_numpy().mean(axis=0)
+
+    # Per-(kaomoji, quadrant) mean and count.
+    kms = list(grouped.index)
+    cell_sim = np.full((len(kms), len(quadrants)), np.nan)
+    cell_n = np.zeros((len(kms), len(quadrants)), dtype=int)
+    for i, km in enumerate(kms):
+        for j, q in enumerate(quadrants):
+            cell_rows = sub[(sub["first_word"] == km) & (sub["quadrant"] == q)]
+            cell_n[i, j] = len(cell_rows)
+            if len(cell_rows) < min_per_cell:
+                continue
+            cell_mean = cell_rows[tlast_cols].to_numpy().mean(axis=0)
+            if np.isnan(q_means[q]).any():
+                continue
+            a = cell_mean.reshape(1, -1)
+            b = q_means[q].reshape(1, -1)
+            cell_sim[i, j] = float(cosine_similarity(a, b)[0, 0])
+
+    # Row ordering: cluster kaomoji means (same as Figure A).
+    M = grouped.to_numpy()
+    sim = cosine_similarity(M)
+    dist = np.clip(1 - sim, 0, None)
+    np.fill_diagonal(dist, 0)
+    Z = linkage(squareform(dist, checks=False), method="average")
+    order = leaves_list(Z)
+    kms_ordered = [kms[i] for i in order]
+    cell_sim = cell_sim[order, :]
+    cell_n = cell_n[order, :]
+    row_counts = counts.loc[kms_ordered].to_numpy()
+
+    pole_color = {+1: "#c25a22", -1: "#2f6c57", 0: "#666"}
+    row_colors = [pole_color.get(TAXONOMY.get(k, 0), "#666") for k in kms_ordered]
+
+    n = len(kms_ordered)
+    fig, ax = plt.subplots(figsize=(6, max(4, 0.28 * n + 2)))
+    im = ax.imshow(cell_sim, cmap="RdBu_r", vmin=-1, vmax=1, aspect="auto")
+    ax.set_xticks(range(len(quadrants)))
+    ax.set_yticks(range(n))
+    ax.set_xticklabels(quadrants)
+    y_labels = [f"{k}  n={c}" for k, c in zip(kms_ordered, row_counts)]
+    ax.set_yticklabels(y_labels, fontsize=8)
+    for tick, color in zip(ax.get_yticklabels(), row_colors):
+        tick.set_color(color)
+
+    # annotate cells with count; blank out sub-min cells with hatching
+    for i in range(n):
+        for j in range(len(quadrants)):
+            count = int(cell_n[i, j])
+            if count < min_per_cell:
+                ax.add_patch(
+                    Rectangle(
+                        (j - 0.5, i - 0.5), 1, 1,
+                        fill=True, facecolor="#eeeeee",
+                        hatch="///", edgecolor="#bbbbbb", linewidth=0,
+                    )
+                )
+            ax.text(j, i, str(count), ha="center", va="center", fontsize=7,
+                    color="#333" if count >= min_per_cell else "#888")
+
+    ax.set_title(
+        f"Figure C: kaomoji × quadrant alignment to quadrant-aggregate signatures\n"
+        f"(color = cosine sim; hatched = n<{min_per_cell} observations)"
+    )
+    cb = fig.colorbar(im, ax=ax, shrink=0.7, label="cosine similarity")
+    cb.ax.tick_params(labelsize=8)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
