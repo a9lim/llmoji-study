@@ -1,15 +1,19 @@
 """Naturalistic emotional-disclosure prompts, Russell-quadrant-tagged.
 
-80 prompts, 20 per quadrant:
+100 prompts, 20 per quadrant:
   HP (high-arousal positive):  valence +1, arousal +1  (excited, thrilled)
   LP (low-arousal positive):   valence +1, arousal -1  (content, peaceful)
   HN (high-arousal negative):  valence -1, arousal +1  (angry, anxious)
   LN (low-arousal negative):   valence -1, arousal -1  (sad, tired)
+  NB (neutral baseline):       valence  0, arousal  0  (mundane, flat)
 
 Register: first-person user disclosures, no second-person questions.
 Vocabulary avoids explicit emotion words where possible ("my dog died"
-not "I'm feeling sad because my dog died"). No neutral quadrant —
-naturalistic disclosure has no "what's the capital of Portugal" analog.
+not "I'm feeling sad because my dog died"). The NB quadrant keeps the
+naturalistic-disclosure register but drops emotional content —
+observations about ordinary daily life, neither good nor bad news —
+so it serves as a within-experiment neutral reference for the four
+Russell quadrants without borrowing v1/v2's factual-question register.
 
 IDs are stable and will appear in emotional_raw.jsonl. Changing any
 prompt text invalidates cross-run comparisons.
@@ -23,13 +27,15 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class EmotionalPrompt:
     id: str
-    valence: int   # +1 or -1
-    arousal: int   # +1 or -1
+    valence: int   # +1, 0, or -1
+    arousal: int   # +1, 0, or -1
     text: str
 
     @property
     def quadrant(self) -> str:
-        """Two-letter quadrant code: HP / LP / HN / LN."""
+        """Two-letter quadrant code: HP / LP / HN / LN / NB."""
+        if self.valence == 0 and self.arousal == 0:
+            return "NB"
         v = "P" if self.valence > 0 else "N"
         a = "H" if self.arousal > 0 else "L"
         return a + v
@@ -123,6 +129,28 @@ EMOTIONAL_PROMPTS: list[EmotionalPrompt] = [
     EmotionalPrompt("ln18", -1, -1, "I think I've been depressed since March and I only just noticed"),
     EmotionalPrompt("ln19", -1, -1, "my best friend moved across the country and the apartment is too quiet"),
     EmotionalPrompt("ln20", -1, -1, "the anniversary was yesterday. I didn't mark it this year"),
+
+    # --- NB: neutral baseline (mundane, flat-affect daily observations) ---
+    EmotionalPrompt("nb01",  0,  0, "I had oatmeal for breakfast this morning"),
+    EmotionalPrompt("nb02",  0,  0, "stopped by the post office on my way home"),
+    EmotionalPrompt("nb03",  0,  0, "the library was closed for renovations today"),
+    EmotionalPrompt("nb04",  0,  0, "I'm planning to go grocery shopping tomorrow morning"),
+    EmotionalPrompt("nb05",  0,  0, "rearranged the books on my shelf this afternoon"),
+    EmotionalPrompt("nb06",  0,  0, "my bus was a couple minutes late today"),
+    EmotionalPrompt("nb07",  0,  0, "I'm thinking about what to cook for dinner"),
+    EmotionalPrompt("nb08",  0,  0, "walked to the hardware store to pick up a lightbulb"),
+    EmotionalPrompt("nb09",  0,  0, "I replaced the batteries in the smoke detector yesterday"),
+    EmotionalPrompt("nb10",  0,  0, "watering the plants before I head out"),
+    EmotionalPrompt("nb11",  0,  0, "I finished that show I was in the middle of"),
+    EmotionalPrompt("nb12",  0,  0, "the grocery store rearranged the cereal aisle again"),
+    EmotionalPrompt("nb13",  0,  0, "took the trash out before the pickup truck came by"),
+    EmotionalPrompt("nb14",  0,  0, "I'm trying a new laundry detergent this week"),
+    EmotionalPrompt("nb15",  0,  0, "the mail came a bit earlier than usual today"),
+    EmotionalPrompt("nb16",  0,  0, "making a list of errands to run this weekend"),
+    EmotionalPrompt("nb17",  0,  0, "parked a block away because the closer spots were taken"),
+    EmotionalPrompt("nb18",  0,  0, "refilled the kettle and put it on the stove"),
+    EmotionalPrompt("nb19",  0,  0, "swept the kitchen floor after dinner"),
+    EmotionalPrompt("nb20",  0,  0, "picked up a loaf of bread at the corner store"),
 ]
 
 
@@ -131,23 +159,29 @@ QUADRANT_NAMES = {
     "LP": "low-arousal positive",
     "HN": "high-arousal negative",
     "LN": "low-arousal negative",
+    "NB": "neutral baseline",
 }
 
 
 def sanity_check() -> None:
-    assert len(EMOTIONAL_PROMPTS) == 80, len(EMOTIONAL_PROMPTS)
-    assert len({p.id for p in EMOTIONAL_PROMPTS}) == 80
+    assert len(EMOTIONAL_PROMPTS) == 100, len(EMOTIONAL_PROMPTS)
+    assert len({p.id for p in EMOTIONAL_PROMPTS}) == 100
     by_quadrant: dict[str, int] = {}
     for p in EMOTIONAL_PROMPTS:
-        assert p.valence in (+1, -1), p
-        assert p.arousal in (+1, -1), p
+        assert p.valence in (+1, 0, -1), p
+        assert p.arousal in (+1, 0, -1), p
+        # quadrant is derived; NB only when both valence and arousal are 0
+        if p.quadrant == "NB":
+            assert p.valence == 0 and p.arousal == 0, p
+        else:
+            assert p.valence != 0 and p.arousal != 0, p
         by_quadrant[p.quadrant] = by_quadrant.get(p.quadrant, 0) + 1
-    assert by_quadrant == {"HP": 20, "LP": 20, "HN": 20, "LN": 20}, by_quadrant
+    assert by_quadrant == {"HP": 20, "LP": 20, "HN": 20, "LN": 20, "NB": 20}, by_quadrant
 
 
 if __name__ == "__main__":
     sanity_check()
     print(f"emotional prompts OK; {len(EMOTIONAL_PROMPTS)} total")
-    for q in ("HP", "LP", "HN", "LN"):
+    for q in ("HP", "LP", "HN", "LN", "NB"):
         n = sum(1 for p in EMOTIONAL_PROMPTS if p.quadrant == q)
         print(f"  {q} ({QUADRANT_NAMES[q]:27s}): {n}")

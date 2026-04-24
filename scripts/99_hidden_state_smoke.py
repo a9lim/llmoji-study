@@ -42,14 +42,14 @@ PROBE_SCORE_TOL = 5e-3  # fp32 probe agreement tolerance
 
 
 def _pick_smoke_prompts():
-    """Pick one prompt per quadrant from EMOTIONAL_PROMPTS + a fake
-    neutral. Keeping smoke small — five generations, not 640."""
-    by_quad: dict[str, list] = {"HP": [], "LP": [], "HN": [], "LN": []}
+    """Pick one prompt per quadrant from EMOTIONAL_PROMPTS — HP, LP,
+    HN, LN, plus NB. Keeping smoke small: 5 generations, not 1000."""
+    by_quad: dict[str, list] = {"HP": [], "LP": [], "HN": [], "LN": [], "NB": []}
     for p in EMOTIONAL_PROMPTS:
         q = p.id[:2].upper()
         if q in by_quad and not by_quad[q]:
             by_quad[q].append(p)
-    return [by_quad["HP"][0], by_quad["LP"][0], by_quad["HN"][0], by_quad["LN"][0]]
+    return [by_quad[q][0] for q in ("HP", "LP", "HN", "LN", "NB")]
 
 
 def main() -> None:
