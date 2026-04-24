@@ -11,6 +11,7 @@ dependencies = [
     "matplotlib",
     "pandas",
     "sentence-transformers",
+    "pyarrow",
 ]
 
 [build-system]
