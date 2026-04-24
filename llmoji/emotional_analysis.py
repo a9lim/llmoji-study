@@ -168,3 +168,142 @@ def plot_kaomoji_cosine_heatmap(
     fig.tight_layout()
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
+
+
+def _cosine_to_mean(vectors: np.ndarray) -> np.ndarray:
+    """For each row in `vectors`, its cosine similarity to the mean
+    across rows. Handles zero-norm edge case by returning zeros there."""
+    if len(vectors) == 0:
+        return np.zeros(0)
+    mean = vectors.mean(axis=0, keepdims=True)
+    mean_norm = np.linalg.norm(mean, axis=1)
+    row_norms = np.linalg.norm(vectors, axis=1)
+    denom = row_norms * mean_norm
+    dots = (vectors * mean).sum(axis=1)
+    out = np.divide(dots, denom, out=np.zeros_like(dots, dtype=float), where=denom > 0)
+    return out
+
+
+def plot_within_kaomoji_consistency(
+    df: pd.DataFrame,
+    out_path: str,
+    *,
+    min_count: int = 3,
+    null_iters: int = 500,
+    null_seed: int = 0,
+) -> None:
+    """Figure B: for each kaomoji with n >= min_count, the distribution
+    of cosine(row_vector, kaomoji_mean_vector) across its occurrences.
+    Plotted as a horizontal strip chart with per-kaomoji median markers,
+    ordered by median (top = tightest). A shaded band behind the strip
+    shows the median ± IQR of null subsets (random same-size samples
+    from the full kaomoji-bearing pool), interpolated over the
+    observed-counts range.
+
+    Interpretation: rows below the null band are real within-kaomoji
+    signatures; rows inside the band are indistinguishable from random
+    and don't support the 'kaomoji tracks state' hypothesis.
+    """
+    import matplotlib.pyplot as plt
+    from .taxonomy import TAXONOMY
+
+    _use_cjk_font()
+
+    sub = _kaomoji_rows(df)
+    if len(sub) == 0:
+        print("  [Fig B] no kaomoji rows; skipping")
+        return
+
+    from .config import PROBES
+    tlast_cols = [f"tlast_{p}" for p in PROBES]
+    pool = sub[tlast_cols].to_numpy()  # all kaomoji-bearing rows
+
+    per_kaomoji: list[tuple[str, np.ndarray, int]] = []
+    for km, group in sub.groupby("first_word"):
+        if len(group) < min_count:
+            continue
+        vecs = group[tlast_cols].to_numpy()
+        sims = _cosine_to_mean(vecs)
+        per_kaomoji.append((str(km), sims, len(group)))
+    if len(per_kaomoji) < 3:
+        print(f"  [Fig B] only {len(per_kaomoji)} kaomoji with n≥{min_count}; skipping")
+        return
+
+    # sort by median consistency, descending (tightest on top when
+    # plotted bottom-to-top later)
+    per_kaomoji.sort(key=lambda t: float(np.median(t[1])), reverse=False)
+
+    # Null band: for each distinct group size present in the data,
+    # draw `null_iters` random subsets of that size from the full pool
+    # and compute each subset's cosine-to-its-own-mean distribution.
+    rng = np.random.default_rng(null_seed)
+    sizes = sorted({t[2] for t in per_kaomoji})
+    null_median: dict[int, float] = {}
+    null_q25: dict[int, float] = {}
+    null_q75: dict[int, float] = {}
+    N = len(pool)
+    for size in sizes:
+        medians = np.empty(null_iters)
+        for j in range(null_iters):
+            idx = rng.choice(N, size=size, replace=False)
+            sims = _cosine_to_mean(pool[idx])
+            medians[j] = float(np.median(sims))
+        null_median[size] = float(np.median(medians))
+        null_q25[size] = float(np.quantile(medians, 0.25))
+        null_q75[size] = float(np.quantile(medians, 0.75))
+
+    pole_color = {+1: "#c25a22", -1: "#2f6c57", 0: "#666"}
+
+    n = len(per_kaomoji)
+    fig, ax = plt.subplots(figsize=(8, max(4, 0.28 * n + 2)))
+
+    # draw null band as per-row shaded spans (each row's null is sized
+    # to that row's n, so the band is stepped rather than continuous)
+    for y, (km, _sims, size) in enumerate(per_kaomoji):
+        ax.fill_betweenx(
+            [y - 0.4, y + 0.4],
+            null_q25[size], null_q75[size],
+            color="#cccccc", alpha=0.6, linewidth=0,
+        )
+        ax.plot(
+            [null_median[size], null_median[size]],
+            [y - 0.4, y + 0.4],
+            color="#888888", linewidth=1,
+        )
+
+    # scatter observed per-row cosines + median tick per row
+    for y, (km, sims, _size) in enumerate(per_kaomoji):
+        color = pole_color.get(TAXONOMY.get(km, 0), "#666")
+        jitter = (rng.random(len(sims)) - 0.5) * 0.3
+        ax.scatter(sims, np.full(len(sims), y) + jitter, s=14, color=color, alpha=0.7)
+        ax.plot(
+            [float(np.median(sims))] * 2,
+            [y - 0.4, y + 0.4],
+            color=color, linewidth=2,
+        )
+
+    y_labels = [f"{km}  n={size}" for km, _, size in per_kaomoji]
+    ax.set_yticks(range(n))
+    ax.set_yticklabels(y_labels, fontsize=8)
+    for tick, (km, _, _) in zip(ax.get_yticklabels(), per_kaomoji):
+        tick.set_color(pole_color.get(TAXONOMY.get(km, 0), "#666"))
+    ax.set_xlabel("cosine(row, kaomoji mean)")
+    ax.set_xlim(-0.1, 1.05)
+    ax.axvline(0, color="#dddddd", linewidth=0.8, zorder=0)
+    ax.set_title(
+        f"Figure B: within-kaomoji final-token consistency vs shuffled null\n"
+        f"(n ≥ {min_count}; null = {null_iters} random same-size subsets)"
+    )
+
+    from matplotlib.patches import Patch
+    legend_handles = [
+        Patch(color=pole_color[+1], label="taxonomy: happy"),
+        Patch(color=pole_color[-1], label="taxonomy: sad"),
+        Patch(color=pole_color[0], label="other / unlabeled"),
+        Patch(color="#cccccc", label="null band (IQR)"),
+    ]
+    ax.legend(handles=legend_handles, loc="lower left", frameon=False, fontsize=8)
+
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
