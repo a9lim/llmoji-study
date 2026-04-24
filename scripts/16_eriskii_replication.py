@@ -99,6 +99,113 @@ def section_axes(
     return df
 
 
+def section_clusters(
+    fw: list[str],
+    n: np.ndarray,
+    E: np.ndarray,
+    descriptions_by_fw: dict[str, str],
+) -> pd.DataFrame:
+    """t-SNE + KMeans(k=15) + Haiku per-cluster labels.
+
+    `descriptions_by_fw` maps first_word → synthesized one-sentence
+    description (the Stage-B output of script 14)."""
+    import os
+    import anthropic
+    import matplotlib.pyplot as plt
+    from sklearn.cluster import KMeans
+    from sklearn.manifold import TSNE
+
+    from llmoji.config import (
+        ERISKII_CLUSTERS_TSV, HAIKU_MODEL_ID,
+    )
+    from llmoji.eriskii import label_cluster_via_haiku
+    from llmoji.eriskii_prompts import CLUSTER_LABEL_PROMPT
+
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        print("ERROR: set ANTHROPIC_API_KEY in the environment first")
+        sys.exit(1)
+
+    print("computing t-SNE...")
+    perp = max(5, min(30, (len(fw) - 1) // 4))
+    xy = TSNE(
+        n_components=2, metric="cosine", perplexity=perp,
+        init="pca", learning_rate="auto", random_state=0,
+    ).fit_transform(E)
+
+    print("computing KMeans(k=15)...")
+    k = min(15, len(fw))
+    km = KMeans(n_clusters=k, n_init=20, random_state=0)
+    clusters = km.fit_predict(E)
+
+    print("requesting cluster labels from Haiku...")
+    client = anthropic.Anthropic()
+    cluster_labels: dict[int, str] = {}
+    cluster_rows = []
+    for c in sorted(set(int(x) for x in clusters)):
+        member_idx = [i for i, ci in enumerate(clusters) if int(ci) == c]
+        members: list[tuple[str, str]] = [
+            (fw[i], descriptions_by_fw.get(fw[i], "")) for i in member_idx
+        ]
+        try:
+            label = label_cluster_via_haiku(
+                client, members,
+                model_id=HAIKU_MODEL_ID,
+                prompt_template=CLUSTER_LABEL_PROMPT,
+            )
+        except Exception as e:
+            print(f"  cluster {c}: Haiku error {e}; using placeholder")
+            label = f"cluster-{c}"
+        cluster_labels[c] = label
+        members_str = ", ".join(fw[i] for i in member_idx)
+        cluster_rows.append({
+            "cluster_id": c,
+            "label": label,
+            "n": len(member_idx),
+            "members": members_str,
+        })
+        print(f"  cluster {c} (n={len(member_idx)}): {label}")
+
+    df_clusters = pd.DataFrame(cluster_rows)
+    df_clusters.to_csv(ERISKII_CLUSTERS_TSV, sep="\t", index=False)
+    print(f"wrote {ERISKII_CLUSTERS_TSV}")
+
+    # labeled t-SNE figure
+    palette = plt.cm.tab20.colors + plt.cm.tab20b.colors
+    fig, ax = plt.subplots(figsize=(14, 10))
+    sizes = np.clip(15 + 60 * np.log1p(n), 15, 250)
+    colors = [palette[int(c) % len(palette)] for c in clusters]
+    ax.scatter(xy[:, 0], xy[:, 1], c=colors, s=sizes, alpha=0.85,
+               edgecolor="white", linewidth=0.4)
+
+    # annotate top-30 most frequent kaomoji
+    top_idx = np.argsort(-n)[:30]
+    for i in top_idx:
+        ax.annotate(fw[i], xy=(xy[i, 0], xy[i, 1]),
+                    xytext=(4, 4), textcoords="offset points",
+                    fontsize=10, color="#222")
+
+    # cluster name at each cluster centroid
+    for c in sorted(cluster_labels):
+        mask = clusters == c
+        cx = float(xy[mask, 0].mean())
+        cy = float(xy[mask, 1].mean())
+        ax.text(cx, cy, cluster_labels[c],
+                fontsize=10, fontweight="bold", color="#111",
+                ha="center", va="center",
+                bbox=dict(boxstyle="round,pad=0.25", facecolor="white",
+                          edgecolor=palette[c % len(palette)], alpha=0.9))
+
+    ax.set_title(f"Eriskii-replication t-SNE + KMeans(k={k}), Haiku-labeled clusters")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    fig.tight_layout()
+    out = FIGURES_DIR / "eriskii_clusters_tsne.png"
+    fig.savefig(out, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"wrote {out}")
+    return df_clusters
+
+
 def main() -> None:
     if not CLAUDE_FACES_EMBED_DESCRIPTION_PATH.exists():
         print(f"no embeddings at {CLAUDE_FACES_EMBED_DESCRIPTION_PATH}; "
@@ -119,7 +226,23 @@ def main() -> None:
     P = project_onto_axes(E, axes, ERISKII_AXES)
 
     print("\n=== Section: axes ===")
-    section_axes(fw, n, P)
+    df_axes = section_axes(fw, n, P)
+
+    print("\n=== Section: clusters ===")
+    # synthesized descriptions: one canonical string per kaomoji
+    import json
+    from llmoji.config import CLAUDE_HAIKU_SYNTHESIZED_PATH
+    descriptions_by_fw: dict[str, str] = {}
+    with open(CLAUDE_HAIKU_SYNTHESIZED_PATH) as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            r = json.loads(line)
+            if "error" in r:
+                continue
+            descriptions_by_fw[r["first_word"]] = r["synthesized"]
+    section_clusters(fw, n, E, descriptions_by_fw)
 
 
 if __name__ == "__main__":

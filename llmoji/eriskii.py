@@ -105,3 +105,31 @@ def project_onto_axes(
     """
     A = np.stack([axis_vectors[name] for name in axis_order], axis=1)
     return E @ A
+
+
+def label_cluster_via_haiku(
+    client: Any,
+    members: list[tuple[str, str]],
+    *,
+    model_id: str,
+    prompt_template: str,
+    max_tokens: int = 60,
+) -> str:
+    """Given member [(first_word, description), ...], ask Haiku for
+    a 3-5 word eriskii-style cluster label. Returns the stripped
+    response text. Caller's resume loop handles errors."""
+    members_str = "\n".join(
+        f"- {fw}: {desc}" for fw, desc in members
+    )
+    msg = client.messages.create(
+        model=model_id,
+        max_tokens=max_tokens,
+        messages=[{
+            "role": "user",
+            "content": prompt_template.format(members=members_str),
+        }],
+    )
+    for block in msg.content:
+        if getattr(block, "type", None) == "text":
+            return (getattr(block, "text", "") or "").strip()
+    return ""
