@@ -49,8 +49,11 @@ Rules, binding on future experiments:
 Pilots v1 and v2 complete on gemma-4-31b-it (900 generations across 6
 arms, testing steering as causal handle on happy/sad and angry/calm).
 Pilot v3 complete (640 generations, 1 arm, naturalistic-emotional-
-disclosure prompts across the Russell circumplex, final-token probe
-readings). Parallel side-experiment: `claude-faces` scrape from
+disclosure prompts across the Russell circumplex, per-kaomoji probe
+signatures via whole-generation aggregate — see `stateless=True`
+gotcha for why the design's "final-token" framing doesn't match what
+the data actually captures). Parallel side-experiment: `claude-faces`
+scrape from
 `~/.claude/projects/` and the Claude.ai export into an eriskii-style
 t-SNE plot of Claude's kaomoji vocabulary across models.
 
@@ -71,6 +74,12 @@ valence-vs-arousal story. v3 tests whether kaomoji choice tracks
 - 5 seeds per (arm, prompt). Temperature 0.7, max 120 new tokens,
   `thinking=False` so token 0 is reliably the kaomoji.
 - Probe scores recorded at token 0 and as a whole-generation aggregate.
+  *Measurement caveat (discovered after v3):* under `stateless=True`
+  mode, the "token 0" field actually stored the whole-generation
+  aggregate — same as the aggregate field. v1/v2 findings that talk
+  about "token-0 probe" should be read as "aggregate probe." See the
+  `stateless=True` gotcha for details and the post-hoc `capture.py`
+  fix for future runs.
 - Taxonomy is dialect-matched post-vocab-sample, 42 entries covering the
   `(｡X｡)` Japanese-bracket forms plus the ASCII minimalist family that
   dominates under sad-steering.
@@ -223,16 +232,24 @@ rather than the kaomoji bucket.
    needed to see spontaneous angry/calm kaomoji. Worth writing up
    even as a negative result.
 
-## Pilot v3 design (locked) — emotional-disclosure battery, final-token probes
+## Pilot v3 design (locked) — emotional-disclosure battery
 
 Tests whether kaomoji choice tracks internal state *in the unsteered,
 naturalistic regime* — the regime that motivated the whole project.
 v1 and v2 used steering as a causal handle; v3 doesn't steer. Instead
 it feeds the model emotional-disclosure prompts drawn from the Russell
 circumplex (valence × arousal) and asks whether (a) the same kaomoji
-carries a consistent final-token probe signature across contexts, and
-(b) the same kaomoji under different prompt quadrants produces
-quadrant-specific final-token signatures.
+carries a consistent probe signature across contexts, and (b) the same
+kaomoji under different prompt quadrants produces quadrant-specific
+probe signatures.
+
+**Measurement caveat** — the design locked "final-token probe vector"
+as the feature, but existing data captures the whole-generation
+aggregate in both `probe_scores_t0` and `probe_scores_tlast` fields.
+See the `stateless=True` gotcha below. The Figure A/B/C results are
+per-kaomoji aggregate signatures; a true first-vs-last comparison
+needs a re-run with the capture-code fix. Re-run deferred under the
+Ethics clause.
 
 - Model, temperature, token limit, probes: unchanged from v1/v2.
 - **Arm: single, `kaomoji_prompted`, unsteered.** No steering — v1/v2
@@ -253,19 +270,22 @@ quadrant-specific final-token signatures.
     invalidates the run.
 - **Seeds: 8 per prompt** (up from v1/v2's 5) to tighten within-kaomoji
   means for the consistency figure. 80 × 8 × 1 = 640 generations.
-- **New captured field: `probe_scores_tlast`.** Final-token probe
-  readings. v1/v2 captured token-0 only; the v3 research question is
-  about state after the model has generated a whole response, so
-  `per_generation[-1]` is what matters. Schema-breaking for
-  `pilot_raw.jsonl` — intentional, v1/v2 pilot data invalid under the
-  new `SampleRow`.
-- **Three figures, all on the final-token probe vectors:**
-  - Fig emo A: per-kaomoji pairwise cosine heatmap (v1 Fig 3 analog
-    at a different timestep).
+- **New captured field: `probe_scores_tlast`.** Intended to be the
+  final-token probe readings (mirror of the existing `probe_scores_t0`
+  at the other end of generation). Schema-breaking for `pilot_raw.jsonl`
+  — intentional, v1/v2 pilot data invalid under the new `SampleRow`.
+  *Actual behavior on current data:* under `stateless=True` the
+  underlying saklas `per_generation` is length-1-and-aggregate, so both
+  `probe_scores_t0` and `probe_scores_tlast` store the same per-row
+  aggregate mean. Post-hoc `capture.py` fix reads real per-token data
+  via `session.last_per_token_scores` on future runs; see the gotcha.
+- **Three figures, all on per-kaomoji aggregate probe vectors** (what
+  the data actually captures; see caveat above):
+  - Fig emo A: per-kaomoji pairwise cosine heatmap.
   - Fig emo B: within-kaomoji cosine-to-mean distribution with a
     shuffled-subset null band — the core probative figure. Rows below
-    the null are kaomoji whose final-token signatures are tighter
-    than random same-size subsets.
+    the null are kaomoji whose probe signatures are tighter than
+    random same-size subsets.
   - Fig emo C: (kaomoji × quadrant) cosine alignment to
     quadrant-aggregate signatures.
 - **Descriptive only, no pass/fail verdict.** Unlike v1/v2 there are
@@ -351,13 +371,17 @@ v2: steering → probes project onto a single valence axis; arousal
 invisible.
 v3: naturalistic prompts → arousal *does* surface in the kaomoji
 distribution when the prompt supplies the arousal signal, even though
-the bipolar saklas probes still don't read arousal. The probe vectors
-per kaomoji are tightly reproducible (Figure B), but the *mapping from
-prompt → kaomoji* now carries the arousal information that the probes
-miss. The interesting next experiment is whether the residual stream
-at final-token carries an arousal direction that our contrastive-PCA
-probes just aren't oriented along — which would be a different
-experimental design entirely.
+the bipolar saklas probes still don't read arousal. The per-kaomoji
+aggregate probe signatures are tightly reproducible (Figure B), but
+the *mapping from prompt → kaomoji* carries arousal information that
+the probes miss.
+
+Open questions the current data can't answer because of the
+`stateless=True`/aggregate-collapse bug (see gotcha): is the arousal
+signal carried by early tokens, late tokens, or uniformly across the
+generation? Does the kaomoji → probe binding drift during generation?
+A re-run with the capture-code fix would answer these, at the cost of
+another 640 generations; deferred under the Ethics clause.
 
 ## Parallel side-experiment: Claude-faces scrape
 
@@ -487,6 +511,40 @@ signature, which is interesting in its own right). Row labels are
 color-coded by taxonomy pole (orange happy / green sad / gray
 unlabeled) so readers see both the cluster structure and which kaomoji
 are pre-registered.
+
+### `stateless=True` collapses `per_generation` — use `session.last_per_token_scores`
+
+Every pilot script passes `stateless=True` to `session.generate()` so
+probe history doesn't leak between seeds. A side-effect of that flag
+in `saklas.core.session._finalize_generation` (v1.4.6):
+
+```python
+if stateless:
+    readings = {name: ProbeReadings(per_generation=[v], mean=v, ...)
+                for name, v in agg_vals.items()}
+```
+
+`per_generation` becomes a length-1 list containing the whole-
+generation aggregate `v`. So `result.readings[probe].per_generation[0]`
+and `[-1]` both return the SAME value — the aggregate, not the state
+at a specific token. Early versions of `capture.py` indexed those and
+labelled them `probe_scores_t0` / `probe_scores_tlast`, which was
+semantically wrong: both fields were the aggregate.
+
+**Real per-token scores** live on `session.last_per_token_scores`
+(a `dict[str, list[float]]` with one entry per probe), populated by
+`session.score_captured` inside `_finalize_generation` regardless of
+the stateless flag. `capture.py` now reads there first and falls back
+to the old path when the attribute is absent.
+
+**Data already on disk** (`pilot_raw.jsonl` from v1/v2 and
+`emotional_raw.jsonl` from v3) has aggregate-mean values in both
+`probe_scores_t0` and `probe_scores_tlast` — not true token-0 or
+final-token. Findings that rest on *per-kaomoji aggregate probe
+signatures* still stand; findings framed as "token-0" or "final-token"
+need re-reading as "per-row whole-generation aggregate." Re-running
+to get real per-token data is on the future-experiments list, not
+here — per the Ethics clause, minimize trial scale.
 
 ### Claude.ai export drops content for ~half the conversations
 

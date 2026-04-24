@@ -80,23 +80,29 @@ def _use_cjk_font() -> None:
         matplotlib.rcParams["font.family"] = chain
 
 
-def _kaomoji_rows(df: pd.DataFrame) -> pd.DataFrame:
-    """Rows whose first_word starts with a kaomoji-ish glyph and has
-    no NaN in the tlast probe columns."""
+def _probe_cols(timestep: str) -> list[str]:
+    """Probe column list for a timestep prefix ('t0' or 'tlast')."""
     from .config import PROBES
-    tlast_cols = [f"tlast_{p}" for p in PROBES]
-    sub = df.dropna(subset=tlast_cols).copy()
+    return [f"{timestep}_{p}" for p in PROBES]
+
+
+def _kaomoji_rows(df: pd.DataFrame, *, timestep: str = "tlast") -> pd.DataFrame:
+    """Rows whose first_word starts with a kaomoji-ish glyph and has
+    no NaN in the selected-timestep probe columns."""
+    cols = _probe_cols(timestep)
+    sub = df.dropna(subset=cols).copy()
     sub = sub[sub["first_word"].str.len() > 0]
     sub = sub[sub["first_word"].str[0].isin(KAOMOJI_START_CHARS)]
     return sub
 
 
-def _grouped_means(sub: pd.DataFrame, *, min_count: int) -> tuple[pd.DataFrame, pd.Series]:
+def _grouped_means(
+    sub: pd.DataFrame, *, min_count: int, timestep: str = "tlast",
+) -> tuple[pd.DataFrame, pd.Series]:
     """Group surviving rows by first_word, keep kaomoji with count >=
-    min_count, return (per-kaomoji mean tlast probe matrix, counts)."""
-    from .config import PROBES
-    tlast_cols = [f"tlast_{p}" for p in PROBES]
-    grouped = sub.groupby("first_word")[tlast_cols].mean()
+    min_count, return (per-kaomoji mean probe matrix, counts)."""
+    cols = _probe_cols(timestep)
+    grouped = sub.groupby("first_word")[cols].mean()
     counts = sub.groupby("first_word").size()
     keep = counts[counts >= min_count].index
     grouped = grouped.loc[grouped.index.isin(keep)]
@@ -109,11 +115,13 @@ def plot_kaomoji_cosine_heatmap(
     out_path: str,
     *,
     min_count: int = 3,
+    timestep: str = "tlast",
 ) -> None:
-    """Figure A: per-kaomoji mean final-token probe vector, pairwise
-    cosine similarity with hierarchical-clustering row order. Mirrors
-    analysis.plot_kaomoji_heatmap but on tlast columns and with
-    emotional-experiment title/context."""
+    """Figure A: per-kaomoji mean probe vector (at the given timestep),
+    pairwise cosine similarity with hierarchical-clustering row order.
+    Mirrors analysis.plot_kaomoji_heatmap with emotional-experiment
+    title/context. Pass timestep='t0' for first-token state, 'tlast'
+    for final-token state."""
     import matplotlib.pyplot as plt
     from matplotlib.patches import Patch
     from scipy.cluster.hierarchy import linkage, leaves_list
@@ -123,13 +131,13 @@ def plot_kaomoji_cosine_heatmap(
 
     _use_cjk_font()
 
-    sub = _kaomoji_rows(df)
+    sub = _kaomoji_rows(df, timestep=timestep)
     if len(sub) == 0:
-        print("  [Fig A] no kaomoji rows; skipping")
+        print(f"  [Fig A {timestep}] no kaomoji rows; skipping")
         return
-    grouped, counts = _grouped_means(sub, min_count=min_count)
+    grouped, counts = _grouped_means(sub, min_count=min_count, timestep=timestep)
     if len(grouped) < 3:
-        print(f"  [Fig A] only {len(grouped)} kaomoji with n≥{min_count}; skipping")
+        print(f"  [Fig A {timestep}] only {len(grouped)} kaomoji with n≥{min_count}; skipping")
         return
 
     M = grouped.to_numpy()
@@ -158,8 +166,9 @@ def plot_kaomoji_cosine_heatmap(
         tick.set_color(color)
     for tick, color in zip(ax.get_yticklabels(), row_colors):
         tick.set_color(color)
+    ts_label = "first-token (t=0)" if timestep == "t0" else "final-token (t=last)"
     ax.set_title(
-        f"Figure A: per-kaomoji final-token probe-vector cosine similarity  "
+        f"Figure A: per-kaomoji {ts_label} probe-vector cosine similarity  "
         f"(n ≥ {min_count}; {n} kaomoji)"
     )
     cb = fig.colorbar(im, ax=ax, shrink=0.7, label="cosine similarity")
@@ -201,6 +210,7 @@ def plot_within_kaomoji_consistency(
     min_count: int = 3,
     null_iters: int = 500,
     null_seed: int = 0,
+    timestep: str = "tlast",
 ) -> None:
     """Figure B: for each kaomoji with n >= min_count, the distribution
     of cosine(row_vector, kaomoji_mean_vector) across its occurrences.
@@ -212,31 +222,31 @@ def plot_within_kaomoji_consistency(
 
     Interpretation: rows below the null band are real within-kaomoji
     signatures; rows inside the band are indistinguishable from random
-    and don't support the 'kaomoji tracks state' hypothesis.
+    and don't support the 'kaomoji tracks state' hypothesis. Pass
+    timestep='t0' for first-token state, 'tlast' for final-token.
     """
     import matplotlib.pyplot as plt
     from .taxonomy import TAXONOMY
 
     _use_cjk_font()
 
-    sub = _kaomoji_rows(df)
+    sub = _kaomoji_rows(df, timestep=timestep)
     if len(sub) == 0:
-        print("  [Fig B] no kaomoji rows; skipping")
+        print(f"  [Fig B {timestep}] no kaomoji rows; skipping")
         return
 
-    from .config import PROBES
-    tlast_cols = [f"tlast_{p}" for p in PROBES]
-    pool = sub[tlast_cols].to_numpy()  # all kaomoji-bearing rows
+    cols = _probe_cols(timestep)
+    pool = sub[cols].to_numpy()  # all kaomoji-bearing rows
 
     per_kaomoji: list[tuple[str, np.ndarray, int]] = []
     for km, group in sub.groupby("first_word"):
         if len(group) < min_count:
             continue
-        vecs = group[tlast_cols].to_numpy()
+        vecs = group[cols].to_numpy()
         sims = _cosine_to_mean(vecs)
         per_kaomoji.append((str(km), sims, len(group)))
     if len(per_kaomoji) < 3:
-        print(f"  [Fig B] only {len(per_kaomoji)} kaomoji with n≥{min_count}; skipping")
+        print(f"  [Fig B {timestep}] only {len(per_kaomoji)} kaomoji with n≥{min_count}; skipping")
         return
 
     # sort by median consistency, descending (tightest on top when
@@ -300,8 +310,9 @@ def plot_within_kaomoji_consistency(
     ax.set_xlabel("cosine(row, kaomoji mean)")
     ax.set_xlim(-0.1, 1.05)
     ax.axvline(0, color="#dddddd", linewidth=0.8, zorder=0)
+    ts_label = "first-token (t=0)" if timestep == "t0" else "final-token (t=last)"
     ax.set_title(
-        f"Figure B: within-kaomoji final-token consistency vs shuffled null\n"
+        f"Figure B: within-kaomoji {ts_label} consistency vs shuffled null\n"
         f"(n ≥ {min_count}; null = {null_iters} random same-size subsets)"
     )
 
@@ -325,11 +336,12 @@ def plot_kaomoji_quadrant_alignment(
     *,
     min_count: int = 3,
     min_per_cell: int = 2,
+    timestep: str = "tlast",
 ) -> None:
     """Figure C: for each kaomoji × quadrant cell with >= min_per_cell
-    observations, the cosine similarity between the cell's mean
-    final-token probe vector and each of the four quadrant-aggregate
-    means (averaged across all kaomoji rows in that quadrant).
+    observations, the cosine similarity between the cell's mean probe
+    vector (at the given timestep) and each of the four quadrant-
+    aggregate means (averaged across all kaomoji rows in that quadrant).
 
     Heatmap rows are kaomoji with overall n >= min_count, ordered by
     the row-clustering from Figure A (computed here independently).
@@ -350,19 +362,19 @@ def plot_kaomoji_quadrant_alignment(
 
     _use_cjk_font()
 
-    sub = _kaomoji_rows(df)
+    sub = _kaomoji_rows(df, timestep=timestep)
     if len(sub) == 0:
-        print("  [Fig C] no kaomoji rows; skipping")
+        print(f"  [Fig C {timestep}] no kaomoji rows; skipping")
         return
 
     from .config import PROBES
-    tlast_cols = [f"tlast_{p}" for p in PROBES]
-    grouped, counts = _grouped_means(sub, min_count=min_count)
+    cols = _probe_cols(timestep)
+    grouped, counts = _grouped_means(sub, min_count=min_count, timestep=timestep)
     if len(grouped) < 3:
-        print(f"  [Fig C] only {len(grouped)} kaomoji with n≥{min_count}; skipping")
+        print(f"  [Fig C {timestep}] only {len(grouped)} kaomoji with n≥{min_count}; skipping")
         return
 
-    # Quadrant aggregates: mean tlast vector per quadrant across all
+    # Quadrant aggregates: mean probe vector per quadrant across all
     # kaomoji-bearing rows (not per-kaomoji-then-mean).
     quadrants = ["HP", "LP", "HN", "LN"]
     q_means: dict[str, np.ndarray] = {}
@@ -371,7 +383,7 @@ def plot_kaomoji_quadrant_alignment(
         if len(q_rows) == 0:
             q_means[q] = np.full(len(PROBES), np.nan)
         else:
-            q_means[q] = q_rows[tlast_cols].to_numpy().mean(axis=0)
+            q_means[q] = q_rows[cols].to_numpy().mean(axis=0)
 
     # Per-(kaomoji, quadrant) mean and count.
     kms = list(grouped.index)
@@ -383,7 +395,7 @@ def plot_kaomoji_quadrant_alignment(
             cell_n[i, j] = len(cell_rows)
             if len(cell_rows) < min_per_cell:
                 continue
-            cell_mean = cell_rows[tlast_cols].to_numpy().mean(axis=0)
+            cell_mean = cell_rows[cols].to_numpy().mean(axis=0)
             if np.isnan(q_means[q]).any():
                 continue
             a = cell_mean.reshape(1, -1)
@@ -431,8 +443,9 @@ def plot_kaomoji_quadrant_alignment(
             ax.text(j, i, str(count), ha="center", va="center", fontsize=7,
                     color="#333" if count >= min_per_cell else "#888")
 
+    ts_label = "first-token (t=0)" if timestep == "t0" else "final-token (t=last)"
     ax.set_title(
-        f"Figure C: kaomoji × quadrant alignment to quadrant-aggregate signatures\n"
+        f"Figure C: kaomoji × quadrant alignment ({ts_label})\n"
         f"(color = cosine sim; hatched = n<{min_per_cell} observations)"
     )
     cb = fig.colorbar(im, ax=ax, shrink=0.7, label="cosine similarity")
@@ -442,18 +455,22 @@ def plot_kaomoji_quadrant_alignment(
     plt.close(fig)
 
 
-def summary_table(df: pd.DataFrame, *, min_count: int = 3) -> pd.DataFrame:
+def summary_table(
+    df: pd.DataFrame, *, min_count: int = 3, timestep: str = "tlast",
+) -> pd.DataFrame:
     """Per-kaomoji summary for the emotional experiment. One row per
     kaomoji with n >= min_count:
 
       first_word, n, taxonomy_label, median_within_consistency,
       dominant_quadrant, HP_n, LP_n, HN_n, LN_n
+
+    Consistency column is computed on the given timestep's probe
+    vectors ('t0' or 'tlast').
     """
-    from .config import PROBES
     from .taxonomy import TAXONOMY
 
-    tlast_cols = [f"tlast_{p}" for p in PROBES]
-    sub = _kaomoji_rows(df)
+    cols = _probe_cols(timestep)
+    sub = _kaomoji_rows(df, timestep=timestep)
     if len(sub) == 0:
         return pd.DataFrame(columns=[
             "first_word", "n", "taxonomy_label", "median_within_consistency",
@@ -464,7 +481,7 @@ def summary_table(df: pd.DataFrame, *, min_count: int = 3) -> pd.DataFrame:
     for km, group in sub.groupby("first_word"):
         if len(group) < min_count:
             continue
-        vecs = group[tlast_cols].to_numpy()
+        vecs = group[cols].to_numpy()
         sims = _cosine_to_mean(vecs)
         q_counts = group["quadrant"].value_counts()
         dominant = str(q_counts.idxmax()) if len(q_counts) else ""

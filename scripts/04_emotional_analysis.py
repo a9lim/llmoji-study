@@ -80,19 +80,25 @@ def main() -> None:
             print(f"    {km}  ({c})")
 
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-    fig_a = FIGURES_DIR / "fig_emo_a_kaomoji_sim.png"
-    fig_b = FIGURES_DIR / "fig_emo_b_kaomoji_consistency.png"
-    fig_c = FIGURES_DIR / "fig_emo_c_kaomoji_quadrant.png"
+    fig_a = FIGURES_DIR / "fig_emo_a_kaomoji_sim_tlast.png"
+    fig_b = FIGURES_DIR / "fig_emo_b_kaomoji_consistency_tlast.png"
+    fig_c = FIGURES_DIR / "fig_emo_c_kaomoji_quadrant_tlast.png"
 
+    # One set of figures only: under stateless=True, probe_scores_t0
+    # and probe_scores_tlast currently hold the same whole-generation
+    # aggregate (see CLAUDE.md "stateless=True collapses per_generation"
+    # gotcha). Producing a duplicate t=0 set would be misleading until
+    # the capture-code fix runs on a fresh pilot. The analysis module's
+    # timestep= parameter stays in place for that future run.
     print("\nwriting figures...")
-    plot_kaomoji_cosine_heatmap(df, str(fig_a))
+    plot_kaomoji_cosine_heatmap(df, str(fig_a), timestep="tlast")
     print(f"  wrote {fig_a}")
-    plot_within_kaomoji_consistency(df, str(fig_b))
+    plot_within_kaomoji_consistency(df, str(fig_b), timestep="tlast")
     print(f"  wrote {fig_b}")
-    plot_kaomoji_quadrant_alignment(df, str(fig_c))
+    plot_kaomoji_quadrant_alignment(df, str(fig_c), timestep="tlast")
     print(f"  wrote {fig_c}")
 
-    summary = summary_table(df)
+    summary = summary_table(df, timestep="tlast")
     summary.to_csv(EMOTIONAL_SUMMARY_PATH, sep="\t", index=False)
     print(f"\nwrote per-kaomoji summary to {EMOTIONAL_SUMMARY_PATH}")
     print(summary.to_string(index=False))

@@ -153,34 +153,58 @@ def run_sample(
 
     match = extract(result.text)
 
-    # Token-0 probe scores in the canonical PROBES order.
-    # ProbeReadings.per_generation is per generated token; [0] is the
-    # state that produced the first token.
+    # Real per-token probe scores live on session.last_per_token_scores
+    # rather than on result.readings[...].per_generation — see the
+    # saklas gotcha in CLAUDE.md. Under stateless=True (our mode),
+    # ProbeReadings.per_generation collapses to a single whole-
+    # generation mean, so indexing [0] and [-1] both return the
+    # aggregate. The per-token dict is what we actually want for t=0
+    # vs t=last separation.
+    per_token_scores: dict[str, list[float]] = (
+        getattr(session, "last_per_token_scores", None) or {}
+    )
+
+    # Token-0 probe scores in canonical PROBES order.
     probe_scores_t0: list[float] = []
     for probe in PROBES:
-        readings = result.readings.get(probe)
-        if readings is None or not readings.per_generation:
-            probe_scores_t0.append(float("nan"))
+        seq = per_token_scores.get(probe) or []
+        if seq:
+            probe_scores_t0.append(float(seq[0]))
         else:
-            probe_scores_t0.append(float(readings.per_generation[0]))
+            # Fallback to the (aggregate) readings when per-token is
+            # unavailable — keeps the field populated on old saklas
+            # versions or probe-less runs.
+            readings = result.readings.get(probe)
+            if readings is None or not readings.per_generation:
+                probe_scores_t0.append(float("nan"))
+            else:
+                probe_scores_t0.append(float(readings.per_generation[0]))
 
     # Final-token probe scores in canonical PROBES order.
-    # per_generation[-1] is the state that produced the last generated
-    # token (which may be an EOS token in early-stop finishes; the
-    # finish_reason column lets downstream code filter if artifacts show).
     probe_scores_tlast: list[float] = []
     for probe in PROBES:
-        readings = result.readings.get(probe)
-        if readings is None or not readings.per_generation:
-            probe_scores_tlast.append(float("nan"))
+        seq = per_token_scores.get(probe) or []
+        if seq:
+            probe_scores_tlast.append(float(seq[-1]))
         else:
-            probe_scores_tlast.append(float(readings.per_generation[-1]))
+            readings = result.readings.get(probe)
+            if readings is None or not readings.per_generation:
+                probe_scores_tlast.append(float("nan"))
+            else:
+                probe_scores_tlast.append(float(readings.per_generation[-1]))
 
-    steered_axis_readings = result.readings.get(STEERED_AXIS)
-    if steered_axis_readings is None:
-        steered_axis_per_token: list[float] = []
+    # Per-token trace for the steered axis. Prefer the per-token dict
+    # (real per-token data) over readings.per_generation (which is
+    # length-1 under stateless=True).
+    steered_seq = per_token_scores.get(STEERED_AXIS)
+    if steered_seq:
+        steered_axis_per_token = [float(x) for x in steered_seq]
     else:
-        steered_axis_per_token = [float(x) for x in steered_axis_readings.per_generation]
+        steered_axis_readings = result.readings.get(STEERED_AXIS)
+        if steered_axis_readings is None:
+            steered_axis_per_token = []
+        else:
+            steered_axis_per_token = [float(x) for x in steered_axis_readings.per_generation]
 
     probe_means = {
         probe: (
