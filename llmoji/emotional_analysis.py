@@ -500,3 +500,87 @@ def summary_table(
     if len(out):
         out = out.sort_values("median_within_consistency", ascending=False).reset_index(drop=True)
     return out
+
+
+def compute_probe_correlations(
+    df: pd.DataFrame, *, timestep: str = "t0",
+) -> dict[str, Any]:
+    """Full pairwise Pearson + Spearman correlation between probe
+    scores at the given timestep. Returns overall + per-quadrant.
+    Run on v3 unsteered data only — steered data would shift the
+    probe distributions and confound the collapse reading.
+    """
+    from scipy.stats import pearsonr, spearmanr
+    from .config import PROBES
+
+    cols = _probe_cols(timestep)
+    out: dict[str, Any] = {"probes": list(PROBES), "by_subset": {}}
+
+    def pair_stats(sub: pd.DataFrame) -> dict[str, Any]:
+        n = len(sub)
+        if n < 3:
+            return {"n": n, "pearson": None, "spearman": None}
+        vals = sub[cols].to_numpy()
+        p = np.full((len(PROBES), len(PROBES)), np.nan)
+        s = np.full((len(PROBES), len(PROBES)), np.nan)
+        for i in range(len(PROBES)):
+            for j in range(len(PROBES)):
+                if i == j:
+                    p[i, j] = 1.0
+                    s[i, j] = 1.0
+                else:
+                    p[i, j] = float(pearsonr(vals[:, i], vals[:, j])[0])
+                    s[i, j] = float(spearmanr(vals[:, i], vals[:, j])[0])
+        return {"n": int(n), "pearson": p.tolist(), "spearman": s.tolist()}
+
+    out["by_subset"]["all"] = pair_stats(df)
+    for q in ("HP", "LP", "HN", "LN"):
+        out["by_subset"][q] = pair_stats(df[df["quadrant"] == q])
+    return out
+
+
+def plot_probe_correlation_matrix(
+    df: pd.DataFrame, out_path: str, *,
+    method: str = "pearson", timestep: str = "t0",
+) -> None:
+    """Plot a 5-panel figure: overall probe correlation matrix + one
+    per Russell quadrant. method='pearson' or 'spearman'. Uses t0
+    (== whole-generation aggregate under stateless=True) — this is
+    the same column v2's valence-collapse claim was derived from."""
+    import matplotlib.pyplot as plt
+    from .config import PROBES
+
+    _use_cjk_font()
+    stats = compute_probe_correlations(df, timestep=timestep)
+    panels = [("all", "all v3 rows"), ("HP", "HP"), ("LP", "LP"),
+              ("HN", "HN"), ("LN", "LN")]
+
+    fig, axes = plt.subplots(1, 5, figsize=(20, 4.5))
+    im = None
+    for ax, (key, title) in zip(axes, panels):
+        sub = stats["by_subset"][key]
+        mat = sub.get(method)
+        if mat is None:
+            ax.text(0.5, 0.5, f"n={sub['n']}\n(too few)", ha="center", va="center")
+            ax.set_xticks([]); ax.set_yticks([])
+            ax.set_title(f"{title}  n={sub['n']}")
+            continue
+        arr = np.asarray(mat)
+        im = ax.imshow(arr, cmap="RdBu_r", vmin=-1, vmax=1, aspect="equal")
+        ax.set_xticks(range(len(PROBES)))
+        ax.set_yticks(range(len(PROBES)))
+        ax.set_xticklabels(PROBES, rotation=45, ha="right", fontsize=7)
+        ax.set_yticklabels(PROBES, fontsize=7)
+        for i in range(len(PROBES)):
+            for j in range(len(PROBES)):
+                ax.text(j, i, f"{arr[i, j]:+.2f}", ha="center", va="center",
+                        fontsize=6, color="white" if abs(arr[i, j]) > 0.5 else "#333")
+        ax.set_title(f"{title}  n={sub['n']}")
+    fig.suptitle(f"v3 probe-probe {method} correlations "
+                 f"(t0 = whole-generation aggregate under stateless)",
+                 fontsize=11)
+    if im is not None:
+        cb = fig.colorbar(im, ax=axes, shrink=0.7, label=f"{method} r")
+        cb.ax.tick_params(labelsize=8)
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
