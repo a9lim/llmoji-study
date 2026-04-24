@@ -119,16 +119,28 @@ CLAUDE_FACES_EMBED_PATH = DATA_DIR / "claude_faces_embed.parquet"
 # Locked Haiku version. Bumping invalidates description-corpus parity.
 HAIKU_MODEL_ID = "claude-haiku-4-5-20251001"
 
+# Stage-A sampling: per kaomoji, randomly sample up to this many
+# instances for per-instance Haiku description (eriskii used 4 with
+# a floor for low-frequency faces). Floor is implicit — kaomoji with
+# fewer than the cap are fully sampled.
+INSTANCE_SAMPLE_CAP = 4
+INSTANCE_SAMPLE_SEED = 0
+
 # Order matters: this is the column order in eriskii_axes.tsv and the
 # heatmap-row order in per-model / per-project figures. Must stay in
-# sync with llmoji.eriskii_prompts.AXIS_ANCHORS.
+# sync with llmoji.eriskii_prompts.AXIS_ANCHORS. All 21 axes from
+# the eriskii.net page (note: "wryness" is the eriskii spelling, with
+# one n).
 ERISKII_AXES = [
     "warmth", "energy", "confidence", "playfulness", "empathy",
     "technicality", "positivity", "curiosity", "approval",
-    "wrynness", "wetness",
+    "apologeticness", "decisiveness", "wryness", "wetness",
+    "surprise", "anger", "frustration", "hatefulness", "sadness",
+    "hope", "aggression", "exhaustion",
 ]
 
 CLAUDE_HAIKU_DESCRIPTIONS_PATH = DATA_DIR / "claude_haiku_descriptions.jsonl"
+CLAUDE_HAIKU_SYNTHESIZED_PATH = DATA_DIR / "claude_haiku_synthesized.jsonl"
 CLAUDE_FACES_EMBED_DESCRIPTION_PATH = DATA_DIR / "claude_faces_embed_description.parquet"
 
 # eriskii-replication output paths
