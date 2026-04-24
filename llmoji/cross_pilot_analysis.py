@@ -1,33 +1,51 @@
 # pyright: reportArgumentType=false, reportAttributeAccessIssue=false, reportCallIssue=false, reportReturnType=false
-"""Pooled analysis across v1/v2 (pilot_raw.jsonl) and v3
-(emotional_raw.jsonl). Both datasets store `probe_scores_t0` as the
-whole-generation aggregate (under stateless=True — see CLAUDE.md
-gotcha), so pooling on that column is apples-to-apples.
+"""Cross-pilot pooled analysis in hidden-state space.
 
-Grouping: per-(first_word, source) tuples. 'source' distinguishes
-v1/v2 condition arms from v3 quadrants, so we can read whether the
-same kaomoji carries the same probe signature across steered and
-naturalistic regimes.
+Pools v1/v2 (``pilot_raw.jsonl`` + ``data/hidden/v1v2/``) with v3
+(``emotional_raw.jsonl`` + ``data/hidden/v3/``) into a single
+(metadata, hidden-state feature matrix) pool. Each row contributes its
+``h_last`` at the highest captured probe layer by default; configurable
+via ``which=`` and ``layer=``.
+
+Replaces the pre-refactor probe-vector version, which operated on
+5-dim probe scores that collapsed to ~1 valence direction (PC1 = 89%
+variance). Hidden-state cosine at ~4096-dim preserves the full
+activation signature.
+
+Plotting conventions match the pre-refactor module:
+  - ``plot_pooled_cosine_heatmap`` — per-(kaomoji, source) cosine
+    heatmap with hierarchical clustering.
+  - ``plot_pooled_pca_scatter``    — PC1 vs PC2 of the same
+    per-(kaomoji, source) means.
+  - ``pooled_summary_table``       — per-(kaomoji, source) counts +
+    taxonomy labels (drops the 5 probe columns; hidden-state means
+    aren't interpretable per-dim).
 """
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
 
-from .config import PROBES
+from .hidden_state_analysis import (
+    cosine_similarity_matrix,
+    group_mean_vectors,
+    load_hidden_features,
+)
 
-# v3 prompt_id prefixes → pooled source name.
-_V3_QUADRANT_SOURCE = {"HP": "v3_HP", "LP": "v3_LP", "HN": "v3_HN", "LN": "v3_LN"}
+
+# v3 prompt_id prefix → pooled source name.
+_V3_QUADRANT_SOURCE = {
+    "HP": "v3_HP", "LP": "v3_LP", "HN": "v3_HN", "LN": "v3_LN", "NB": "v3_NB",
+}
 
 # Reuse the kaomoji-start-char filter from emotional_analysis.
 KAOMOJI_START_CHARS = set("([（｛ヽ٩ᕕ╰╭╮┐┌＼¯໒＼ヾっ")
 
-# source-color palette. Distinct hues per source; grouped visually by
-# family (baselines neutral, happy-pole warm, sad-pole cool, angry
-# reds, calm greens, v3 quadrants mid-saturation).
+# source-color palette. Distinct hues per source family.
 SOURCE_COLORS = {
     "baseline":         "#888888",
     "kaomoji_prompted": "#444444",
@@ -39,96 +57,94 @@ SOURCE_COLORS = {
     "v3_LP":            "#b28c3d",
     "v3_HN":            "#d06c5a",
     "v3_LN":            "#5f7ca8",
+    "v3_NB":            "#6e6e6e",
 }
 
 
-def load_pooled_rows(v1_v2_path: str, v3_path: str) -> pd.DataFrame:
-    """Union v1/v2 and v3 JSONL with a 'source' column identifying arm
-    (v1/v2) or quadrant (v3). Explodes probe_scores_t0 into per-probe
-    columns. Drops rows whose first_word doesn't look like a kaomoji
-    and rows whose probe vector is NaN (rare capture-fallback)."""
-    v12: pd.DataFrame = pd.read_json(v1_v2_path, lines=True)
-    v12 = v12.assign(source=v12["condition"])
+def load_pooled_features(
+    v1_v2_jsonl: str | Path,
+    v3_jsonl: str | Path,
+    data_dir: Path,
+    *,
+    v1_v2_experiment: str = "v1v2",
+    v3_experiment: str = "v3",
+    which: str = "h_last",
+    layer: int | None = None,
+) -> tuple[pd.DataFrame, np.ndarray]:
+    """Union v1/v2 + v3 JSONL, load per-row hidden-state sidecars, and
+    tag each row with a ``source`` derived from v1/v2 ``condition`` or
+    v3 quadrant. Filters to kaomoji-bearing rows (first_word starts
+    with a kaomoji-ish glyph). Returns (metadata df, hidden-state
+    matrix) aligned row-wise.
+    """
+    df12, X12 = load_hidden_features(
+        v1_v2_jsonl, data_dir, v1_v2_experiment,
+        which=which, layer=layer,
+    )
+    df3, X3 = load_hidden_features(
+        v3_jsonl, data_dir, v3_experiment,
+        which=which, layer=layer,
+    )
 
-    v3: pd.DataFrame = pd.read_json(v3_path, lines=True)
-    quad = v3["prompt_id"].str[:2].str.upper()
-    v3 = v3.assign(source=quad.map(_V3_QUADRANT_SOURCE))
-    # v3 has probe_scores_tlast; we don't use it for pooling.
-    if "probe_scores_tlast" in v3.columns:
-        v3 = v3.drop(columns=["probe_scores_tlast"])
+    if len(df12):
+        df12 = df12.assign(source=df12["condition"])
+    if len(df3):
+        quad = df3["prompt_id"].str[:2].str.upper()
+        df3 = df3.assign(source=quad.map(_V3_QUADRANT_SOURCE))
 
-    common = [
-        "source", "prompt_id", "seed", "prompt_text",
-        "text", "first_word", "kaomoji", "kaomoji_label",
-        "probe_scores_t0",
-    ]
-    df = pd.concat([v12[common], v3[common]], ignore_index=True)
+    # Guard: if either side empty, return the non-empty side alone.
+    if len(df12) == 0 and len(df3) == 0:
+        return pd.DataFrame(), np.zeros((0, 0), dtype=np.float32)
+    if len(df12) == 0:
+        df, X = df3, X3
+    elif len(df3) == 0:
+        df, X = df12, X12
+    else:
+        common_cols = [c for c in df12.columns if c in df3.columns]
+        df = pd.concat([df12[common_cols], df3[common_cols]], ignore_index=True)
+        X = np.concatenate([X12, X3], axis=0)
 
-    # Explode probe_scores_t0 into per-probe columns.
-    stacked = np.asarray(df["probe_scores_t0"].tolist(), dtype=float)
-    for i, probe in enumerate(PROBES):
-        df[f"t0_{probe}"] = stacked[:, i]
-    df = df.drop(columns=["probe_scores_t0"])
-
-    # Drop rows with NaN in any probe column (rare capture-fallback).
-    probe_cols = [f"t0_{p}" for p in PROBES]
-    df = df.dropna(subset=probe_cols)
-
-    # Filter to kaomoji-bearing rows (same logic as emotional_analysis).
-    df = df[df["first_word"].astype(str).str.len() > 0]
-    df = df[df["first_word"].astype(str).str[0].isin(KAOMOJI_START_CHARS)]
-    return df.reset_index(drop=True)
-
-
-def grouped_kaomoji_source_means(
-    df: pd.DataFrame, *, min_count: int = 3,
-) -> tuple[pd.DataFrame, pd.Series]:
-    """Group by (first_word, source), require n >= min_count, return
-    (mean-probe-vector DataFrame, count Series). Index is a MultiIndex
-    of (first_word, source)."""
-    cols = [f"t0_{p}" for p in PROBES]
-    grouped = df.groupby(["first_word", "source"])[cols].mean()
-    counts = df.groupby(["first_word", "source"]).size()
-    keep = counts[counts >= min_count].index
-    grouped = grouped.loc[grouped.index.isin(keep)]
-    counts = counts.loc[grouped.index]
-    return grouped, counts
+    # Filter to kaomoji-bearing rows: first_word starts with a bracket-
+    # family glyph. Same filter as the pre-refactor module.
+    mask = (
+        df["first_word"].astype(str).str.len().to_numpy() > 0
+    )
+    first_char_ok = np.asarray([
+        (s[:1] in KAOMOJI_START_CHARS) if isinstance(s, str) else False
+        for s in df["first_word"]
+    ])
+    keep = mask & first_char_ok
+    return df.loc[keep].reset_index(drop=True), X[keep]
 
 
 def plot_pooled_cosine_heatmap(
-    df: pd.DataFrame, out_path: str, *, min_count: int = 3,
+    df: pd.DataFrame,
+    X: np.ndarray,
+    out_path: str,
+    *,
+    min_count: int = 3,
     center: bool = True,
 ) -> None:
-    """Per-(kaomoji, source) mean probe-vector cosine similarity, with
-    hierarchical-clustering row order. Row tick labels are colored by
-    source.
-
-    When ``center=True`` (default), the grand mean across all
-    per-(kaomoji, source) tuples is subtracted before computing cosine.
-    Without centering, the shared 'response-baseline' direction (the
-    valence-correlated probe cluster that every response inherits)
-    dominates cosine similarity and every pair reads ~0.8-1.0, wiping
-    out between-kaomoji structure. Centered cosine measures deviation
-    from the baseline and spans the full -1..+1 range.
-    """
+    """Per-(kaomoji, source) mean hidden-state vector, pairwise cosine
+    similarity with hierarchical-clustering row order. Row tick labels
+    are colored by source."""
     import matplotlib.pyplot as plt
     from matplotlib.patches import Patch
     from scipy.cluster.hierarchy import linkage, leaves_list
     from scipy.spatial.distance import squareform
-    from sklearn.metrics.pairwise import cosine_similarity
     from .emotional_analysis import _use_cjk_font
 
     _use_cjk_font()
 
-    grouped, counts = grouped_kaomoji_source_means(df, min_count=min_count)
-    if len(grouped) < 3:
-        print(f"  [pooled heatmap] only {len(grouped)} (kaomoji, source) with n≥{min_count}; skipping")
+    keys_df, M, counts = group_mean_vectors(
+        df, X, ["first_word", "source"], min_count=min_count,
+    )
+    if len(keys_df) < 3:
+        print(f"  [pooled heatmap] only {len(keys_df)} (kaomoji, source) "
+              f"with n≥{min_count}; skipping")
         return
 
-    M = grouped.to_numpy()
-    if center:
-        M = M - M.mean(axis=0, keepdims=True)
-    sim = cosine_similarity(M)
+    sim = cosine_similarity_matrix(M, center=center)
     dist = np.clip(1 - sim, 0, None)
     np.fill_diagonal(dist, 0)
 
@@ -136,19 +152,22 @@ def plot_pooled_cosine_heatmap(
     order = leaves_list(Z)
     ordered_sim = sim[np.ix_(order, order)]
 
-    idx = grouped.index.to_list()
-    ordered_idx = [idx[i] for i in order]
-    ordered_counts = [int(counts.loc[k]) for k in ordered_idx]
-    labels = [f"{km}  [{src}]  n={c}"
-              for (km, src), c in zip(ordered_idx, ordered_counts)]
-    row_colors = [SOURCE_COLORS.get(src, "#666") for _, src in ordered_idx]
+    ordered_keys = keys_df.iloc[order].reset_index(drop=True)
+    ordered_counts = counts.iloc[order].to_numpy()
+    labels = [
+        f"{km}  [{src}]  n={c}"
+        for km, src, c in zip(
+            ordered_keys["first_word"], ordered_keys["source"], ordered_counts,
+        )
+    ]
+    row_colors = [SOURCE_COLORS.get(src, "#666") for src in ordered_keys["source"]]
 
-    n = len(ordered_idx)
+    n = len(ordered_keys)
     fig, ax = plt.subplots(figsize=(max(9, 0.28 * n + 5), max(9, 0.28 * n + 4)))
     im = ax.imshow(ordered_sim, cmap="RdBu_r", vmin=-1, vmax=1, aspect="equal")
     ax.set_xticks(range(n))
     ax.set_yticks(range(n))
-    ax.set_xticklabels([km for km, _ in ordered_idx],
+    ax.set_xticklabels(ordered_keys["first_word"].tolist(),
                        rotation=45, ha="right", fontsize=6)
     ax.set_yticklabels(labels, fontsize=7)
     for tick, color in zip(ax.get_xticklabels(), row_colors):
@@ -157,7 +176,7 @@ def plot_pooled_cosine_heatmap(
         tick.set_color(color)
     centering_note = "grand-mean centered; " if center else "uncentered; "
     ax.set_title(
-        f"Pooled per-(kaomoji, source) probe-vector cosine similarity\n"
+        f"Pooled per-(kaomoji, source) HIDDEN-STATE cosine similarity\n"
         f"({centering_note}n ≥ {min_count}; {n} rows; v1/v2 + v3)"
     )
     cb = fig.colorbar(im, ax=ax, shrink=0.7, label="cosine similarity")
@@ -172,20 +191,16 @@ def plot_pooled_cosine_heatmap(
 
 
 def plot_pooled_pca_scatter(
-    df: pd.DataFrame, out_path: str, *, min_count: int = 3,
+    df: pd.DataFrame,
+    X: np.ndarray,
+    out_path: str,
+    *,
+    min_count: int = 3,
 ) -> dict[str, Any]:
-    """PC1 vs PC2 scatter of per-(kaomoji, source) mean probe vectors.
-
-    PCA implicitly centers, so the shared-baseline direction that
-    dominates uncentered cosine ends up in PC1 and any between-kaomoji
-    structure lands in PC2+. Complementary to the centered cosine
-    heatmap: if PC2 carries meaningful variance and separates sources,
-    there's real secondary structure; if PC2 is near-zero compared to
-    PC1, the honest conclusion is that the 5 probes are near-
-    1-dimensional in practice.
-
-    Returns the explained-variance-ratio spectrum for caller logging.
-    """
+    """PC1 vs PC2 scatter of per-(kaomoji, source) mean hidden-state
+    vectors. Fits PCA on the per-group means (not on row-level data)
+    — treats each (kaomoji, source) cell as one point for clustering
+    purposes. Returns the explained-variance spectrum dict."""
     import matplotlib.pyplot as plt
     from matplotlib.patches import Patch
     from sklearn.decomposition import PCA
@@ -193,29 +208,29 @@ def plot_pooled_pca_scatter(
     from .taxonomy import TAXONOMY
 
     _use_cjk_font()
-    grouped, _ = grouped_kaomoji_source_means(df, min_count=min_count)
-    if len(grouped) < 3:
-        print(f"  [pooled PCA] only {len(grouped)} tuples; skipping")
+
+    keys_df, M, counts = group_mean_vectors(
+        df, X, ["first_word", "source"], min_count=min_count,
+    )
+    if len(keys_df) < 3:
+        print(f"  [pooled PCA] only {len(keys_df)} tuples; skipping")
         return {}
 
-    M = grouped.to_numpy()
     n_comp = min(5, M.shape[0], M.shape[1])
     pca = PCA(n_components=n_comp)
     coords = pca.fit_transform(M)
     var = pca.explained_variance_ratio_
 
-    idx = grouped.index.to_list()
-
     fig, ax = plt.subplots(figsize=(12, 9))
-    for (km, src), pt in zip(idx, coords):
+    for i in range(len(keys_df)):
+        km = keys_df["first_word"].iloc[i]
+        src = keys_df["source"].iloc[i]
         color = SOURCE_COLORS.get(src, "#666")
-        # Outline by taxonomy pole: happy=orange, sad=green, other=gray.
-        # (Edge color; fill is the source color.)
         pole = TAXONOMY.get(str(km), 0)
         edge = {+1: "#c25a22", -1: "#2f6c57", 0: "#444"}[pole]
-        ax.scatter(pt[0], pt[1], c=color, s=60, edgecolor=edge,
-                   linewidth=1.2, alpha=0.85, zorder=3)
-        ax.annotate(km, (pt[0], pt[1]), fontsize=5, alpha=0.75,
+        ax.scatter(coords[i, 0], coords[i, 1], c=color, s=60,
+                   edgecolor=edge, linewidth=1.2, alpha=0.85, zorder=3)
+        ax.annotate(km, (coords[i, 0], coords[i, 1]), fontsize=5, alpha=0.75,
                     xytext=(4, 4), textcoords="offset points", zorder=4)
 
     ax.axhline(0, color="#ccc", linewidth=0.6, zorder=0)
@@ -223,47 +238,56 @@ def plot_pooled_pca_scatter(
     ax.set_xlabel(f"PC1  ({var[0] * 100:.1f}% var)")
     ax.set_ylabel(f"PC2  ({var[1] * 100:.1f}% var)")
     ax.set_title(
-        f"Pooled (kaomoji, source) means — PC1 vs PC2\n"
-        f"(n ≥ {min_count}; {len(idx)} points; fill=source, edge=taxonomy pole)"
+        f"Pooled (kaomoji, source) hidden-state means — PC1 vs PC2\n"
+        f"(n ≥ {min_count}; {len(keys_df)} points; fill=source, edge=taxonomy pole)"
     )
-
     source_legend = [Patch(color=c, label=s) for s, c in SOURCE_COLORS.items()]
     ax.legend(handles=source_legend, loc="best", frameon=False, fontsize=8,
               title="source (fill)")
-
     fig.tight_layout()
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
 
     return {
-        "n_points": len(idx),
+        "n_points": len(keys_df),
         "explained_variance_ratio": var.tolist(),
         "singular_values": pca.singular_values_.tolist(),
-        "components": pca.components_.tolist(),
     }
 
 
 def pooled_summary_table(
-    df: pd.DataFrame, *, min_count: int = 3,
+    df: pd.DataFrame,
+    X: np.ndarray,
+    *,
+    min_count: int = 3,
 ) -> pd.DataFrame:
-    """Per-(kaomoji, source) summary: n, taxonomy label, and the
-    5-probe mean vector."""
+    """Per-(kaomoji, source) count + taxonomy label + within-group
+    cosine-to-mean consistency. Drops the 5 probe-mean columns the
+    probe-based version had (per-dim hidden-state means aren't
+    interpretable; the consistency column is the summary stat)."""
+    from .hidden_state_analysis import cosine_to_mean
     from .taxonomy import TAXONOMY
-    cols = [f"t0_{p}" for p in PROBES]
+
     rows: list[dict[str, Any]] = []
-    for key, g in df.groupby(["first_word", "source"]):
-        km, src = key  # type: ignore[misc]  # pandas groupby-list key is a tuple at runtime
+    if len(df) == 0:
+        return pd.DataFrame(rows)
+
+    for (km, src), g in df.groupby(["first_word", "source"]):
         if len(g) < min_count:
             continue
-        means = g[cols].mean().to_dict()
+        idxs = g.index.to_numpy()
+        vecs = X[idxs]
+        sims = cosine_to_mean(vecs)
         rows.append({
             "first_word": km,
             "source": src,
             "n": int(len(g)),
             "taxonomy_label": int(TAXONOMY.get(str(km), 0)),
-            **{p: float(means[f"t0_{p}"]) for p in PROBES},
+            "median_within_consistency": float(np.median(sims)),
         })
     out = pd.DataFrame(rows)
     if len(out):
-        out = out.sort_values(["first_word", "source"]).reset_index(drop=True)
+        out = out.sort_values(
+            ["source", "median_within_consistency"], ascending=[True, False],
+        ).reset_index(drop=True)
     return out

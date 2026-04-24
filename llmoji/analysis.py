@@ -262,29 +262,37 @@ def plot_axis_scatter(df: pd.DataFrame, out_path: str) -> None:
     plt.close(fig)
 
 
-def plot_pca_scatter(df: pd.DataFrame, out_path: str) -> None:
-    """Fig 1b: PCA(2) of the 5-axis probe vector, unsteered arm only,
-    colored by kaomoji pole."""
+def plot_pca_scatter(df: pd.DataFrame, X: np.ndarray, out_path: str) -> None:
+    """Fig 1b: PCA(2) of the per-row HIDDEN-STATE vector, unsteered arm
+    only, colored by kaomoji pole.
+
+    ``df`` must be row-aligned with ``X``. Filters to the unsteered arm
+    (``kaomoji_prompted``) with kaomoji_label != 0, PCA-transforms on
+    that subset's hidden states."""
     import matplotlib.pyplot as plt
     from sklearn.decomposition import PCA
 
-    sub = df[(df["condition"] == "kaomoji_prompted") & (df["kaomoji_label"] != 0)]
-    X = probe_matrix(sub)
-    if len(X) < 4 or np.isnan(X).any():
+    mask = (
+        (df["condition"] == "kaomoji_prompted")
+        & (df["kaomoji_label"] != 0)
+    ).to_numpy()
+    sub = df.loc[mask]
+    X_sub = X[mask]
+    if len(X_sub) < 4 or np.isnan(X_sub).any():
         return
 
-    pca = PCA(n_components=2, random_state=0).fit(X)
-    Z = pca.transform(X)
+    pca = PCA(n_components=2, random_state=0).fit(X_sub)
+    Z = pca.transform(X_sub)
 
     fig, ax = plt.subplots(figsize=(5.5, 5))
     for label, color, name in [(+1, "#d94", "happy"), (-1, "#4a7", "sad")]:
-        mask = sub["kaomoji_label"].to_numpy() == label
-        ax.scatter(Z[mask, 0], Z[mask, 1], c=color, alpha=0.7, label=name,
+        m2 = sub["kaomoji_label"].to_numpy() == label
+        ax.scatter(Z[m2, 0], Z[m2, 1], c=color, alpha=0.7, label=name,
                    s=36, edgecolor="white", linewidth=0.5)
     ev = pca.explained_variance_ratio_
     _setup_axes(
         ax,
-        "PCA(2) of 5-axis probe vector (unsteered)",
+        "PCA(2) of per-row HIDDEN-STATE vector (unsteered)",
         f"PC1 ({ev[0]:.1%})", f"PC2 ({ev[1]:.1%})",
     )
     ax.legend(frameon=False, loc="best")
@@ -328,69 +336,63 @@ def plot_condition_bars(df: pd.DataFrame, out_path: str) -> None:
 
 def plot_kaomoji_heatmap(
     df: pd.DataFrame,
+    X: np.ndarray,
     out_path: str,
     *,
     min_count: int = 3,
     center: bool = True,
 ) -> None:
-    """Fig 3: per-kaomoji mean probe vector, cosine-similarity heatmap
-    with hierarchical clustering (dendrogram-ordered).
+    """Fig 3: per-kaomoji mean HIDDEN-STATE vector, cosine-similarity
+    heatmap with hierarchical clustering (dendrogram-ordered).
 
-    Groups by the raw ``first_word`` so every bracket-form output the
-    model emitted gets a row, not just pre-registered taxonomy entries.
-    Row labels are colored by taxonomy pole (happy / sad / other).
-    Leading tokens that aren't bracket-form (plain English words like
-    ``"I"`` or markdown bolding like ``"**Congratulations!**"``) are
-    excluded by requiring the first character to be an opening bracket
-    or one of the common kaomoji-prefix glyphs.
+    ``df`` must be row-aligned with ``X``. Groups by the raw
+    ``first_word`` so every bracket-form output the model emitted gets
+    a row, not just pre-registered taxonomy entries. Row labels are
+    colored by taxonomy pole (happy / sad / other). Leading tokens
+    that aren't bracket-form (plain English words, markdown bolding)
+    are excluded by requiring the first character to be an opening
+    bracket or one of the common kaomoji-prefix glyphs.
 
-    When ``center=True`` (default), the grand mean across the surviving
-    per-kaomoji rows is subtracted before cosine. Without centering the
-    shared response-baseline direction (valence-correlated probe cluster
-    common to all responses) dominates cosine and every pair reads
-    ~0.8-1.0, wiping out between-kaomoji structure. Centered cosine
-    spans the full -1..+1 range.
+    When ``center=True`` (default), the grand mean across the
+    surviving per-kaomoji rows is subtracted before cosine.
     """
     import matplotlib.pyplot as plt
     from scipy.cluster.hierarchy import linkage, leaves_list
     from scipy.spatial.distance import squareform
-    from sklearn.metrics.pairwise import cosine_similarity
-    from .config import PROBES
+    from .hidden_state_analysis import cosine_similarity_matrix
     from .taxonomy import TAXONOMY
-
-    probe_cols = [f"t0_{p}" for p in PROBES]
 
     # pool across all conditions — we want a per-kaomoji representation
     # summary, not a condition-stratified one.
-    sub = df.dropna(subset=probe_cols).copy()
     # keep first_words that look like kaomoji: start with an opening
-    # bracket or one of the common kaomoji-prefix glyphs. This sweeps
-    # up every observed paren-form, not just taxonomy-registered ones.
+    # bracket or one of the common kaomoji-prefix glyphs.
     kaomoji_starts = set("([（｛ヽ٩ᕕ╰╭╮┐┌＼¯໒＼ヾっ")
-    sub = sub[sub["first_word"].str.len() > 0]
-    sub = sub[sub["first_word"].str[0].isin(kaomoji_starts)]
-    if len(sub) == 0:
+    keep_mask = np.asarray([
+        isinstance(s, str) and len(s) > 0 and s[0] in kaomoji_starts
+        for s in df["first_word"]
+    ])
+    if not keep_mask.any():
+        return
+    sub = df.loc[keep_mask].reset_index(drop=True)
+    X_sub = X[keep_mask]
+
+    # Per-kaomoji mean hidden-state vector, filtered to n >= min_count.
+    from .hidden_state_analysis import group_mean_vectors
+    keys_df, M, counts = group_mean_vectors(
+        sub, X_sub, "first_word", min_count=min_count,
+    )
+    if len(keys_df) < 3:
         return
 
-    grouped = sub.groupby("first_word")[probe_cols].mean()
-    counts = sub.groupby("first_word").size()
-    keep = counts[counts >= min_count].index
-    grouped = grouped.loc[grouped.index.isin(keep)]
-    if len(grouped) < 3:
-        return
-
-    M = grouped.to_numpy()
-    if center:
-        M = M - M.mean(axis=0, keepdims=True)
-    sim = cosine_similarity(M)
+    sim = cosine_similarity_matrix(M, center=center)
     dist = np.clip(1 - sim, 0, None)
     np.fill_diagonal(dist, 0)
 
     Z = linkage(squareform(dist, checks=False), method="average")
     order = leaves_list(Z)
     ordered_sim = sim[np.ix_(order, order)]
-    labels = grouped.index.to_numpy()[order]
-    label_counts = counts.loc[labels].to_numpy()
+    labels = keys_df["first_word"].iloc[order].to_numpy()
+    label_counts = counts.iloc[order].to_numpy()
 
     # pole-color each label per the current taxonomy: happy=warm,
     # sad=cool, other=gray. Observed-but-unlabeled variants show gray
@@ -408,7 +410,7 @@ def plot_kaomoji_heatmap(
     # show n= on the y-axis after each kaomoji so readers can weigh the
     # noise on each row.
     y_labels = [f"{k}  n={c}" for k, c in zip(labels, label_counts)]
-    ax.set_xticklabels(labels, rotation=45, ha="right", fontsize=7)
+    ax.set_xticklabels(labels.tolist(), rotation=45, ha="right", fontsize=7)
     ax.set_yticklabels(y_labels, fontsize=7)
     for tick, color in zip(ax.get_xticklabels(), row_colors):
         tick.set_color(color)
@@ -416,7 +418,7 @@ def plot_kaomoji_heatmap(
         tick.set_color(color)
     centering_note = "grand-mean centered; " if center else "uncentered; "
     ax.set_title(
-        f"per-kaomoji probe-vector cosine similarity  "
+        f"per-kaomoji HIDDEN-STATE cosine similarity  "
         f"({centering_note}n ≥ {min_count} observations; {n} kaomoji shown)"
     )
     cb = fig.colorbar(im, ax=ax, shrink=0.7, label="cosine similarity")
@@ -477,12 +479,19 @@ def plot_cluster_confusion(df: pd.DataFrame, out_path: str) -> None:
     plt.close(fig)
 
 
-def all_figures(df: pd.DataFrame, figures_dir: str) -> None:
+def all_figures(df: pd.DataFrame, X: np.ndarray, figures_dir: str) -> None:
+    """Render all v1/v2 figures. ``df`` has probe-score columns via
+    ``load_rows``; ``X`` is the row-aligned hidden-state matrix via
+    ``llmoji.hidden_state_analysis.load_hidden_features``.
+
+    Probe-based (use df columns): Fig 1a axis scatter, Fig 2 bars, Fig 4
+    k-means confusion.
+    Hidden-state-based (use X): Fig 1b PCA, Fig 3 per-kaomoji cosine."""
     import os
     _use_cjk_font()
     os.makedirs(figures_dir, exist_ok=True)
     plot_axis_scatter(df, os.path.join(figures_dir, "fig1a_axis_scatter.png"))
-    plot_pca_scatter(df, os.path.join(figures_dir, "fig1b_pca_scatter.png"))
+    plot_pca_scatter(df, X, os.path.join(figures_dir, "fig1b_pca_scatter.png"))
     plot_condition_bars(df, os.path.join(figures_dir, "fig2_condition_bars.png"))
-    plot_kaomoji_heatmap(df, os.path.join(figures_dir, "fig3_kaomoji_heatmap.png"))
+    plot_kaomoji_heatmap(df, X, os.path.join(figures_dir, "fig3_kaomoji_heatmap.png"))
     plot_cluster_confusion(df, os.path.join(figures_dir, "fig4_cluster_confusion.png"))

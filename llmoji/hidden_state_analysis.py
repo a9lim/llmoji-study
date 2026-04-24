@@ -1,35 +1,37 @@
-"""Analysis over saved hidden states: post-hoc probe computation and
-cosine similarity in hidden-state space.
+# pyright: reportArgumentType=false, reportAttributeAccessIssue=false, reportCallIssue=false, reportReturnType=false
+"""Analysis over saved hidden states: feature loading, group-mean
+aggregation, cosine heatmaps, PCA scatters, and per-(kaomoji, source)
+primitives used by analysis.py / emotional_analysis.py /
+cross_pilot_analysis.py.
 
-The motivating argument for the whole refactor is that saklas's 5
-bipolar probes collapse to ~1 valence direction (PC1 = 89-95% of
-variance across all our data), so probe-score-cosine throws away most
-of the structure in the underlying representations. Cosine on raw
-hidden states (~4096-dim in gemma-4-31b-it) preserves the full
-activation signature — whatever structure exists in the model's
-internal state is available for analysis.
+Motivating argument for the whole refactor: saklas's 5 bipolar probes
+collapse to ~1 valence direction (PC1 = 89-95% of variance across
+v1/v2/v3). Cosine on raw hidden states (~4096-dim in gemma-4-31b-it)
+preserves the full activation signature — whatever structure exists
+in the model's internal state is available for analysis.
 
-This module provides the basic primitives:
+Primitives are generic: they take a DataFrame of metadata + an
+(n_rows, hidden_dim) feature matrix, and a groupby column. The
+specific analysis modules compose these into their figures.
 
-  load_row_hidden(row, data_dir) -> FullSequenceCapture
-      load the sidecar for a row (looked up by row_uuid).
+Layer selection: default is the highest captured probe layer
+(closest to output; "the deepest affect-readable representation").
+Override via ``layer=`` where needed.
 
-  recompute_probe_scores(capture, session) -> dict[probe_name, float]
-      apply current probes to saved hidden states. Used by the smoke
-      test to verify round-trip vs. on-the-fly scores.
-
-  pooled_kaomoji_cosine_from_hidden(df, data_dir, *, which='h_last',
-                                    layer=None) -> DataFrame
-      per-(kaomoji, source) cosine similarity matrix, computed from
-      saved hidden states rather than probe scores.
+Snapshot selection: default is ``h_last`` (matches saklas's
+aggregate readout, which scores the last non-special generated token).
+Use ``h_first`` for "state that produced the kaomoji" under kaomoji-
+prompted conditions, or ``h_mean`` for a whole-generation summary.
 """
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
 import numpy as np
+import pandas as pd
 
 from .hidden_capture import FullSequenceCapture
 from .hidden_state_io import hidden_state_path, load_hidden_states
@@ -38,19 +40,205 @@ from .hidden_state_io import hidden_state_path, load_hidden_states
 WHICH_SNAPSHOTS = ("h_first", "h_last", "h_mean")
 
 
+# ---------------------------------------------------------------------------
+# Loading
+# ---------------------------------------------------------------------------
+
+
 def load_row_hidden(
     row: dict[str, Any],
     data_dir: Path,
     experiment: str,
+    *,
+    full_trace: bool = True,
 ) -> FullSequenceCapture:
-    """Load hidden-state sidecar for a JSONL row. Expects ``row_uuid`` key."""
+    """Load hidden-state sidecar for one JSONL row."""
     uuid = row.get("row_uuid")
     if not uuid:
-        raise KeyError("row has no row_uuid; probably pre-refactor data")
+        raise KeyError("row has no row_uuid; pre-refactor data")
     path = hidden_state_path(data_dir, experiment, uuid)
     if not path.exists():
         raise FileNotFoundError(f"no sidecar at {path}")
-    return load_hidden_states(path)
+    return load_hidden_states(path, full_trace=full_trace)
+
+
+def load_hidden_features(
+    jsonl_path: str | Path,
+    data_dir: Path,
+    experiment: str,
+    *,
+    which: str = "h_last",
+    layer: int | None = None,
+    drop_errors: bool = True,
+) -> tuple[pd.DataFrame, np.ndarray]:
+    """Load a JSONL + its hidden-state sidecars into a (metadata df,
+    feature matrix) pair.
+
+    Rows without a ``row_uuid`` or missing sidecar files are dropped.
+    ``layer=None`` picks the highest layer index present in the first
+    loaded sidecar (typically the probe-set max, closest to output).
+
+    Returns
+    -------
+    df : pd.DataFrame
+        Metadata columns only; no probe-score columns loaded. Row order
+        matches X row order.
+    X : np.ndarray
+        (n_rows, hidden_dim) fp32 matrix of the chosen snapshot at the
+        chosen layer.
+    """
+    if which not in WHICH_SNAPSHOTS:
+        raise ValueError(f"which must be one of {WHICH_SNAPSHOTS}")
+
+    jsonl_path = Path(jsonl_path)
+    rows: list[dict[str, Any]] = []
+    with jsonl_path.open() as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            r = json.loads(line)
+            if drop_errors and "error" in r:
+                continue
+            rows.append(r)
+
+    chosen_layer = layer
+    features: list[np.ndarray] = []
+    kept: list[dict[str, Any]] = []
+    missing = 0
+    for r in rows:
+        uuid = r.get("row_uuid", "")
+        if not uuid:
+            missing += 1
+            continue
+        sidecar = hidden_state_path(data_dir, experiment, uuid)
+        if not sidecar.exists():
+            missing += 1
+            continue
+        cap = load_hidden_states(sidecar, full_trace=False)
+        if chosen_layer is None:
+            chosen_layer = max(cap.layers.keys())
+        lc = cap.layers.get(chosen_layer)
+        if lc is None:
+            missing += 1
+            continue
+        features.append(getattr(lc, which).astype(np.float32))
+        kept.append(r)
+
+    if missing:
+        print(f"  [load_hidden_features] dropped {missing} rows with "
+              f"no sidecar / missing layer")
+
+    if not kept:
+        return pd.DataFrame(), np.zeros((0, 0), dtype=np.float32)
+
+    df = pd.DataFrame(kept)
+    X = np.asarray(features, dtype=np.float32)
+    return df.reset_index(drop=True), X
+
+
+# ---------------------------------------------------------------------------
+# Group aggregation
+# ---------------------------------------------------------------------------
+
+
+def group_mean_vectors(
+    df: pd.DataFrame,
+    X: np.ndarray,
+    group_by: str | list[str],
+    *,
+    min_count: int = 3,
+) -> tuple[pd.DataFrame, np.ndarray, pd.Series]:
+    """Group rows of X by one or more DataFrame columns, return
+    (keys_df, per-group-mean matrix, counts).
+
+    keys_df has one row per surviving group with the group-by columns,
+    aligned with M's row order. Groups with n < min_count are dropped.
+    """
+    if isinstance(group_by, str):
+        group_cols = [group_by]
+    else:
+        group_cols = list(group_by)
+
+    counts = df.groupby(group_cols).size()
+    keep_idx = counts[counts >= min_count].index
+    if len(keep_idx) == 0:
+        empty_keys = pd.DataFrame({c: [] for c in group_cols})
+        return empty_keys, np.zeros((0, X.shape[1] if X.size else 0), dtype=np.float32), pd.Series(dtype=int)
+
+    # Build a single Series for group-key comparisons.
+    if len(group_cols) == 1:
+        row_keys = df[group_cols[0]]
+    else:
+        row_keys = pd.MultiIndex.from_frame(df[group_cols])
+
+    keys_out: list[Any] = []
+    means: list[np.ndarray] = []
+    counts_kept: list[int] = []
+    for key in keep_idx:
+        if len(group_cols) == 1:
+            mask = (df[group_cols[0]] == key).to_numpy()
+        else:
+            mask = np.asarray([row_keys[i] == key for i in range(len(df))])
+        if not mask.any():
+            continue
+        keys_out.append(key)
+        means.append(X[mask].mean(axis=0))
+        counts_kept.append(int(mask.sum()))
+
+    if len(group_cols) == 1:
+        keys_df = pd.DataFrame({group_cols[0]: keys_out})
+    else:
+        # keys are tuples; expand
+        rows = [dict(zip(group_cols, k)) for k in keys_out]
+        keys_df = pd.DataFrame(rows)
+
+    M = np.asarray(means, dtype=np.float32)
+    counts_series = pd.Series(counts_kept, index=range(len(keys_out)), name="n")
+    return keys_df, M, counts_series
+
+
+# ---------------------------------------------------------------------------
+# Similarity primitives
+# ---------------------------------------------------------------------------
+
+
+def cosine_similarity_matrix(
+    X: np.ndarray, *, center: bool = True,
+) -> np.ndarray:
+    """Pairwise cosine similarity of rows in X. ``center=True``
+    subtracts the column mean first — in hidden-state space there's
+    still a shared response-baseline direction that uncentered cosine
+    would be dominated by (same reasoning that applied to probe
+    vectors, only more so given 4096 dims of room for a shared mean).
+    """
+    if len(X) == 0:
+        return np.zeros((0, 0), dtype=np.float32)
+    if center:
+        X = X - X.mean(axis=0, keepdims=True)
+    norms = np.linalg.norm(X, axis=1, keepdims=True)
+    norms = np.where(norms > 0, norms, 1.0)
+    Xn = X / norms
+    return Xn @ Xn.T
+
+
+def cosine_to_mean(X: np.ndarray) -> np.ndarray:
+    """For each row in X, its cosine similarity to the mean across
+    rows. Used for within-group consistency distributions."""
+    if len(X) == 0:
+        return np.zeros(0, dtype=np.float32)
+    mean = X.mean(axis=0, keepdims=True)
+    mean_norm = np.linalg.norm(mean, axis=1)
+    row_norms = np.linalg.norm(X, axis=1)
+    denom = row_norms * mean_norm
+    dots = (X * mean).sum(axis=1)
+    out = np.divide(dots, denom, out=np.zeros_like(dots, dtype=np.float32), where=denom > 0)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Probe recomputation (retained for validation / cross-check)
+# ---------------------------------------------------------------------------
 
 
 def recompute_probe_scores(
@@ -60,17 +248,13 @@ def recompute_probe_scores(
     which: str = "h_last",
 ) -> dict[str, float]:
     """Run saklas's own probe-scoring on saved hidden states for one
-    snapshot (h_first / h_last / h_attn_weighted). Used to verify the
-    sidecars faithfully reproduce on-the-fly probe scores.
-
-    The snapshot must be at (or above) the layers saklas's probes
-    target; ``capture.layers`` covers those by construction."""
+    snapshot. Used by the smoke test to verify sidecars faithfully
+    reproduce on-the-fly probe scores."""
     import torch
 
     if which not in WHICH_SNAPSHOTS:
         raise ValueError(f"which must be one of {WHICH_SNAPSHOTS}")
 
-    # Build the {layer_idx: Tensor(hidden_dim,)} dict saklas expects.
     hidden_dict: dict[int, Any] = {}
     for idx, lc in capture.layers.items():
         arr = getattr(lc, which)
@@ -87,11 +271,7 @@ def stack_snapshot(
     which: str = "h_last",
     layer: int | None = None,
 ) -> np.ndarray:
-    """Stack one snapshot across rows into (n_rows, hidden_dim).
-
-    ``layer`` selects which probe layer to read from. Default picks
-    the highest layer index in the first capture (closest to the
-    output) which is usually where affect probes live."""
+    """Stack one snapshot across captures into (n, hidden_dim)."""
     if not captures:
         return np.zeros((0, 0), dtype=np.float32)
     if layer is None:
@@ -105,18 +285,3 @@ def stack_snapshot(
             )
         out.append(getattr(cap.layers[layer], which))
     return np.asarray(out, dtype=np.float32)
-
-
-def cosine_similarity_matrix(
-    X: np.ndarray, *, center: bool = True,
-) -> np.ndarray:
-    """Pairwise cosine similarity of rows in X, optionally centered
-    on the column mean first. Same recipe we use on probe vectors —
-    centering removes the shared-baseline direction that dominates
-    uncentered cosine across activations."""
-    if center and len(X) > 0:
-        X = X - X.mean(axis=0, keepdims=True)
-    norms = np.linalg.norm(X, axis=1, keepdims=True)
-    norms = np.where(norms > 0, norms, 1.0)
-    Xn = X / norms
-    return Xn @ Xn.T

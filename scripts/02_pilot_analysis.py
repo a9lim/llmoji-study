@@ -15,7 +15,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from llmoji.analysis import all_figures, evaluate_axis, load_rows
-from llmoji.config import FIGURES_DIR, PILOT_RAW_PATH, STEERED_AXES
+from llmoji.config import (
+    DATA_DIR,
+    FIGURES_DIR,
+    PILOT_EXPERIMENT,
+    PILOT_RAW_PATH,
+    STEERED_AXES,
+)
+from llmoji.hidden_state_analysis import load_hidden_features
 
 
 def main() -> None:
@@ -46,8 +53,28 @@ def main() -> None:
         print()
 
     # --- figures ---
+    # For hidden-state figures (Fig 1b PCA, Fig 3 cosine), load the
+    # per-row hidden-state matrix from sidecars. Fig 1a / 2 / 4 stay
+    # probe-based and just use the df columns. `load_hidden_features`
+    # reads the JSONL independently and returns its own metadata df
+    # aligned with X; we discard that df and use the probe-column df
+    # from load_rows for probe-based figures, passing only X forward.
+    print("\nloading hidden-state features for Fig 1b + Fig 3...")
+    df_hidden, X = load_hidden_features(
+        str(PILOT_RAW_PATH), DATA_DIR,
+        experiment=PILOT_EXPERIMENT, which="h_last",
+    )
+    # Align X to df via row_uuid (drops rows without sidecars).
+    uuid_to_idx = {u: i for i, u in enumerate(df_hidden["row_uuid"])}
+    aligned_idx = [uuid_to_idx.get(u, -1) for u in df.get("row_uuid", [])]
+    keep = [i for i in aligned_idx if i >= 0]
+    if len(keep) < len(df):
+        print(f"  [align] {len(keep)}/{len(df)} rows have hidden-state sidecars")
+    df = df.iloc[[k for k, i in enumerate(aligned_idx) if i >= 0]].reset_index(drop=True)
+    X = X[keep]
+
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-    all_figures(df, str(FIGURES_DIR))
+    all_figures(df, X, str(FIGURES_DIR))
     print(f"figures written to {FIGURES_DIR}")
 
     # --- go / no-go call (per axis) ---

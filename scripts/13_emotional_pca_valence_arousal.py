@@ -1,10 +1,10 @@
-"""v3-only PCA on row probe vectors, per-(kaomoji, quadrant) means
-projected into PC1/PC2, plotted with valence + arousal colorings.
+"""v3 PCA on hidden-state features, Russell-quadrant-colored scatter
+with optional v1/v2 neutral-valence baseline.
 
-Complements scripts/10_cross_pilot_clustering.py — that one pools
-v1/v2 + v3 and PC1 ends up dominated by steering shifts. This one
-restricts to naturalistic-regime data so the PC axes have a chance
-to reflect valence/arousal structure directly."""
+Loads v3 per-row hidden-state sidecars from data/hidden/v3/ and the
+v1/v2 neutral-valence rows from data/hidden/v1v2/ (if present), then
+fits PCA on the combined row-level hidden states and projects
+per-(kaomoji, quadrant) means through."""
 
 from __future__ import annotations
 
@@ -14,14 +14,16 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from llmoji.config import (
+    DATA_DIR,
     EMOTIONAL_DATA_PATH,
+    EMOTIONAL_EXPERIMENT,
     FIGURES_DIR,
+    PILOT_EXPERIMENT,
     PILOT_RAW_PATH,
-    PROBES,
 )
 from llmoji.emotional_analysis import (
-    load_rows,
-    load_v1v2_neutral_baseline,
+    load_emotional_features,
+    load_v1v2_neutral_baseline_features,
     plot_v3_pca_valence_arousal,
 )
 
@@ -31,19 +33,32 @@ def main() -> None:
         print(f"no data at {EMOTIONAL_DATA_PATH}; run scripts/03_emotional_run.py first")
         return
 
-    df = load_rows(str(EMOTIONAL_DATA_PATH))
-    print(f"loaded {len(df)} v3 rows")
+    print("loading v3 hidden-state features...")
+    df, X = load_emotional_features(
+        str(EMOTIONAL_DATA_PATH), DATA_DIR,
+        experiment=EMOTIONAL_EXPERIMENT, which="h_last",
+    )
+    print(f"loaded {len(df)} v3 kaomoji-bearing rows; X shape {X.shape}")
+    if len(df) == 0:
+        print("nothing to plot; the v3 run needs to land hidden-state sidecars first")
+        return
 
-    baseline = None
+    # Optional v1/v2 neutral baseline — adds an NB-style comparator
+    # from the v1/v2 factual-question register.
+    baseline_df = baseline_X = None
     if PILOT_RAW_PATH.exists():
-        baseline = load_v1v2_neutral_baseline(str(PILOT_RAW_PATH))
-        print(f"loaded {len(baseline)} v1/v2 kaomoji_prompted neutral-valence rows")
-    else:
-        print(f"(no pilot_raw at {PILOT_RAW_PATH}; skipping neutral baseline)")
+        baseline_df, baseline_X = load_v1v2_neutral_baseline_features(
+            str(PILOT_RAW_PATH), DATA_DIR,
+            experiment=PILOT_EXPERIMENT, which="h_last",
+        )
+        print(f"loaded {len(baseline_df)} v1/v2 neutral-valence baseline rows")
 
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
     fig_path = FIGURES_DIR / "fig_v3_pca_valence_arousal.png"
-    stats = plot_v3_pca_valence_arousal(df, str(fig_path), baseline_df=baseline)
+    stats = plot_v3_pca_valence_arousal(
+        df, X, str(fig_path),
+        baseline_df=baseline_df, baseline_X=baseline_X,
+    )
     print(f"\nwrote {fig_path}")
     print(f"fit PCA on {stats.get('n_rows_fit')} rows; "
           f"plotted {stats.get('n_cells_plotted')} (kaomoji, quadrant) cells")
@@ -51,15 +66,6 @@ def main() -> None:
     print("\nPCA explained-variance spectrum:")
     for i, v in enumerate(stats.get("explained_variance_ratio", []), 1):
         print(f"  PC{i}: {v * 100:6.2f}%")
-
-    components = stats.get("components") or []
-    if len(components) >= 2:
-        print("\nPC1 loadings (probe -> weight on PC1):")
-        for name, load in zip(PROBES, components[0]):
-            print(f"  {name:>22}  {load:+.3f}")
-        print("\nPC2 loadings (probe -> weight on PC2):")
-        for name, load in zip(PROBES, components[1]):
-            print(f"  {name:>22}  {load:+.3f}")
 
     centroids = stats.get("quadrant_centroids_pc12") or {}
     within = stats.get("within_quadrant_std_pc12") or {}
@@ -75,9 +81,6 @@ def main() -> None:
                 print(f"  {q}:  ({pc1:+.3f}, {pc2:+.3f})   "
                       f"|  ({s1:.3f}, {s2:.3f})")
 
-        # Separation quality: between-centroid spread divided by mean
-        # within-quadrant spread. >1 = between-centroid is bigger than
-        # the typical within-quadrant scatter = clean separation.
         mean_within_pc1 = sum(v[0] for v in within.values()) / max(1, len(within))
         mean_within_pc2 = sum(v[1] for v in within.values()) / max(1, len(within))
         print(f"\nseparation ratio (between-centroid std / mean within-quadrant std):")
