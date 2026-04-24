@@ -331,6 +331,7 @@ def plot_kaomoji_heatmap(
     out_path: str,
     *,
     min_count: int = 3,
+    center: bool = True,
 ) -> None:
     """Fig 3: per-kaomoji mean probe vector, cosine-similarity heatmap
     with hierarchical clustering (dendrogram-ordered).
@@ -342,6 +343,13 @@ def plot_kaomoji_heatmap(
     ``"I"`` or markdown bolding like ``"**Congratulations!**"``) are
     excluded by requiring the first character to be an opening bracket
     or one of the common kaomoji-prefix glyphs.
+
+    When ``center=True`` (default), the grand mean across the surviving
+    per-kaomoji rows is subtracted before cosine. Without centering the
+    shared response-baseline direction (valence-correlated probe cluster
+    common to all responses) dominates cosine and every pair reads
+    ~0.8-1.0, wiping out between-kaomoji structure. Centered cosine
+    spans the full -1..+1 range.
     """
     import matplotlib.pyplot as plt
     from scipy.cluster.hierarchy import linkage, leaves_list
@@ -372,6 +380,8 @@ def plot_kaomoji_heatmap(
         return
 
     M = grouped.to_numpy()
+    if center:
+        M = M - M.mean(axis=0, keepdims=True)
     sim = cosine_similarity(M)
     dist = np.clip(1 - sim, 0, None)
     np.fill_diagonal(dist, 0)
@@ -404,9 +414,10 @@ def plot_kaomoji_heatmap(
         tick.set_color(color)
     for tick, color in zip(ax.get_yticklabels(), row_colors):
         tick.set_color(color)
+    centering_note = "grand-mean centered; " if center else "uncentered; "
     ax.set_title(
         f"per-kaomoji probe-vector cosine similarity  "
-        f"(n ≥ {min_count} observations; {n} kaomoji shown)"
+        f"({centering_note}n ≥ {min_count} observations; {n} kaomoji shown)"
     )
     cb = fig.colorbar(im, ax=ax, shrink=0.7, label="cosine similarity")
     cb.ax.tick_params(labelsize=8)

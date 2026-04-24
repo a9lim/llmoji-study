@@ -116,12 +116,18 @@ def plot_kaomoji_cosine_heatmap(
     *,
     min_count: int = 3,
     timestep: str = "tlast",
+    center: bool = True,
 ) -> None:
     """Figure A: per-kaomoji mean probe vector (at the given timestep),
     pairwise cosine similarity with hierarchical-clustering row order.
     Mirrors analysis.plot_kaomoji_heatmap with emotional-experiment
     title/context. Pass timestep='t0' for first-token state, 'tlast'
-    for final-token state."""
+    for final-token state.
+
+    When ``center=True`` (default), the grand mean across surviving
+    per-kaomoji rows is subtracted before cosine, removing the shared
+    response-baseline direction. Without centering every pair reads
+    high-positive and between-kaomoji structure is invisible."""
     import matplotlib.pyplot as plt
     from matplotlib.patches import Patch
     from scipy.cluster.hierarchy import linkage, leaves_list
@@ -141,6 +147,8 @@ def plot_kaomoji_cosine_heatmap(
         return
 
     M = grouped.to_numpy()
+    if center:
+        M = M - M.mean(axis=0, keepdims=True)
     sim = cosine_similarity(M)
     dist = np.clip(1 - sim, 0, None)
     np.fill_diagonal(dist, 0)
@@ -167,9 +175,10 @@ def plot_kaomoji_cosine_heatmap(
     for tick, color in zip(ax.get_yticklabels(), row_colors):
         tick.set_color(color)
     ts_label = "first-token (t=0)" if timestep == "t0" else "final-token (t=last)"
+    centering_note = "grand-mean centered; " if center else "uncentered; "
     ax.set_title(
         f"Figure A: per-kaomoji {ts_label} probe-vector cosine similarity  "
-        f"(n ≥ {min_count}; {n} kaomoji)"
+        f"({centering_note}n ≥ {min_count}; {n} kaomoji)"
     )
     cb = fig.colorbar(im, ax=ax, shrink=0.7, label="cosine similarity")
     cb.ax.tick_params(labelsize=8)
@@ -337,6 +346,7 @@ def plot_kaomoji_quadrant_alignment(
     min_count: int = 3,
     min_per_cell: int = 2,
     timestep: str = "tlast",
+    center: bool = True,
 ) -> None:
     """Figure C: for each kaomoji × quadrant cell with >= min_per_cell
     observations, the cosine similarity between the cell's mean probe
@@ -348,9 +358,17 @@ def plot_kaomoji_quadrant_alignment(
     Cells with < min_per_cell observations are shown as hatched/blank.
     Sample counts annotated in cells.
 
-    Interpretation: if row ``(｡◕‿◕｡)`` looks red in HP and LP columns
-    but blue in HN and LN, valence-context is written into its final-
-    token signature. If the row is uniform, the signature is
+    When ``center=True`` (default), cell means and quadrant aggregates
+    are each centered against the same reference (the overall
+    kaomoji-pool mean) before cosine. Without centering the shared
+    baseline dominates and every non-hatched cell reads high-positive,
+    wiping out the context-specificity signal. Centered cosine measures
+    whether this cell's *deviation from baseline* aligns with the
+    quadrant's *deviation from baseline*.
+
+    Interpretation (centered): if row ``(｡◕‿◕｡)`` looks red in HP and
+    LP columns but blue in HN and LN, valence-context is written into
+    its signature. If the row is uniform, the signature is
     context-invariant.
     """
     import matplotlib.pyplot as plt
@@ -374,6 +392,11 @@ def plot_kaomoji_quadrant_alignment(
         print(f"  [Fig C {timestep}] only {len(grouped)} kaomoji with n≥{min_count}; skipping")
         return
 
+    # Common centering reference: the mean of the full kaomoji-bearing
+    # pool. Both cell means and quadrant aggregates get this subtracted
+    # so their cosine compares deviations from the same baseline.
+    pool_mean = sub[cols].to_numpy().mean(axis=0) if center else np.zeros(len(PROBES))
+
     # Quadrant aggregates: mean probe vector per quadrant across all
     # kaomoji-bearing rows (not per-kaomoji-then-mean).
     quadrants = ["HP", "LP", "HN", "LN"]
@@ -383,7 +406,7 @@ def plot_kaomoji_quadrant_alignment(
         if len(q_rows) == 0:
             q_means[q] = np.full(len(PROBES), np.nan)
         else:
-            q_means[q] = q_rows[cols].to_numpy().mean(axis=0)
+            q_means[q] = q_rows[cols].to_numpy().mean(axis=0) - pool_mean
 
     # Per-(kaomoji, quadrant) mean and count.
     kms = list(grouped.index)
@@ -395,15 +418,19 @@ def plot_kaomoji_quadrant_alignment(
             cell_n[i, j] = len(cell_rows)
             if len(cell_rows) < min_per_cell:
                 continue
-            cell_mean = cell_rows[cols].to_numpy().mean(axis=0)
+            cell_mean = cell_rows[cols].to_numpy().mean(axis=0) - pool_mean
             if np.isnan(q_means[q]).any():
                 continue
             a = cell_mean.reshape(1, -1)
             b = q_means[q].reshape(1, -1)
+            # cosine_similarity with zero-norm vectors returns 0; safe.
             cell_sim[i, j] = float(cosine_similarity(a, b)[0, 0])
 
-    # Row ordering: cluster kaomoji means (same as Figure A).
+    # Row ordering: cluster kaomoji means (same as Figure A, centered
+    # against the same pool mean for consistency).
     M = grouped.to_numpy()
+    if center:
+        M = M - M.mean(axis=0, keepdims=True)
     sim = cosine_similarity(M)
     dist = np.clip(1 - sim, 0, None)
     np.fill_diagonal(dist, 0)
@@ -444,9 +471,10 @@ def plot_kaomoji_quadrant_alignment(
                     color="#333" if count >= min_per_cell else "#888")
 
     ts_label = "first-token (t=0)" if timestep == "t0" else "final-token (t=last)"
+    centering_note = "pool-mean centered; " if center else "uncentered; "
     ax.set_title(
         f"Figure C: kaomoji × quadrant alignment ({ts_label})\n"
-        f"(color = cosine sim; hatched = n<{min_per_cell} observations)"
+        f"({centering_note}color = cosine sim; hatched = n<{min_per_cell} observations)"
     )
     cb = fig.colorbar(im, ax=ax, shrink=0.7, label="cosine similarity")
     cb.ax.tick_params(labelsize=8)
