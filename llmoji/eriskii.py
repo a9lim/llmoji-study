@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import numpy as np
+
 
 MASK_TOKEN = "[FACE]"
 
@@ -58,3 +60,48 @@ def call_haiku(
         if getattr(block, "type", None) == "text":
             return (getattr(block, "text", "") or "").strip()
     return ""
+
+
+def compute_axis_vectors(
+    embedder: Any,
+    anchors: dict[str, tuple[str, str]],
+) -> dict[str, np.ndarray]:
+    """For each axis name → (positive_anchor, negative_anchor),
+    embed both, return the L2-normalized difference (positive − negative).
+
+    `embedder` is a sentence_transformers.SentenceTransformer instance.
+    """
+    pos_texts = [pos for pos, _ in anchors.values()]
+    neg_texts = [neg for _, neg in anchors.values()]
+    # one batch call for all anchors at once
+    pos_emb = embedder.encode(
+        pos_texts, normalize_embeddings=True, show_progress_bar=False,
+    )
+    neg_emb = embedder.encode(
+        neg_texts, normalize_embeddings=True, show_progress_bar=False,
+    )
+    out: dict[str, np.ndarray] = {}
+    for i, name in enumerate(anchors.keys()):
+        diff = np.asarray(pos_emb[i]) - np.asarray(neg_emb[i])
+        norm = float(np.linalg.norm(diff))
+        if norm > 0:
+            diff = diff / norm
+        out[name] = diff
+    return out
+
+
+def project_onto_axes(
+    E: np.ndarray,
+    axis_vectors: dict[str, np.ndarray],
+    axis_order: list[str],
+) -> np.ndarray:
+    """Return (n_kaomoji, n_axes) projection matrix.
+
+    Rows of E are assumed already L2-normalized (matches what
+    save_embeddings/load_embeddings produce). Axis vectors are
+    L2-normalized by compute_axis_vectors. Cosine similarity collapses
+    to dot product under that normalization, so result[i, j] is the
+    cosine of kaomoji i's description-embedding with axis j.
+    """
+    A = np.stack([axis_vectors[name] for name in axis_order], axis=1)
+    return E @ A
