@@ -28,8 +28,9 @@ def _use_cjk_font() -> None:
     import matplotlib
     import matplotlib.font_manager as fm
     preferred = [
+        "Noto Sans CJK JP",
         "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Hiragino Maru Gothic ProN",
-        "Apple Color Emoji", "Noto Sans CJK JP", "Yu Gothic", "MS Gothic",
+        "Apple Color Emoji", "Yu Gothic", "MS Gothic",
     ]
     available = {f.name for f in fm.fontManager.ttflist}
     for name in preferred:

@@ -215,7 +215,7 @@ def _use_cjk_font() -> None:
     import matplotlib
     import matplotlib.font_manager as fm
     avail = {f.name for f in fm.fontManager.ttflist}
-    for candidate in ("Hiragino Sans", "Arial Unicode MS", "Noto Sans CJK JP",
+    for candidate in ("Noto Sans CJK JP", "Hiragino Sans", "Arial Unicode MS",
                       "Apple SD Gothic Neo", "Hiragino Sans GB", "PingFang SC"):
         if candidate in avail:
             matplotlib.rcParams["font.family"] = [candidate, "DejaVu Sans"]
