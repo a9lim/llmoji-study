@@ -91,17 +91,57 @@ def _iter_conversation(conv: dict[str, Any]) -> Iterator[ScrapeRow]:
         turn += 1
 
 
+def _conv_content_score(conv: dict[str, Any]) -> int:
+    """Count messages with non-empty .text or .content in a conversation.
+    Used to rank duplicate conversations across multiple exports — newer
+    Claude.ai exports sometimes return empty content for conversations
+    that earlier exports returned in full. Prefer the version with more
+    filled-in messages."""
+    if not isinstance(conv, dict):
+        return 0
+    score = 0
+    for m in conv.get("chat_messages") or []:
+        if not isinstance(m, dict):
+            continue
+        t = m.get("text")
+        if isinstance(t, str) and t.strip():
+            score += 1
+            continue
+        for b in m.get("content") or []:
+            if isinstance(b, dict) and b.get("type") == "text":
+                bt = b.get("text") or ""
+                if bt.strip():
+                    score += 1
+                    break
+    return score
+
+
 def iter_claude_export() -> Iterator[ScrapeRow]:
-    """Yield every kaomoji-bearing assistant message from the
-    Claude.ai export conversations.json."""
-    from .config import CLAUDE_AI_EXPORT_DIR
-    path = Path(CLAUDE_AI_EXPORT_DIR) / "conversations.json"
-    if not path.exists():
-        return
-    with path.open() as f:
-        data = json.load(f)
-    if not isinstance(data, list):
-        return
-    for conv in data:
-        if isinstance(conv, dict):
-            yield from _iter_conversation(conv)
+    """Yield kaomoji-bearing assistant messages from all configured
+    Claude.ai export directories, unioning by conversation UUID and
+    preferring the copy with more non-empty messages."""
+    from .config import CLAUDE_AI_EXPORT_DIRS
+
+    best: dict[str, dict[str, Any]] = {}
+    best_score: dict[str, int] = {}
+    for export_dir in CLAUDE_AI_EXPORT_DIRS:
+        path = Path(export_dir) / "conversations.json"
+        if not path.exists():
+            continue
+        with path.open() as f:
+            data = json.load(f)
+        if not isinstance(data, list):
+            continue
+        for conv in data:
+            if not isinstance(conv, dict):
+                continue
+            uuid = conv.get("uuid")
+            if not isinstance(uuid, str):
+                continue
+            score = _conv_content_score(conv)
+            if score > best_score.get(uuid, -1):
+                best[uuid] = conv
+                best_score[uuid] = score
+
+    for conv in best.values():
+        yield from _iter_conversation(conv)
