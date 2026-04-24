@@ -54,21 +54,30 @@ def tlast_matrix(df: pd.DataFrame) -> np.ndarray:
 
 
 def _use_cjk_font() -> None:
-    """Force a matplotlib font that renders the Japanese-bracket kaomoji
-    glyphs. Copied from analysis._use_cjk_font to keep this module
-    standalone; the two copies should be kept consistent."""
+    """Configure matplotlib font-family as a fallback *chain* covering
+    the kaomoji character set. matplotlib 3.6+ does per-glyph fallback
+    through this list. The chain below hits 100% of the 90ish non-ASCII
+    characters seen across Claude's + gemma's kaomoji output on this
+    machine — intersection of Arial Unicode MS (primary), DejaVu Sans +
+    Serif (IPA + misc), Tahoma (˵ ˶), Noto Sans Canadian Aboriginal
+    (ᗒ ᗕ ᗜ ᗨ), Heiti TC (꒳). Copied to analysis._use_cjk_font and
+    scripts/09_claude_faces_plot.py — keep consistent."""
     import matplotlib
     import matplotlib.font_manager as fm
-    preferred = [
-        "Noto Sans CJK JP",
-        "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Hiragino Maru Gothic ProN",
-        "Apple Color Emoji", "Yu Gothic", "MS Gothic",
+    chain = [
+        "Noto Sans CJK JP",  # primary for JP brackets and kana
+        "Arial Unicode MS",  # 82% broad Unicode coverage
+        "DejaVu Sans",
+        "DejaVu Serif",      # covers ᴥ (bear cheek)
+        "Tahoma",            # covers ˵ ˶
+        "Noto Sans Canadian Aboriginal",  # covers ᗒ ᗕ ᗜ ᗨ
+        "Heiti TC",          # covers ꒳
+        "Hiragino Sans", "Apple Symbols",
     ]
     available = {f.name for f in fm.fontManager.ttflist}
-    for name in preferred:
-        if name in available:
-            matplotlib.rcParams["font.family"] = name
-            return
+    chain = [n for n in chain if n in available]
+    if chain:
+        matplotlib.rcParams["font.family"] = chain
 
 
 def _kaomoji_rows(df: pd.DataFrame) -> pd.DataFrame:

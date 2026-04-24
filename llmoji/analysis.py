@@ -209,18 +209,22 @@ def evaluate(df: pd.DataFrame) -> AxisVerdict:
 # ---------------------------------------------------------------------
 
 def _use_cjk_font() -> None:
-    """Point matplotlib at a CJK-capable font so kaomoji render
-    properly. Falls through silently if none is installed — plots then
-    show tofu boxes for Japanese glyphs but everything else renders."""
+    """Configure a matplotlib font fallback chain that covers ~100% of
+    observed kaomoji characters. matplotlib 3.6+ falls back per-glyph
+    through this list. See emotional_analysis._use_cjk_font for the
+    character-coverage rationale."""
     import matplotlib
     import matplotlib.font_manager as fm
-    avail = {f.name for f in fm.fontManager.ttflist}
-    for candidate in ("Noto Sans CJK JP", "Hiragino Sans", "Arial Unicode MS",
-                      "Apple SD Gothic Neo", "Hiragino Sans GB", "PingFang SC"):
-        if candidate in avail:
-            matplotlib.rcParams["font.family"] = [candidate, "DejaVu Sans"]
-            matplotlib.rcParams["axes.unicode_minus"] = False
-            return
+    chain = [
+        "Noto Sans CJK JP", "Arial Unicode MS", "DejaVu Sans", "DejaVu Serif",
+        "Tahoma", "Noto Sans Canadian Aboriginal", "Heiti TC",
+        "Hiragino Sans", "Apple Symbols",
+    ]
+    available = {f.name for f in fm.fontManager.ttflist}
+    chain = [n for n in chain if n in available]
+    if chain:
+        matplotlib.rcParams["font.family"] = chain
+        matplotlib.rcParams["axes.unicode_minus"] = False
 
 
 def _setup_axes(ax: Any, title: str, xlabel: str, ylabel: str) -> None:

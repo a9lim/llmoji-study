@@ -25,18 +25,19 @@ from llmoji.config import CLAUDE_FACES_EMBED_PATH, FIGURES_DIR
 
 
 def _use_cjk_font() -> None:
+    """Fallback chain covering ~100% of observed kaomoji characters.
+    See llmoji.emotional_analysis._use_cjk_font for rationale."""
     import matplotlib
     import matplotlib.font_manager as fm
-    preferred = [
-        "Noto Sans CJK JP",
-        "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Hiragino Maru Gothic ProN",
-        "Apple Color Emoji", "Yu Gothic", "MS Gothic",
+    chain = [
+        "Noto Sans CJK JP", "Arial Unicode MS", "DejaVu Sans", "DejaVu Serif",
+        "Tahoma", "Noto Sans Canadian Aboriginal", "Heiti TC",
+        "Hiragino Sans", "Apple Symbols",
     ]
     available = {f.name for f in fm.fontManager.ttflist}
-    for name in preferred:
-        if name in available:
-            matplotlib.rcParams["font.family"] = name
-            return
+    chain = [n for n in chain if n in available]
+    if chain:
+        matplotlib.rcParams["font.family"] = chain
 
 
 def _tsne_2d(E: np.ndarray, *, seed: int = 0) -> np.ndarray:
@@ -96,7 +97,7 @@ def _plot_panel(
         ax.annotate(
             labels[i], xy=(xy[i, 0], xy[i, 1]),
             xytext=(4, 4), textcoords="offset points",
-            fontsize=7, color="#222",
+            fontsize=10, color="#222",
         )
 
     # cluster id at each cluster centroid (skip -1 noise)
@@ -179,7 +180,7 @@ def main() -> None:
     clusters_km = _kmeans(E, k=15)
 
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-    fig, axes = plt.subplots(1, 2, figsize=(18, 8))
+    fig, axes = plt.subplots(1, 2, figsize=(24, 12))
     _plot_panel(
         axes[0], xy, labels, counts, clusters_hdb,
         title=f"HDBSCAN (auto-k; {len(set(int(c) for c in clusters_hdb) - {-1})} clusters + noise)",
