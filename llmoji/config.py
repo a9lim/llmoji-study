@@ -89,7 +89,7 @@ EMOTIONAL_SUMMARY_PATH = DATA_DIR / "emotional_summary.tsv"
 CLAUDE_CODE_PROJECTS_DIR = Path.home() / ".claude" / "projects"
 CLAUDE_AI_EXPORT_DIR = Path(
     "/Users/a9lim/Downloads/data-72de1230-b9fa-4c55-bc10-84a35b58d89c"
-    "-1776479747-1b0e6bd8-batch-0000"
+    "-1777012863-4b01638a-batch-0000"
 )
 CLAUDE_KAOMOJI_PATH = DATA_DIR / "claude_kaomoji.jsonl"
 CLAUDE_VOCAB_SAMPLE_PATH = DATA_DIR / "claude_vocab_sample.tsv"
