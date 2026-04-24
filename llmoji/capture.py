@@ -5,12 +5,22 @@ The feature we actually care about is the probe score at the state that
 instruction, is the kaomoji itself). That lives at
 `result.readings[probe].per_generation[0]`. We also record the full
 per-token trace and the aggregate mean for downstream analysis.
+
+As of the hidden-state refactor: if ``hidden_dir`` is passed to
+``run_sample``, a per-row .npz sidecar is written with full-sequence
+hidden states at probe layers and the final layer's last-token
+attention weights — see ``llmoji.hidden_capture`` and
+``llmoji.hidden_state_io``. The SampleRow gets a ``row_uuid`` that keys
+into the sidecar. Probe-score fields are kept for back-compat and as
+a pre-computed redundant readout.
 """
 
 from __future__ import annotations
 
+import uuid
 from contextlib import contextmanager, nullcontext
 from dataclasses import asdict, dataclass
+from pathlib import Path
 from typing import Any, Iterator
 
 from saklas import SaklasSession, SamplingConfig
@@ -23,6 +33,8 @@ from .config import (
     STEERED_AXIS,
     TEMPERATURE,
 )
+from .hidden_capture import build_full_input_ids, capture_full_sequence
+from .hidden_state_io import hidden_state_path, save_hidden_states
 from .prompts import Prompt
 from .taxonomy import extract
 
@@ -68,6 +80,11 @@ class SampleRow:
 
     # --- aggregate stats across the full generation ---
     probe_means: dict[str, float]
+
+    # --- hidden-state sidecar bookkeeping ---
+    # Populated when run_sample is called with hidden_dir; otherwise
+    # empty string (rows from pre-refactor runs won't have this).
+    row_uuid: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -130,8 +147,21 @@ def run_sample(
     prompt: Prompt,
     condition: str,
     seed: int,
+    hidden_dir: Path | None = None,
+    experiment: str = "default",
+    store_full_trace: bool = True,
 ) -> SampleRow:
-    """Run one generation and build a feature row."""
+    """Run one generation and build a feature row.
+
+    If ``hidden_dir`` is given, writes a per-row sidecar of hidden
+    states + attention weights under
+    ``<hidden_dir>/hidden/<experiment>/<row_uuid>.npz`` — enables
+    post-hoc probe computation and cosine-in-hidden-state analysis.
+    ``store_full_trace=False`` stores only the three aggregate
+    snapshots (first/last/attention-weighted) per layer, dropping the
+    per-token trace — ~60x smaller sidecars at the cost of losing
+    mid-sequence access.
+    """
     kaomoji_instructed = condition != "baseline"
     messages = build_messages(prompt, kaomoji_instructed=kaomoji_instructed)
     expr = steering_for(condition)
@@ -214,6 +244,39 @@ def run_sample(
         for probe in PROBES
     }
 
+    # Hidden-state sidecar capture (if requested). One extra
+    # full-sequence forward pass over (prompt + generated) with hooks
+    # on probe layers + final-layer self_attn.
+    row_uuid = ""
+    if hidden_dir is not None:
+        row_uuid = uuid.uuid4().hex
+        layer_idxs = sorted({
+            idx
+            for prof in session._monitor.profiles.values()
+            for idx in prof
+        })
+        if not layer_idxs:
+            raise RuntimeError(
+                "no probe layers registered on session; cannot capture hidden states"
+            )
+        input_ids, prompt_len = build_full_input_ids(
+            session._tokenizer, messages, result.text,
+        )
+        # Move input_ids to the same device as the model (gemma's
+        # forward requires the same device).
+        model = session._model
+        device = next(model.parameters()).device
+        input_ids = input_ids.to(device)
+        capture = capture_full_sequence(
+            model=model,
+            layers=session._layers,
+            layer_idxs=layer_idxs,
+            input_ids=input_ids,
+            prompt_len=prompt_len,
+        )
+        sidecar = hidden_state_path(hidden_dir, experiment, row_uuid)
+        save_hidden_states(capture, sidecar, store_full_trace=store_full_trace)
+
     return SampleRow(
         condition=condition,
         prompt_id=prompt.id,
@@ -232,4 +295,5 @@ def run_sample(
         probe_scores_tlast=probe_scores_tlast,
         steered_axis_per_token=steered_axis_per_token,
         probe_means=probe_means,
+        row_uuid=row_uuid,
     )
