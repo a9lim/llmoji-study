@@ -77,3 +77,10 @@ FIGURES_DIR = REPO_ROOT / "figures"
 VOCAB_SAMPLE_PATH = DATA_DIR / "vocab_sample.jsonl"
 PILOT_RAW_PATH = DATA_DIR / "pilot_raw.jsonl"
 PILOT_FEATURES_PATH = DATA_DIR / "pilot_features.parquet"
+
+# --- emotional-battery experiment (Russell quadrants, final-token probes) ---
+# Single arm: kaomoji-instructed, unsteered. 80 prompts × 8 seeds = 640 cells.
+EMOTIONAL_CONDITION = "kaomoji_prompted"
+EMOTIONAL_SEEDS_PER_CELL = 8
+EMOTIONAL_DATA_PATH = DATA_DIR / "emotional_raw.jsonl"
+EMOTIONAL_SUMMARY_PATH = DATA_DIR / "emotional_summary.tsv"
