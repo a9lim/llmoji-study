@@ -5,6 +5,7 @@ description = "Does kaomoji choice track internal state in local LMs?"
 requires-python = ">=3.11"
 dependencies = [
     "saklas>=1.4.6",
+    "anthropic",
     "numpy",
     "scipy",
     "scikit-learn",
