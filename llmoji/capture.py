@@ -54,6 +54,12 @@ class SampleRow:
     # one float per probe in PROBES, same order
     probe_scores_t0: list[float]
 
+    # --- feature vector: score at state producing the final token ---
+    # one float per probe in PROBES, same order. Mirrors probe_scores_t0
+    # but reads per_generation[-1]. Required — old pilot_raw.jsonl rows
+    # will fail to deserialize until re-run under this schema.
+    probe_scores_tlast: list[float]
+
     # --- auxiliary: per-token trace for the axis of interest ---
     # ProbeReadings.per_generation for STEERED_AXIS; lets us sanity-check
     # that token 0 is actually where the kaomoji emerges in the causal
@@ -158,6 +164,18 @@ def run_sample(
         else:
             probe_scores_t0.append(float(readings.per_generation[0]))
 
+    # Final-token probe scores in canonical PROBES order.
+    # per_generation[-1] is the state that produced the last generated
+    # token (which may be an EOS token in early-stop finishes; the
+    # finish_reason column lets downstream code filter if artifacts show).
+    probe_scores_tlast: list[float] = []
+    for probe in PROBES:
+        readings = result.readings.get(probe)
+        if readings is None or not readings.per_generation:
+            probe_scores_tlast.append(float("nan"))
+        else:
+            probe_scores_tlast.append(float(readings.per_generation[-1]))
+
     steered_axis_readings = result.readings.get(STEERED_AXIS)
     if steered_axis_readings is None:
         steered_axis_per_token: list[float] = []
@@ -187,6 +205,7 @@ def run_sample(
         tok_per_sec=result.tok_per_sec,
         finish_reason=result.finish_reason,
         probe_scores_t0=probe_scores_t0,
+        probe_scores_tlast=probe_scores_tlast,
         steered_axis_per_token=steered_axis_per_token,
         probe_means=probe_means,
     )
