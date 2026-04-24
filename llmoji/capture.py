@@ -33,7 +33,7 @@ from .config import (
     STEERED_AXIS,
     TEMPERATURE,
 )
-from .hidden_capture import build_full_input_ids, capture_full_sequence
+from .hidden_capture import read_after_generate
 from .hidden_state_io import hidden_state_path, save_hidden_states
 from .prompts import Prompt
 from .taxonomy import extract
@@ -244,36 +244,12 @@ def run_sample(
         for probe in PROBES
     }
 
-    # Hidden-state sidecar capture (if requested). One extra
-    # full-sequence forward pass over (prompt + generated) with hooks
-    # on probe layers + final-layer self_attn.
+    # Hidden-state sidecar capture (if requested). Reads directly from
+    # saklas's post-generation capture buckets — no extra forward pass.
     row_uuid = ""
     if hidden_dir is not None:
         row_uuid = uuid.uuid4().hex
-        layer_idxs = sorted({
-            idx
-            for prof in session._monitor.profiles.values()
-            for idx in prof
-        })
-        if not layer_idxs:
-            raise RuntimeError(
-                "no probe layers registered on session; cannot capture hidden states"
-            )
-        input_ids, prompt_len = build_full_input_ids(
-            session._tokenizer, messages, result.text,
-        )
-        # Move input_ids to the same device as the model (gemma's
-        # forward requires the same device).
-        model = session._model
-        device = next(model.parameters()).device
-        input_ids = input_ids.to(device)
-        capture = capture_full_sequence(
-            model=model,
-            layers=session._layers,
-            layer_idxs=layer_idxs,
-            input_ids=input_ids,
-            prompt_len=prompt_len,
-        )
+        capture = read_after_generate(session)
         sidecar = hidden_state_path(hidden_dir, experiment, row_uuid)
         save_hidden_states(capture, sidecar, store_full_trace=store_full_trace)
 

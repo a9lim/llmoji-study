@@ -35,7 +35,7 @@ from .hidden_capture import FullSequenceCapture
 from .hidden_state_io import hidden_state_path, load_hidden_states
 
 
-WHICH_SNAPSHOTS = ("h_first", "h_last", "h_attn_weighted")
+WHICH_SNAPSHOTS = ("h_first", "h_last", "h_mean")
 
 
 def load_row_hidden(

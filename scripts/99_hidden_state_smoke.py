@@ -107,53 +107,68 @@ def main() -> None:
             all_pass = False
             continue
         print(f"  sidecar ok: {sidecar.stat().st_size / 1024:.1f} KB  "
-              f"seq_len={capture.seq_len}  prompt_len={capture.prompt_len}  "
+              f"n_tokens={capture.n_tokens}  "
               f"layers={sorted(capture.layers.keys())}")
 
         # (3) shapes
         for idx, lc in capture.layers.items():
-            if lc.hidden_states.shape[0] != capture.seq_len:
+            if lc.hidden_states.shape[0] != capture.n_tokens:
                 print(f"  FAIL: layer {idx} hidden_states seq dim "
-                      f"{lc.hidden_states.shape[0]} != seq_len {capture.seq_len}")
+                      f"{lc.hidden_states.shape[0]} != n_tokens {capture.n_tokens}")
                 all_pass = False
-            if lc.h_first.shape != lc.h_last.shape != lc.h_attn_weighted.shape:
-                print(f"  FAIL: layer {idx} aggregate shapes inconsistent")
+            if not (lc.h_first.shape == lc.h_last.shape == lc.h_mean.shape):
+                print(f"  FAIL: layer {idx} aggregate shapes inconsistent: "
+                      f"first={lc.h_first.shape}, last={lc.h_last.shape}, "
+                      f"mean={lc.h_mean.shape}")
                 all_pass = False
 
-        # (2) Probe round-trip. On-the-fly `probe_means` is the
-        # whole-generation aggregate: mean over per-token probe
-        # scores. For linear probes this equals probe · mean(hidden),
-        # so we reproduce by mean-pooling the per-token hidden states
-        # at each probe layer and running saklas's own scorer on the
-        # resulting single-vector dict.
+        # (2) Probe round-trip. Feed h_first and h_last through
+        # saklas's own scorer; they should match probe_scores_t0 /
+        # probe_scores_tlast to fp32 tolerance since the math is
+        # identical (center + L2-normalize per layer, weighted-average
+        # over probe layers) whether you hand in one token or a trace.
         try:
             import torch
-            mean_hidden = {
-                idx: torch.from_numpy(lc.hidden_states.mean(axis=0))
+            first_hidden = {
+                idx: torch.from_numpy(lc.h_first)
                 for idx, lc in capture.layers.items()
             }
-            recomputed = session._monitor.score_single_token(mean_hidden)
-            recomputed_aggregate = {str(k): float(v) for k, v in recomputed.items()}
+            last_hidden = {
+                idx: torch.from_numpy(lc.h_last)
+                for idx, lc in capture.layers.items()
+            }
+            recomputed_first = {
+                str(k): float(v) for k, v in
+                session._monitor.score_single_token(first_hidden).items()
+            }
+            recomputed_last = {
+                str(k): float(v) for k, v in
+                session._monitor.score_single_token(last_hidden).items()
+            }
         except Exception as e:
             print(f"  FAIL: probe recomputation raised — {e}")
             all_pass = False
             continue
 
-        # Compare to row.probe_means (saklas's on-the-fly aggregate).
+        # Compare per-probe against row.probe_scores_t0 / tlast.
         probe_mismatches = []
-        for probe in PROBES:
-            on_the_fly = row.probe_means.get(probe, float("nan"))
-            posthoc = recomputed_aggregate.get(probe, float("nan"))
-            if np.isnan(on_the_fly) or np.isnan(posthoc):
-                probe_mismatches.append(f"{probe}: NaN in {on_the_fly}/{posthoc}")
-                continue
-            diff = abs(on_the_fly - posthoc)
-            tag = "OK" if diff < PROBE_SCORE_TOL else "MISMATCH"
-            print(f"  {tag:9s} probe={probe:<22s}  "
-                  f"on-the-fly={on_the_fly:+.6f}  posthoc={posthoc:+.6f}  "
-                  f"|diff|={diff:.2e}")
-            if diff >= PROBE_SCORE_TOL:
-                probe_mismatches.append(f"{probe}: |diff|={diff:.2e}")
+        for label, on_the_fly_vec, posthoc in (
+            ("t0", row.probe_scores_t0, recomputed_first),
+            ("tlast", row.probe_scores_tlast, recomputed_last),
+        ):
+            for i, probe in enumerate(PROBES):
+                otf = on_the_fly_vec[i] if i < len(on_the_fly_vec) else float("nan")
+                ph = posthoc.get(probe, float("nan"))
+                if np.isnan(otf) or np.isnan(ph):
+                    probe_mismatches.append(f"{probe}[{label}]: NaN")
+                    continue
+                diff = abs(otf - ph)
+                tag = "OK" if diff < PROBE_SCORE_TOL else "MISMATCH"
+                print(f"  {tag:9s} {label:5s} probe={probe:<22s}  "
+                      f"on-the-fly={otf:+.6f}  posthoc={ph:+.6f}  "
+                      f"|diff|={diff:.2e}")
+                if diff >= PROBE_SCORE_TOL:
+                    probe_mismatches.append(f"{probe}[{label}]: |diff|={diff:.2e}")
 
         if probe_mismatches:
             print(f"  FAIL on probe round-trip: {probe_mismatches}")
