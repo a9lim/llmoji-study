@@ -16,6 +16,7 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
+import pandas as pd
 
 
 MASK_TOKEN = "[FACE]"
@@ -155,7 +156,6 @@ def weighted_group_axis_stats(
     Returns long-form DataFrame with columns
     [group_col, 'axis', 'mean', 'std', 'n'].
     """
-    import pandas as pd
     # left-join axes onto rows by first_word
     merged = rows.merge(
         axes_df.set_index("first_word")[axis_names],
