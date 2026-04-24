@@ -584,3 +584,98 @@ def plot_probe_correlation_matrix(
         cb.ax.tick_params(labelsize=8)
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
+
+
+def prompt_kaomoji_matrix(
+    df: pd.DataFrame, *, top_k: int = 12, min_prompt_emissions: int = 0,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """(80-prompt × top-K kaomoji) emission-count matrix. Rows are
+    ordered by quadrant (HP, LP, HN, LN) then by prompt_id within
+    quadrant. Returns (matrix, row_meta) where row_meta has prompt_id,
+    quadrant, prompt_text, total_emissions."""
+    sub = _kaomoji_rows(df)
+    if len(sub) == 0:
+        return pd.DataFrame(), pd.DataFrame()
+
+    top = sub["first_word"].value_counts().head(top_k).index.tolist()
+    prompts = df[["prompt_id", "quadrant", "prompt_text"]].drop_duplicates("prompt_id")
+    q_order = {"HP": 0, "LP": 1, "HN": 2, "LN": 3}
+    prompts = prompts.assign(_qord=prompts["quadrant"].map(q_order))
+    prompts = prompts.sort_values(["_qord", "prompt_id"]).drop(columns=["_qord"])
+
+    mat = pd.DataFrame(
+        0, index=prompts["prompt_id"].tolist(), columns=top, dtype=int,
+    )
+    for pid, group in sub.groupby("prompt_id"):
+        if pid not in mat.index:
+            continue
+        counts = group["first_word"].value_counts()
+        for km in top:
+            mat.at[pid, km] = int(counts.get(km, 0))
+
+    prompts = prompts.assign(
+        total_emissions=[int(mat.loc[pid].sum()) for pid in prompts["prompt_id"]]
+    )
+    if min_prompt_emissions > 0:
+        keep = prompts[prompts["total_emissions"] >= min_prompt_emissions]["prompt_id"]
+        mat = mat.loc[keep]
+        prompts = prompts[prompts["prompt_id"].isin(keep)]
+    return mat, prompts.reset_index(drop=True)
+
+
+def plot_prompt_kaomoji_matrix(
+    df: pd.DataFrame, out_path: str, *, top_k: int = 12,
+) -> None:
+    """Heatmap of prompt-level emission counts, rows grouped by
+    quadrant with horizontal dividers between quadrants."""
+    import matplotlib.pyplot as plt
+
+    _use_cjk_font()
+
+    mat, meta = prompt_kaomoji_matrix(df, top_k=top_k)
+    if mat.empty:
+        print("  [prompt matrix] no rows; skipping")
+        return
+
+    quad_colors = {"HP": "#e6b260", "LP": "#b28c3d",
+                   "HN": "#d06c5a", "LN": "#5f7ca8"}
+    row_colors = [quad_colors[q] for q in meta["quadrant"]]
+
+    fig, ax = plt.subplots(figsize=(max(8, 0.45 * len(mat.columns) + 4),
+                                    max(8, 0.18 * len(mat) + 3)))
+    im = ax.imshow(mat.to_numpy(), cmap="magma", aspect="auto",
+                   vmin=0, vmax=8)
+    ax.set_xticks(range(len(mat.columns)))
+    ax.set_yticks(range(len(mat)))
+    ax.set_xticklabels(mat.columns, rotation=45, ha="right", fontsize=8)
+    y_labels = [f"{pid}  [{q}]  {txt[:40]}"
+                for pid, q, txt in zip(meta["prompt_id"],
+                                       meta["quadrant"],
+                                       meta["prompt_text"])]
+    ax.set_yticklabels(y_labels, fontsize=6)
+    for tick, color in zip(ax.get_yticklabels(), row_colors):
+        tick.set_color(color)
+
+    # Quadrant divider lines.
+    prev_q = None
+    for i, q in enumerate(meta["quadrant"]):
+        if prev_q is not None and q != prev_q:
+            ax.axhline(i - 0.5, color="#333", linewidth=1)
+        prev_q = q
+
+    for i in range(len(mat)):
+        for j in range(len(mat.columns)):
+            v = int(mat.iat[i, j])
+            if v > 0:
+                ax.text(j, i, str(v), ha="center", va="center",
+                        color="white" if v >= 4 else "#333", fontsize=6)
+
+    ax.set_title(
+        f"v3 prompt × kaomoji emission counts "
+        f"(top-{top_k} kaomoji; rows by quadrant)"
+    )
+    cb = fig.colorbar(im, ax=ax, shrink=0.6, label="count out of 8 seeds")
+    cb.ax.tick_params(labelsize=8)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
