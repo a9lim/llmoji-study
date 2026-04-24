@@ -430,3 +430,46 @@ def plot_kaomoji_quadrant_alignment(
     fig.tight_layout()
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
+
+
+def summary_table(df: pd.DataFrame, *, min_count: int = 3) -> pd.DataFrame:
+    """Per-kaomoji summary for the emotional experiment. One row per
+    kaomoji with n >= min_count:
+
+      first_word, n, taxonomy_label, median_within_consistency,
+      dominant_quadrant, HP_n, LP_n, HN_n, LN_n
+    """
+    from .config import PROBES
+    from .taxonomy import TAXONOMY
+
+    tlast_cols = [f"tlast_{p}" for p in PROBES]
+    sub = _kaomoji_rows(df)
+    if len(sub) == 0:
+        return pd.DataFrame(columns=[
+            "first_word", "n", "taxonomy_label", "median_within_consistency",
+            "dominant_quadrant", "HP_n", "LP_n", "HN_n", "LN_n",
+        ])
+
+    rows: list[dict[str, Any]] = []
+    for km, group in sub.groupby("first_word"):
+        if len(group) < min_count:
+            continue
+        vecs = group[tlast_cols].to_numpy()
+        sims = _cosine_to_mean(vecs)
+        q_counts = group["quadrant"].value_counts()
+        dominant = str(q_counts.idxmax()) if len(q_counts) else ""
+        rows.append({
+            "first_word": km,
+            "n": int(len(group)),
+            "taxonomy_label": int(TAXONOMY.get(str(km), 0)),
+            "median_within_consistency": float(np.median(sims)),
+            "dominant_quadrant": dominant,
+            "HP_n": int(q_counts.get("HP", 0)),
+            "LP_n": int(q_counts.get("LP", 0)),
+            "HN_n": int(q_counts.get("HN", 0)),
+            "LN_n": int(q_counts.get("LN", 0)),
+        })
+    out = pd.DataFrame(rows)
+    if len(out):
+        out = out.sort_values("median_within_consistency", ascending=False).reset_index(drop=True)
+    return out
