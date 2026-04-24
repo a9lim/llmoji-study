@@ -114,3 +114,27 @@ CLAUDE_AI_EXPORT_DIRS: list[Path] = [
 CLAUDE_KAOMOJI_PATH = DATA_DIR / "claude_kaomoji.jsonl"
 CLAUDE_VOCAB_SAMPLE_PATH = DATA_DIR / "claude_vocab_sample.tsv"
 CLAUDE_FACES_EMBED_PATH = DATA_DIR / "claude_faces_embed.parquet"
+
+# --- eriskii-replication experiment (description-based embeddings + axes) ---
+# Locked Haiku version. Bumping invalidates description-corpus parity.
+HAIKU_MODEL_ID = "claude-haiku-4-5-20251001"
+
+# Order matters: this is the column order in eriskii_axes.tsv and the
+# heatmap-row order in per-model / per-project figures. Must stay in
+# sync with llmoji.eriskii_prompts.AXIS_ANCHORS.
+ERISKII_AXES = [
+    "warmth", "energy", "confidence", "playfulness", "empathy",
+    "technicality", "positivity", "curiosity", "approval",
+    "wrynness", "wetness",
+]
+
+CLAUDE_HAIKU_DESCRIPTIONS_PATH = DATA_DIR / "claude_haiku_descriptions.jsonl"
+CLAUDE_FACES_EMBED_DESCRIPTION_PATH = DATA_DIR / "claude_faces_embed_description.parquet"
+
+# eriskii-replication output paths
+ERISKII_AXES_TSV = DATA_DIR / "eriskii_axes.tsv"
+ERISKII_CLUSTERS_TSV = DATA_DIR / "eriskii_clusters.tsv"
+ERISKII_PER_MODEL_TSV = DATA_DIR / "eriskii_per_model.tsv"
+ERISKII_PER_PROJECT_TSV = DATA_DIR / "eriskii_per_project.tsv"
+ERISKII_USER_KAOMOJI_CORR_TSV = DATA_DIR / "eriskii_user_kaomoji_axis_corr.tsv"
+ERISKII_COMPARISON_MD = DATA_DIR / "eriskii_comparison.md"
