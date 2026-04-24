@@ -57,6 +57,11 @@ scrape from
 `~/.claude/projects/` and the Claude.ai export into an eriskii-style
 t-SNE plot of Claude's kaomoji vocabulary across models.
 
+Post-v3 reanalyses complete (no new generations, existing JSONL
+only): cross-pilot pooled (kaomoji, source) clustering with PCA,
+v3 valence-collapse replication, v3 prompt × kaomoji matrix. See
+"Post-v3 analyses" section for findings.
+
 The v2 data replaced v1's "unmarked/marked affect" reading with a
 valence-vs-arousal story. v3 tests whether kaomoji choice tracks
 *functional* state in the unsteered, naturalistic regime.
@@ -125,6 +130,17 @@ So sad kaomoji share essentially one probe signature regardless of form
 (`(｡•́︿•̀｡) ↔ (._.)` cos = +0.981), while happy kaomoji have several
 distinct signatures (`(｡◕‿◕｡) ↔ (｡♥‿♥｡)` cos = +0.081).
 
+*Centering caveat:* those two cosines are from the **uncentered**
+Fig 3 heatmap. The response-baseline direction (PC1, ≈89% of
+variance — see Post-v3 analyses) dominates uncentered cosine across
+this whole dataset, so both numbers are inflated by the shared
+baseline and the difference between them is the real signal. Fig 3
+now renders grand-mean-centered by default — see the "uncentered
+cosine on probe vectors collapses to near-1" gotcha. Qualitative
+asymmetric-compression story is reinforced by the cross-pilot PCA
+(Post-v3 analyses section), but the specific numeric pair cosines
+cited here no longer match the regenerated figure.
+
 Collateral observation: under α = 0.5 sad-steering, the model exits its
 preferred Japanese-dialect kaomoji entirely (0/150 dialect-form
 emissions) and collapses to ASCII minimalism plus one clear corruption
@@ -168,7 +184,12 @@ bimodal, not a four-corner Russell circumplex.
 ### The four-cluster result (Fig 3, 41 kaomoji)
 
 Hierarchical clustering on cosine distance in probe space, cut at
-k=4:
+k=4. *Drafted from uncentered cosine*; the centered re-run (see
+Post-v3 analyses and the uncentered-cosine gotcha) may reorder rows
+and change specific k=4 cuts — the figure itself regenerates
+centered-by-default now, but the cluster labels below were not
+re-derived. Cross-pilot pooled PCA gives the definitive structural
+read across both pilots.
 
 - Cluster A ("positive-valence"): every positive kaomoji the model
   emits, including `(◕‿◕)`/`(｡◕‿◕｡)` from happy-steer and
@@ -304,18 +325,36 @@ Design + plan doc: `docs/superpowers/plans/2026-04-23-emotional-kaomoji-probe-fi
 
 ### Emission rate is quadrant-dependent
 
-- HP: 145/160 rows bear a kaomoji (91%), 6 distinct forms.
+Two different numbers here depending on what you count.
+
+**Taxonomy-labeled kaomoji emission** (rows where `kaomoji` is
+non-null; i.e. first_word matches a pre-registered TAXONOMY entry):
+
+- HP: 145/160 rows (91%), 6 distinct forms.
 - LP: 114/160 (71%), 5 distinct forms.
 - LN: 159/160 (99%), 8 distinct forms.
 - HN: 68/160 (42%), 8 distinct forms.
 
-Strong asymmetry: gemma-4-31b-it produces a kaomoji almost reflexively
-on LN prompts (someone's dog died → sad face, 99%), but skips the
-kaomoji on ~58% of HN prompts (rent shock, missing child, laptop-died-
-before-presentation). HN is the hardest quadrant to elicit kaomoji
-under the current instruction — the model appears to prioritize
-producing urgent helpful text over the format requirement when stakes
-are high.
+**First-word kaomoji emission** (rows where first_word starts with
+an opening-bracket-family glyph — catches spontaneous forms the
+taxonomy doesn't cover):
+
+- HP: 160/160 (100%). LP: 160/160 (100%). HN: 160/160 (100%).
+  LN: 160/160 (100%).
+
+The gap is largest on HN: 92 HN rows emit spontaneous unregistered
+forms — `(╯°□°)` 13×, halfwidth-paren `(╯°□°）` 30×, `(⊙_⊙)` 30×,
+`(⊙﹏⊙)` 6×, `(っ╥﹏╥)` 5× plus a long tail. These are clearly
+kaomoji; they're just not in TAXONOMY. So the "HN is the hardest
+quadrant to elicit kaomoji" claim holds only under the
+taxonomy-matched reading. Under the permissive first-word reading,
+gemma emits a kaomoji on every prompt in the naturalistic battery —
+it just switches registers, reaching for a shocked/angry vocabulary
+on HN that's absent from the other quadrants.
+
+Both numbers are useful depending on question: taxonomy-labeled for
+pre-registered decision rules that reference TAXONOMY; first-word
+for the cross-quadrant emission-specialization story.
 
 ### v2's angry.calm Rule 1 is overturned: spontaneous arousal kaomoji exist
 
@@ -382,6 +421,89 @@ signal carried by early tokens, late tokens, or uniformly across the
 generation? Does the kaomoji → probe binding drift during generation?
 A re-run with the capture-code fix would answer these, at the cost of
 another 640 generations; deferred under the Ethics clause.
+
+## Post-v3 analyses
+
+Three free analyses on the existing v1/v2 + v3 JSONL, no new
+generations. All three run from `scripts/10_`, `11_`, `12_`.
+Design + findings doc at
+`docs/superpowers/plans/2026-04-24-cross-pilot-valence-prompt-analyses.md`.
+
+### Cross-pilot pooled clustering (`scripts/10_cross_pilot_clustering.py`)
+
+Pools v1/v2 (900 rows) + v3 (640 rows) on `probe_scores_t0` (= the
+whole-generation aggregate under `stateless=True` in both datasets).
+Groups by (first_word, source) where `source` is one of 10: the six
+v1/v2 arm names plus `v3_HP`, `v3_LP`, `v3_HN`, `v3_LN`. 76 tuples
+survive n≥3. Writes `figures/fig_pool_cosine.png` (centered),
+`figures/fig_pool_cosine_uncentered.png` (kept for comparison),
+`figures/fig_pool_pca.png`, `data/pool_summary.tsv`.
+
+**PCA spectrum: PC1 88.93%, PC2 8.59%, PC3 1.32%, PC4 0.96%, PC5
+0.19%.** The 5 probes are functionally ~2-dimensional in this data.
+
+**PC1 loadings** (the dominant direction every response inherits):
+`happy.sad −0.48, angry.calm +0.61, confident.uncertain −0.01,
+warm.clinical −0.45, humorous.serious +0.44`. Four of the five
+affect probes load equally on PC1; `confident.uncertain`
+(the epistemic probe) is orthogonal. PC1 *is* the
+valence-collapse axis v2 diagnosed — a single direction that all
+affect probes project onto.
+
+**PC2 loadings** (the remaining 9%): `happy.sad +0.65, angry.calm
++0.60, confident.uncertain −0.33, warm.clinical −0.15,
+humorous.serious −0.28`. PC2 has *both* happy.sad and angry.calm
+loading positively — the direction where sad-side and angry-side
+probe scores go together, opposing confident-side. This is an
+arousal-like axis: distressed/activated negative emotion vs
+composed/confident.
+
+**PC2 per-source means** tell a specific story: steered_angry +0.11,
+steered_happy +0.08 (both high-arousal steering, positive PC2);
+steered_sad −0.05, steered_calm −0.05 (both low-arousal steering,
+negative PC2). But v3 quadrants don't follow: v3_HP −0.00, v3_HN
+−0.05, v3_LP −0.01, v3_LN −0.04 — naturalistic emotional prompts
+all sit near PC2 = 0 regardless of arousal. **Steering induces
+arousal-axis probe shifts; naturalistic stimuli don't.** This is
+direct support for the arousal-contrastive-probe experiment:
+the probes *can* read an arousal direction (PC2 exists), they
+just aren't being activated by prompts alone.
+
+**Cross-regime kaomoji consistency** (from
+`data/pool_summary.tsv`): `(๑˃ᴗ˂)ﻭ` appears in three sources with
+tight probe signatures — `kaomoji_prompted` (n=16), `v3_HP` (n=80),
+`v3_LP` (n=40), all around happy.sad≈−0.22, angry.calm≈+0.21. Same
+kaomoji, same signature, across steered-unsteered + emotional-
+disclosure-unsteered regimes.
+
+### v3 valence-collapse replication (`scripts/11_emotional_probe_correlations.py`)
+
+Direct test of v2's claim that bipolar probes project onto a single
+valence axis, rerun on naturalistic unsteered v3 data (640 rows, no
+steering). Pre-registered: `|r(happy.sad, angry.calm)|` > 0.7
+replicates v2; < 0.4 would say v2 was a steering artifact.
+
+**Result: Pearson r = −0.930 on all 640 rows.** Per-quadrant
+correlations are slightly tighter: HP −0.944, LP −0.950, HN −0.954,
+LN −0.941. V2 replicates strongly and the collapse is
+quadrant-invariant. Writes `figures/fig_v3_corr_{pearson,spearman}
+.png` (5-panel heatmaps) and `data/v3_probe_correlations.json`
+(full 5×5 per-subset matrices).
+
+### v3 prompt × kaomoji matrix (`scripts/12_emotional_prompt_matrix.py`)
+
+(80 prompts × top-12 kaomoji) emission-count matrix, rows grouped
+by Russell quadrant. Answers "within a quadrant, do different
+prompts pull different kaomoji?" Writes
+`figures/fig_v3_prompt_kaomoji.png` and
+`data/v3_prompt_kaomoji_matrix.tsv`.
+
+Within-quadrant heterogeneity is real. Illustrative HP rows:
+`hp01` (job news) splits 4/4 between `(๑˃ᴗ˂)ﻭ` and `(ﾉ◕ヮ◕)`; `hp03`
+(house closing) prefers `(✿◠‿◠)` 5 + `(๑˃ᴗ˂)ﻭ` 3; `hp04`
+(engagement) fragments across four distinct forms. The per-kaomoji
+summary from `04_emotional_analysis.py` averaged over this
+prompt-level structure.
 
 ## Parallel side-experiment: Claude-faces scrape
 
@@ -512,6 +634,32 @@ color-coded by taxonomy pole (orange happy / green sad / gray
 unlabeled) so readers see both the cluster structure and which kaomoji
 are pre-registered.
 
+### Uncentered cosine on probe vectors collapses to near-1
+
+Every response gemma-4-31b-it produces — happy, sad, angry, calm,
+steered, unsteered, v1/v2/v3 — lives in the same hyper-octant of
+probe space, because the 5 probes share a non-zero mean direction
+(PC1 of the pooled data eats ~89% of variance; see Post-v3 analyses).
+Cosine-on-raw-vectors is dominated by that shared direction and
+every pair reads ~0.8-1.0. The Fig 3 / Fig A / Fig C / Fig pool
+heatmaps were all uniformly red-shifted-toward-1 before we noticed.
+
+**Fix, now the default** in `analysis.plot_kaomoji_heatmap`,
+`emotional_analysis.plot_kaomoji_cosine_heatmap`,
+`emotional_analysis.plot_kaomoji_quadrant_alignment`, and
+`cross_pilot_analysis.plot_pooled_cosine_heatmap`: subtract the
+grand mean of the surviving rows before computing cosine
+(`center=True`). For Fig C, both cell means and quadrant aggregates
+are centered against the same pool mean so their cosines compare
+deviations from the same baseline. Titles annotate whether the
+figure is centered. Pass `center=False` for the old behavior if you
+need a side-by-side.
+
+Older write-ups that cite specific pair cosines (e.g. v1's
+`(｡•́︿•̀｡) ↔ (._.)` = +0.981) were computed on uncentered heatmaps.
+Direction of those findings is preserved under centering; specific
+numbers aren't.
+
 ### `stateless=True` collapses `per_generation` — use `session.last_per_token_scores`
 
 Every pilot script passes `stateless=True` to `session.generate()` so
@@ -618,6 +766,11 @@ python scripts/06_claude_scrape.py         # → data/claude_kaomoji.jsonl
 python scripts/07_claude_kaomoji_basics.py # descriptive stats
 python scripts/08_claude_faces_embed.py    # per-kaomoji embeddings
 python scripts/09_claude_faces_plot.py     # t-SNE + clustering figures
+
+# Post-v3 analyses (no new generations; pool v1/v2 + v3 on disk)
+python scripts/10_cross_pilot_clustering.py        # pooled cosine + PCA
+python scripts/11_emotional_probe_correlations.py  # v3 valence-collapse test
+python scripts/12_emotional_prompt_matrix.py       # v3 prompt × kaomoji matrix
 ```
 
 ## Layout
@@ -631,7 +784,8 @@ llmoji/
     emotional_prompts.py     # 80 Russell-quadrant naturalistic prompts (v3)
     capture.py               # run_sample() → SampleRow; probes at t=0 and t=last
     analysis.py              # pilot v1/v2 figures and decision rules
-    emotional_analysis.py    # pilot v3 figures (three) + summary_table
+    emotional_analysis.py    # pilot v3 figures + correlations + prompt matrix
+    cross_pilot_analysis.py  # pooled (kaomoji, source) clustering + PCA (v1/v2+v3)
     claude_scrape.py         # ScrapeRow schema + iter_all entry point
     claude_code_source.py    # ~/.claude/projects JSONL walker
     claude_export_source.py  # Claude.ai export adapter, multi-dir-aware
@@ -647,9 +801,12 @@ llmoji/
     07_claude_kaomoji_basics.py   # descriptive stats
     08_claude_faces_embed.py      # compute per-kaomoji embeddings
     09_claude_faces_plot.py       # t-SNE + HDBSCAN + KMeans panels
+    10_cross_pilot_clustering.py      # pool v1/v2 + v3, cosine + PCA
+    11_emotional_probe_correlations.py  # v3 valence-collapse replication
+    12_emotional_prompt_matrix.py       # v3 prompt × kaomoji emission matrix
   docs/superpowers/plans/         # design+plan docs for each experiment
-  data/                           # *.jsonl, *.tsv, *.parquet (gitignored)
-  figures/                        # fig*.png, claude_faces_interactive.html (gitignored)
+  data/                           # *.jsonl, *.tsv, *.parquet, *.json (tracked)
+  figures/                        # fig*.png, claude_faces_interactive.html (tracked)
 ```
 
 ## Conventions
