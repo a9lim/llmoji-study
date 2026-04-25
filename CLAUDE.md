@@ -107,14 +107,25 @@ Multi-model wiring via `LLMOJI_MODEL=qwen` (registry in
   HP 10 / LP 21 / HN 11 / LN 14 / NB 17.
 - Russell-quadrant PCA: PC1 14.9%, PC2 8.3% (gemma 13.0 / 7.5).
   Separation ratios PC1 2.34 / PC2 1.93 (gemma 2.02 / 2.73).
-  Same axis structure but the dominant axis flips — Qwen
+  Same axis structure but the dominant axis flips: Qwen
   separates valence (PC1) more cleanly than activation (PC2),
   gemma was the reverse.
 - Per-quadrant centroids in PC1/PC2:
   HP (-22.5, -30.3), LP (-15.4, -2.7), HN (+30.6, +21.1),
   LN (+33.9, -4.9), NB (-23.7, +29.4).
-  HN and LN cluster right-side (positive valence, distress);
-  HP / LP / NB cluster left-side; arousal mostly on PC2.
+- Geometric finding: positive-cluster and negative-cluster
+  arousal axes are **anti-parallel on PC2**, not collinear.
+  HP→LP spread is (+7, +28) — positive cluster widens upward.
+  HN→LN spread is (+3, -26) — negative cluster widens downward.
+  So PC2 is not a single shared arousal dimension; it's two
+  internal arousal dimensions, one per valence half, pointing
+  opposite ways. Gemma by contrast gives essentially one shared
+  arousal axis (positive-side spread is +10 on PC2; negative-
+  side spread is ~0 because HN and LN both lean on `(｡•́︿•̀｡)`).
+  Cross-model summary: gemma is closer to a 1D-affect-with-
+  arousal-modifier representation; Qwen is closer to a true 2D
+  Russell circumplex with arousal expressed independently within
+  each valence half.
 - Cross-quadrant emitters analogous to gemma's `(｡•́︿•̀｡)`:
   `(；ω；)` (n=71; LN 64 + HN 5 + LP 2),
   `(｡•́︿•̀｡)` (n=22; LN 15 + HN 4 + NB 2 + LP 1) — same form

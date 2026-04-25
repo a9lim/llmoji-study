@@ -200,30 +200,157 @@ just a two-mode one.
 4. α = 0.3 instead of α = 0.5 for the causal arms, to keep the model
    inside its native dialect and reduce corruption signatures.
 
+The v3 sections below pick up from (1) and (2): naturalistic prompting,
+no steering, hidden-state space instead of probe space, and Russell
+quadrants instead of a single bipolar axis.
+
+## Pilot v3: naturalistic emotional disclosure (gemma)
+
+Same model, but the question changed. v1/v2 said the steering handle is
+real, but the probes at token 0 collapse to a single valence direction.
+v3 asks whether the kaomoji distribution tracks state in a richer
+affective space under unsteered, naturalistic prompting, using the
+per-row hidden state at the deepest probe layer rather than the probe
+scalar.
+
+Setup: 100 prompts balanced across the five Russell quadrants
+(HP high-valence-high-arousal, LP high-valence-low-arousal, HN, LN, plus
+a neutral-baseline NB), 8 seeds per prompt, single `kaomoji_prompted`
+arm. 800 generations. Per-row hidden-state sidecars at the deepest
+probe layer, written alongside the JSONL.
+
+### Findings
+
+Hidden-state PCA on 800 row-level vectors gives PC1 13.0% and PC2 7.5%.
+Russell quadrants separate cleanly. PC1 reads as valence (HN and LN on
+the right at +7, HP and LP and NB on the left at -2 to -5), PC2 reads
+as activation (NB and LP at +4 to +6, HP at -6). Separation ratios are
+PC1 2.02 and PC2 2.73.
+
+HP and LP discriminate cleanly. HN and LN overlap on PC1, because they
+share the sad-face vocabulary `(｡•́︿•̀｡)` (n=171, 102 LN + 52 HN); a
+single cross-quadrant face flattens the negative-side arousal
+information. HN gets a dedicated shocked/angry register
+(`(╯°□°)`, `(⊙_⊙)`, `(⊙﹏⊙)`) that doesn't appear elsewhere.
+
+Within-kaomoji consistency to mean is 0.92 to 0.99 across the 38 forms
+with n≥3. The lowest-consistency faces are exactly the cross-quadrant
+emitters.
+
+Probe-space PCA on the same 800 rows would give PC1 ≈ 89% (the v1/v2
+collapse). In hidden-state space the second emotional dimension
+survives, so the v1/v2 valence-collapse is a probe-extraction artifact,
+not a property of the underlying representation.
+
+![v3 PCA](figures/fig_v3_pca_valence_arousal.png)
+
+## Pilot v3: Qwen3.6-27B replication
+
+Same prompts, same seeds, same instruction, swapped model. Multi-model
+wiring via `LLMOJI_MODEL=qwen` selects a registry entry that reroutes
+outputs to `data/qwen_emotional_*` and `figures/qwen/*`. Qwen3.6-27B is
+a reasoning model so `thinking=False` is set; gemma-4-31b-it is not.
+This is the closest-to-equivalent comparison.
+
+### Findings
+
+73 unique kaomoji forms emerge at N=800, against gemma's 33. Qwen has
+roughly 2.2x the kaomoji vocabulary spread, with a broader tail in
+every quadrant.
+
+Russell-quadrant separation survives, but the dominant axis flips.
+Separation ratios are PC1 2.34 and PC2 1.93 (gemma 2.02 and 2.73). PC1
+is still valence; PC2 is no longer cleanly arousal.
+
+Per-quadrant centroids in PC1/PC2:
+
+| centroid | PC1 | PC2 |
+| --- | ---: | ---: |
+| HP | -22.5 | -30.3 |
+| LP | -15.4 |  -2.7 |
+| LN | +33.9 |  -4.9 |
+| HN | +30.6 | +21.1 |
+| NB | -23.7 | +29.4 |
+
+The geometric difference: in gemma, all four affect quadrants share one
+PC2 axis, with HP at one end and NB at the other and HN and LN
+clustered near the origin (the `(｡•́︿•̀｡)` cross-quadrant face flattens
+the negative side). In Qwen, the positive and negative valence clusters
+each have their own arousal-like spread on PC2, but those spreads point
+in opposite directions: HP→LP travels (+7, +28) on PC2 (positive
+cluster widens upward), HN→LN travels (+3, -26) on PC2 (negative
+cluster widens downward). Two arousal axes, anti-parallel, instead of
+one shared one.
+
+The probe geometry diverges sharply too. Pearson correlation between
+mean `happy.sad` and mean `angry.calm` across kaomoji is r = -0.93
+(p < 1e-15) on gemma, but r = -0.14 (p = 0.25) on Qwen. The
+valence-collapse that motivated v3 doesn't appear on Qwen; saklas's
+contrastive-PCA recovers near-orthogonal `happy.sad` and `angry.calm`
+directions on this model.
+
+Practical reading: gemma's affect representation is closer to
+one-dimensional with arousal as a small modifier; Qwen's is closer to a
+true two-dimensional Russell circumplex, with arousal expressed
+independently within each valence half.
+
+A few cross-quadrant kaomoji exist on Qwen too. `(；ω；)` is its
+cross-quadrant sad (n=71, 64 LN + 5 HN + 2 LP), analogous to gemma's
+`(｡•́︿•̀｡)`. The one form shared between gemma's and Qwen's vocabulary
+is `(╯°□°)`, the table-flip glyph, HN-coded on both.
+
+![v3 Qwen PCA](figures/qwen/fig_v3_pca_valence_arousal.png)
+
 ## Layout
 
 ```
 llmoji/
   llmoji/
-    config.py        # MODEL_ID, probe categories, steering axes, paths
-    taxonomy.py      # happy.sad and angry.calm kaomoji dicts, extractor
-    prompts.py       # 30 pre-registered prompts with valence labels
-    capture.py       # run_sample() → SampleRow with probe readings
-    analysis.py      # per-axis verdicts and all five figures
+    config.py                 # paths, probe categories, MODEL_REGISTRY,
+                              # current_model() helper for $LLMOJI_MODEL
+    taxonomy.py               # happy.sad / angry.calm kaomoji dicts,
+                              # canonicalize_kaomoji(), extractor
+    prompts.py                # 30 v1/v2 prompts with valence labels
+    emotional_prompts.py      # 100 v3 prompts (5 Russell quadrants × 20)
+    capture.py                # run_sample() → SampleRow with probe readings
+    hidden_capture.py         # per-row hidden-state capture from saklas
+    hidden_state_io.py        # .npz sidecar save/load
+    hidden_state_analysis.py  # cosine, group means, feature loaders
+    analysis.py               # v1/v2 verdicts and figures
+    emotional_analysis.py     # v3 figures + summary, loaders apply
+                              # canonicalize_kaomoji at load time
   scripts/
-    00_vocab_sample.py    # pre-pilot vocabulary sample on a new model
-    01_pilot_run.py       # resumable 900-generation run
-    02_pilot_analysis.py  # prints verdicts, writes figures/
-  data/                   # pilot outputs committed for readability
+    00_vocab_sample.py             # pre-pilot vocabulary sample
+    01_pilot_run.py                # v1/v2 resumable 900-generation run
+    02_pilot_analysis.py           # v1/v2 verdicts and figures
+    03_emotional_run.py            # v3 800-generation run
+    04_emotional_analysis.py       # v3 Fig A/B/C + summary TSV
+    13_emotional_pca_valence_arousal.py   # v3 Russell-quadrant PCA
+    17_v3_face_scatters.py                # v3 per-face PCA, probe scatter,
+                                          # cosine heatmap
+    19_qwen_vocab_sample.py        # cursory v1-style vocab sample on Qwen
+    20_qwen_gemma_overlap.py       # leading-glyph overlap analysis
+  data/                            # pilot outputs (gemma defaults)
     pilot_raw.jsonl
+    emotional_raw.jsonl
     vocab_sample.jsonl
-  figures/                # final plots, committed
+    qwen_emotional_raw.jsonl       # v3 on Qwen3.6-27B
+    qwen36_vocab_sample.jsonl
+    hidden/                        # per-row .npz sidecars (gitignored)
+      v3/<row_uuid>.npz
+      v3_qwen/<row_uuid>.npz
+  figures/                         # gemma figures (default)
     fig1a_axis_scatter.png
-    fig1b_pca_scatter.png
     fig2_condition_bars.png
     fig3_kaomoji_heatmap.png
-    fig4_cluster_confusion.png
-  CLAUDE.md               # engineering notes, gotchas, session context
+    fig_v3_pca_valence_arousal.png
+    fig_v3_face_pca_by_quadrant.png
+    qwen/                          # v3 Qwen replication figures
+      fig_v3_pca_valence_arousal.png
+      fig_v3_face_pca_by_quadrant.png
+      ...
+  docs/superpowers/plans/          # one design doc per experiment
+  CLAUDE.md                        # engineering notes, gotchas, gotcha index
 ```
 
 ## Reproducing
@@ -231,21 +358,43 @@ llmoji/
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -e .                           # pulls saklas from PyPI
+
+# v1/v2 (steering pilot, gemma)
 python scripts/00_vocab_sample.py          # always first on a new model
 python scripts/01_pilot_run.py             # resumable, skips errored cells
 python scripts/02_pilot_analysis.py        # figures and verdicts
+
+# v3 (naturalistic, gemma default)
+python scripts/03_emotional_run.py
+python scripts/04_emotional_analysis.py
+python scripts/13_emotional_pca_valence_arousal.py
+python scripts/17_v3_face_scatters.py
+
+# v3 on a non-gemma model (registered names: gemma, qwen, ministral)
+LLMOJI_MODEL=qwen python scripts/03_emotional_run.py
+LLMOJI_MODEL=qwen python scripts/04_emotional_analysis.py
+LLMOJI_MODEL=qwen python scripts/13_emotional_pca_valence_arousal.py
+LLMOJI_MODEL=qwen python scripts/17_v3_face_scatters.py
 ```
 
-Approximately thirty minutes end-to-end on an M5 Max with the model
-cached locally. The run is resumable via a `(condition, prompt_id,
-seed)` check against the JSONL, and errored cells are retried on the
-next invocation rather than re-running the whole pipeline.
+The v1/v2 run is approximately thirty minutes end-to-end on an M5 Max
+with the model cached locally. v3 is approximately four hours on the
+same hardware (800 generations at 18 to 20 seconds each plus model
+load). Both runs are resumable via a `(condition, prompt_id, seed)`
+check against the JSONL, and errored cells are retried on the next
+invocation rather than re-running the whole pipeline. Outputs are
+keyed by model: setting `LLMOJI_MODEL=qwen` reroutes everything to
+`data/qwen_emotional_*` and `figures/qwen/*` so gemma and Qwen runs
+don't clobber each other.
 
 There are a few gotchas documented in `CLAUDE.md`: saklas's `probes=`
 kwarg takes category names and not concept names, steering vectors
 aren't auto-registered from probe bootstrap, saklas `safe_model_id` is
-case-preserving while cached tensors are lowercase, and the kaomoji
-taxonomy is strongly model-dialect-specific.
+case-preserving while cached tensors are lowercase, the kaomoji
+taxonomy is strongly model-dialect-specific, and the v3 runner's
+per-quadrant "emission rate" log line counts TAXONOMY matches rather
+than instruction-following compliance, which reads as collapse on any
+non-gemma model when it isn't.
 
 ## Related
 
