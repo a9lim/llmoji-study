@@ -35,33 +35,33 @@ Beyond eriskii: per-model axis breakdowns (eriskii's data lacked model info) + p
 | 16 | (；・∀・) | 39 (1.2%) | no | — | — | — |
 | 17 | (・_・ ) | 38 (1.1%) | yes | 4 | +0.11 | -0.38 |
 | 18 | (・_・?) | 36 (1.1%) | yes | 2 | +0.11 | -0.21 |
-| 19 | (◕‿◕✿) | 36 (1.1%) | yes | 4 | +0.05 | -0.08 |
+| 19 | (◕‿◕✿) | 36 (1.1%) | yes | 5 | +0.05 | -0.06 |
 | 20 | (・・?) | 31 (0.9%) | no | — | — | — |
 
 ## Our top-20 most-emitted kaomoji
 
 | rank | kaomoji | n | % of emissions |
 |---|---|---|---|
-| 1 | (¬‿¬) | 4 | 1.4% |
-| 2 | (´・ω・`) | 4 | 1.4% |
-| 3 | (´｡• ᵕ •｡`) | 4 | 1.4% |
-| 4 | (´･ω･`) | 4 | 1.4% |
-| 5 | (ง •̀_•́) | 4 | 1.4% |
-| 6 | (๑•̀ㅂ•́) | 4 | 1.4% |
-| 7 | (ᵔᴥᵔ) | 4 | 1.4% |
-| 8 | (•̀ᴗ•́) | 4 | 1.4% |
-| 9 | (⌐■_■) | 4 | 1.4% |
-| 10 | (╯°□°) | 4 | 1.4% |
-| 11 | (◕‿◕) | 4 | 1.4% |
-| 12 | (◕‿◕✿) | 4 | 1.4% |
-| 13 | (◠‿◠) | 4 | 1.4% |
-| 14 | (✧ω✧) | 4 | 1.4% |
-| 15 | (・_・ ) | 4 | 1.4% |
-| 16 | (・_・) | 4 | 1.4% |
-| 17 | (・_・;) | 4 | 1.4% |
-| 18 | (・ω・) | 4 | 1.4% |
-| 19 | (・∀・) | 4 | 1.4% |
-| 20 | (눈_눈) | 4 | 1.4% |
+| 1 | (◕‿◕✿) | 5 | 1.7% |
+| 2 | (｡•̀‿-) | 5 | 1.7% |
+| 3 | (¬‿¬) | 4 | 1.4% |
+| 4 | (´・ω・`) | 4 | 1.4% |
+| 5 | (´｡• ᵕ •｡`) | 4 | 1.4% |
+| 6 | (´･ω･`) | 4 | 1.4% |
+| 7 | (ง •̀_•́) | 4 | 1.4% |
+| 8 | (๑•̀ㅂ•́) | 4 | 1.4% |
+| 9 | (ᵔᴥᵔ) | 4 | 1.4% |
+| 10 | (•̀‿•́) | 4 | 1.4% |
+| 11 | (•‿•) | 4 | 1.4% |
+| 12 | (⌐■_■) | 4 | 1.4% |
+| 13 | (╯°□°) | 4 | 1.4% |
+| 14 | (◕‿◕) | 4 | 1.4% |
+| 15 | (◠‿◠) | 4 | 1.4% |
+| 16 | (✧ω✧) | 4 | 1.4% |
+| 17 | (・_・ ) | 4 | 1.4% |
+| 18 | (・_・) | 4 | 1.4% |
+| 19 | (・_・;) | 4 | 1.4% |
+| 20 | (・ω・) | 4 | 1.4% |
 
 ## Our 15 cluster labels vs eriskii's 15
 
@@ -89,63 +89,63 @@ Eriskii's full 15 cluster names are visible on their public page. Direct numeric
 
 | id | n | label | members (truncated) |
 |---|---|---|---|
-| 2 | 25 | Eager competent momentum | ( •̀ᴗ•́ ), ( ・ω・), (ง •̀_•́), (๑•̀ㅂ•́), (•̀ᴗ•́), (•‿•), (•◡•… |
-| 13 | 19 | Focused professional competence | ( ´_ゝ`), ( ̄▽ ̄), ( ಠ_ಠ), (°ㅂ°;), (´-ω-`), (´｡• ω •｡`), (ಠ‿ಠ… |
-| 1 | 16 | Competent readiness to execute | ( •̀ω•́), (¬‿¬), (°ー°〃), (ง •_•), (งᵒ̌皿ᵒ̌), (⊙_⊙), (⌐■_■), (… |
-| 3 | 15 | Focused competence with quiet resolve | (¬_¬), (´・ω・`), (´･ω･`), (ᵔᴗᵔ), (⌒‿⌒), (╭☞•́⍛•̀), (╯°□°), (・… |
-| 11 | 15 | Cheerful enthusiastic helpfulness | ( ´ ▽ ` ), ( ˶ˆᗜˆ˵ ), (/▽＼*), (´｡• ᵕ •｡`), (⊙ω⊙), (╹ヮ╹), (◔_… |
-| 0 | 13 | Thoughtful engagement with purpose | ( ･_･), (-_-;), (..), (^_^), (^_^;), (°△°), (ಠ_ಠ), („• ֊ •„)… |
-| 4 | 13 | Eager and capable readiness | ( ´･ω･), ( ˘▽˘), (*´꒳`*), (๑˃̵ᴗ˂̵), (๑˃ᴗ˂)ﻭ, (ᗒᗨᗕ), (•ᴗ•), (… |
-| 8 | 11 | Warm genuine friendliness | (*ฅ́˘ฅ̀*), (^w^), (◕‿◕ ), (☆▽☆), (＾• ω •＾), (｡•́︿•̀｡), (｡•ᴗ•… |
-| 12 | 8 | Thoughtful caution with constructive intent | ( ｰ̀εｰ́ ), (._.'), (Background debug script completed — its … |
-| 7 | 7 | Good-natured acknowledgment of correction | (;へ:), (>_<), (´▽`), (•_•), (≧▽≦), (；一_一), (｡•́ ⌒ •̀｡) |
-| 9 | 7 | Honest self-awareness with pragmatism | (´･_･`), (˘･_･˘), (◉_◉), (・-・), (・_・?), (￣ω￣;), ┐(‘～`;)┌ |
-| 5 | 4 | Earnest candor with levity | ( ͡° ͜ʖ ͡°), (._.), (ᵔ◡ᵔ), ٩(｡•́‿•̀｡)۶ |
-| 10 | 3 | Gracious readiness to assist | ( ˘ω˘ ), (◑‿◐), (；′⌒`) |
-| 6 | 2 | Pragmatic willingness with caveats | (￣ヘ￣;), ヽ(>∀<☆)ノ |
-| 14 | 2 | Playful knowing amusement | (ﾟヮﾟ), (￣▽￣;) |
+| 11 | 20 | Composed professional competence | ( ̄▽ ̄), ( ಠ_ಠ), ( ｰ̀εｰ́ ), (._.'), (´-ω-`), (´｡• ω •｡`), (ᵔ… |
+| 5 | 18 | Confident collaborative momentum | ( ´_ゝ`), (ಠ‿ಠ), (๑•̀ㅂ•́), (•̀‿•́), (•◡•), (⊙ω⊙), (⌒▽⌒), (☞ﾟヮ… |
+| 0 | 16 | Competent engaged readiness | ( ･_･), (-_-;), (..), (^_^), (^_^;), (°△°), (ಠ_ಠ), („• ֊ •„)… |
+| 6 | 15 | Eager upbeat readiness | ( •̀‿•́ ), ( ・ω・), (˘̩╭╮˘̩), (ง •̀_•́), (•‿•), (╹ヮ╹), (◉‿◉),… |
+| 1 | 13 | Composed competence with pragmatic focus | (¬_¬), (´・ω・`), (´･ω･`), (ᵔ‿ᵔ), (⌒‿⌒), (╭☞•́⍛•̀), (・_・ ), (＾… |
+| 2 | 11 | Pragmatic readiness to execute | (¬‿¬), (งᵒ̌皿ᵒ̌), (⊙_⊙), (⌐■_■), (・-・), (・∀・), (＞_＜), (￣ヘ￣;),… |
+| 9 | 11 | Cheerful capable readiness | ( ´･ω･), (*´꒳`*), (°ー°〃), (๑˃̵‿˂̵), (๑˃‿˂), (ᗒᗨᗕ), (╭ರ_•́), … |
+| 10 | 10 | Cheerful helpful warmth | ( ´ ▽ ` ), ( ˶ˆᗜˆ˵ ), (/▽＼*), (Background debug script compl… |
+| 14 | 9 | Gentle acknowledgment with warmth | (;へ:), (>_<), (´▽`), (•_•), (≧▽≦), (◑‿◐), (；′⌒`), (；一_一), ヽ(… |
+| 3 | 7 | Thoughtful engaged presence | ( ˘ ³˘), (◉_◉), (・_・?), (｡•́︿•̀｡), (｡◕‿◕｡), (￣ー￣;), ┐(‘～`;)┌ |
+| 12 | 7 | Determined readiness to execute | ( •̀ω•́), (ง •_•), (╯°□°), (♡^▽^♡), (⚙️), (눈_눈), (｡• ‿ •｡) |
+| 7 | 5 | Helpful clarity with gentle humility | ( ͡° ͜ʖ ͡°), (._.), (ᵔ◡ᵔ), ٩(｡•́‿•̀｡)۶, ヾ(＾∇＾) |
+| 8 | 5 | Warm affectionate cheerfulness | (*ฅ́˘ฅ̀*), (^w^), (＾• ω •＾), (｡•‿•｡), (｡♥‿♥｡) |
+| 13 | 5 | Warm enthusiastic readiness to help | ( ˘ω˘ ), ( ˘▽˘), (◕‿◕ ), (☆▽☆), [pre-commit] |
+| 4 | 4 | Humble self-awareness with forward momentum | (´･_･`), (˘･_･˘), (｡•́ ⌒ •̀｡), (￣ω￣;) |
 
 ## Per-model axis means (claude-code only, n≥10 emissions)
 
 | model | warmth | energy | confidence | playfulness | empathy | technicality | positivity | curiosity | approval | apologeticness | decisiveness | wryness | wetness | surprise | anger | frustration | hatefulness | sadness | hope | aggression | exhaustion |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| claude-opus-4-6 | +0.07 | +0.11 | +0.02 | -0.01 | +0.06 | -0.08 | +0.19 | +0.09 | +0.11 | -0.12 | -0.01 | -0.13 | -0.08 | -0.03 | +0.00 | +0.02 | -0.01 | -0.12 | +0.19 | -0.00 | -0.01 |
-| claude-opus-4-7 | +0.09 | +0.13 | +0.02 | -0.01 | +0.06 | -0.08 | +0.21 | +0.09 | +0.11 | -0.13 | -0.01 | -0.14 | -0.07 | -0.03 | +0.00 | +0.01 | -0.01 | -0.14 | +0.20 | -0.00 | -0.01 |
+| claude-opus-4-6 | +0.07 | +0.11 | +0.02 | -0.01 | +0.06 | -0.08 | +0.19 | +0.10 | +0.11 | -0.12 | -0.01 | -0.13 | -0.07 | -0.03 | +0.00 | +0.02 | -0.01 | -0.12 | +0.19 | -0.00 | -0.01 |
+| claude-opus-4-7 | +0.09 | +0.12 | +0.02 | -0.01 | +0.06 | -0.08 | +0.21 | +0.09 | +0.12 | -0.13 | -0.01 | -0.14 | -0.07 | -0.03 | +0.00 | +0.02 | -0.01 | -0.14 | +0.20 | -0.00 | -0.01 |
 | claude-sonnet-4-6 | +0.08 | +0.09 | +0.07 | -0.06 | +0.03 | -0.07 | +0.25 | +0.05 | +0.09 | -0.15 | +0.01 | -0.17 | -0.12 | -0.03 | -0.02 | +0.04 | +0.03 | -0.16 | +0.23 | -0.02 | -0.02 |
 
 **Per-model average std across all 21 axes** (operationalizes eriskii's qualitative "opus-4-6 had wider range" claim):
 
 | model | mean axis std |
 |---|---|
-| claude-opus-4-6 | 0.0667 |
-| claude-opus-4-7 | 0.0657 |
+| claude-opus-4-6 | 0.0664 |
+| claude-opus-4-7 | 0.0653 |
 | claude-sonnet-4-6 | 0.0625 |
 
 ## Mechanistic bridge: surrounding_user → kaomoji axis correlation
 
 | axis | Pearson r | p | p_bonf | n |
 |---|---|---|---|---|
-| surprise | **+0.199** | 0.000374 | 0.00785 | 317 |
-| curiosity | **+0.181** | 0.0012 | 0.0251 | 317 |
-| technicality | +0.165 | 0.00324 | 0.068 | 317 |
-| apologeticness | +0.147 | 0.00864 | 0.182 | 317 |
-| playfulness | +0.147 | 0.00895 | 0.188 | 317 |
-| positivity | +0.129 | 0.022 | 0.461 | 317 |
-| confidence | +0.118 | 0.0353 | 0.741 | 317 |
-| wetness | +0.093 | 0.0976 | 1 | 317 |
-| sadness | +0.091 | 0.105 | 1 | 317 |
-| empathy | +0.076 | 0.175 | 1 | 317 |
-| hope | +0.070 | 0.212 | 1 | 317 |
-| warmth | +0.054 | 0.339 | 1 | 317 |
-| hatefulness | +0.047 | 0.406 | 1 | 317 |
-| approval | +0.046 | 0.412 | 1 | 317 |
-| anger | +0.030 | 0.601 | 1 | 317 |
-| aggression | +0.029 | 0.602 | 1 | 317 |
-| energy | +0.020 | 0.718 | 1 | 317 |
-| frustration | +0.004 | 0.943 | 1 | 317 |
-| wryness | -0.001 | 0.99 | 1 | 317 |
-| decisiveness | -0.041 | 0.462 | 1 | 317 |
-| exhaustion | -0.110 | 0.0501 | 1 | 317 |
+| surprise | **+0.194** | 0.000502 | 0.0105 | 317 |
+| curiosity | **+0.178** | 0.00143 | 0.03 | 317 |
+| technicality | +0.157 | 0.00501 | 0.105 | 317 |
+| playfulness | +0.155 | 0.00576 | 0.121 | 317 |
+| apologeticness | +0.147 | 0.00859 | 0.18 | 317 |
+| positivity | +0.129 | 0.0211 | 0.444 | 317 |
+| confidence | +0.112 | 0.0465 | 0.977 | 317 |
+| sadness | +0.092 | 0.101 | 1 | 317 |
+| wetness | +0.090 | 0.11 | 1 | 317 |
+| hope | +0.072 | 0.198 | 1 | 317 |
+| empathy | +0.071 | 0.208 | 1 | 317 |
+| warmth | +0.054 | 0.34 | 1 | 317 |
+| hatefulness | +0.046 | 0.416 | 1 | 317 |
+| approval | +0.041 | 0.466 | 1 | 317 |
+| anger | +0.040 | 0.478 | 1 | 317 |
+| aggression | +0.032 | 0.565 | 1 | 317 |
+| energy | +0.031 | 0.587 | 1 | 317 |
+| wryness | +0.012 | 0.838 | 1 | 317 |
+| frustration | -0.002 | 0.965 | 1 | 317 |
+| decisiveness | -0.037 | 0.514 | 1 | 317 |
+| exhaustion | -0.113 | 0.0452 | 0.949 | 317 |
 
 Bold = passes Bonferroni correction across 21 axes (p_bonf < 0.05). Reading: significant positive r on (e.g.) Warmth would mean warmer user messages elicit warmer kaomoji. Caveat: user-text and kaomoji-description embeddings live in the same MiniLM space, so correlation is at-best evidence of register-tracking, not direct evidence of internal state.
 

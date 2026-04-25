@@ -6,9 +6,12 @@ Panel B: t-SNE + KMeans(k=15) for eriskii parity.
 Both panels: top-30 most-frequent kaomoji annotated; point size ~
 log(count); cluster-centroid id labels.
 
-Also writes figures/claude_faces_interactive.html (plotly) with
-hover-tooltips showing kaomoji + count + cluster id, matching eriskii's
-interactive explorer.
+The interactive plotly HTML (figures/claude_faces_interactive.html) is
+written by scripts/16_eriskii_replication.py — there it shares t-SNE
+coords, KMeans clusters, and Haiku-derived cluster labels with
+figures/eriskii_clusters_tsne.png so hovering shows the same cluster
+identity as the static figure. This script writes the response-based
+PNG comparison panel only.
 """
 
 from __future__ import annotations
@@ -199,8 +202,8 @@ def main() -> None:
     plt.close(fig)
     print(f"wrote {out_png}")
 
-    out_html = FIGURES_DIR / "claude_faces_interactive.html"
-    _write_interactive(xy, labels, counts, clusters_km, out_html)
+    # Interactive HTML moved to scripts/16_eriskii_replication.py so the
+    # hover-tooltip clustering matches eriskii_clusters_tsne.png.
 
 
 if __name__ == "__main__":

@@ -204,7 +204,94 @@ def section_clusters(
     fig.savefig(out, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"wrote {out}")
+
+    # Interactive plotly HTML — same xy, clusters, and Haiku labels as
+    # the static figure so hovering matches what's in eriskii_clusters_tsne.
+    _write_interactive_clusters_html(
+        xy, fw, n, clusters, cluster_labels, descriptions_by_fw,
+        out_path=FIGURES_DIR / "claude_faces_interactive.html",
+    )
     return df_clusters
+
+
+def _write_interactive_clusters_html(
+    xy: np.ndarray,
+    fw: list[str],
+    n: np.ndarray,
+    clusters: np.ndarray,
+    cluster_labels: dict[int, str],
+    descriptions_by_fw: dict[str, str],
+    *,
+    out_path: Path,
+) -> None:
+    """Plotly HTML with the eriskii-clusters_tsne layout and clustering.
+
+    One trace per cluster so the legend toggles clusters on/off and the
+    Haiku-derived label appears in the legend. Hover shows the kaomoji,
+    cluster label, emission count, and (truncated) synthesized
+    description."""
+    try:
+        import plotly.graph_objects as go
+    except ImportError:
+        print(f"  (plotly not installed; skipping {out_path.name})")
+        return
+
+    palette = [
+        "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
+        "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf",
+        "#aec7e8", "#ffbb78", "#98df8a", "#ff9896", "#c5b0d5",
+        "#c49c94", "#f7b6d2", "#dbdb8d", "#9edae5", "#ad494a",
+    ]
+
+    sizes = np.clip(8 + 6 * np.log1p(n), 8, 36)
+
+    def _truncate(s: str, lim: int = 140) -> str:
+        if len(s) <= lim:
+            return s
+        return s[:lim].rstrip() + "…"
+
+    fig = go.Figure()
+    for c in sorted(cluster_labels):
+        idxs = [i for i, ci in enumerate(clusters) if int(ci) == c]
+        if not idxs:
+            continue
+        label = cluster_labels[c]
+        hover = [
+            (
+                f"<b>{fw[i]}</b><br>"
+                f"cluster {c}: {label}<br>"
+                f"n = {int(n[i])}<br>"
+                f"<i>{_truncate(descriptions_by_fw.get(fw[i], ''))}</i>"
+            )
+            for i in idxs
+        ]
+        fig.add_trace(
+            go.Scatter(
+                x=xy[idxs, 0], y=xy[idxs, 1],
+                mode="markers",
+                name=f"{c}: {label}",
+                text=hover,
+                hoverinfo="text",
+                marker=dict(
+                    size=[float(sizes[i]) for i in idxs],
+                    color=palette[c % len(palette)],
+                    line=dict(color="white", width=0.6),
+                    opacity=0.85,
+                ),
+            )
+        )
+    fig.update_layout(
+        title=(
+            f"Claude faces — t-SNE + KMeans(k={len(cluster_labels)}), "
+            "Haiku-labeled clusters (canonicalized; description-based embeddings)"
+        ),
+        xaxis=dict(visible=False),
+        yaxis=dict(visible=False),
+        legend=dict(title="cluster", itemsizing="constant"),
+        width=1200, height=900,
+    )
+    fig.write_html(str(out_path))
+    print(f"wrote {out_path}")
 
 
 def _heatmap(
@@ -507,9 +594,10 @@ def main() -> None:
         sys.exit(1)
     _use_cjk_font()
 
-    print("loading description embeddings...")
-    fw, n, E = load_embeddings(CLAUDE_FACES_EMBED_DESCRIPTION_PATH)
-    print(f"  {len(fw)} kaomoji, {E.shape[1]}-dim")
+    print("loading description embeddings (canonicalized)...")
+    from llmoji.claude_faces import load_embeddings_canonical
+    fw, n, E = load_embeddings_canonical(CLAUDE_FACES_EMBED_DESCRIPTION_PATH)
+    print(f"  {len(fw)} canonical kaomoji, {E.shape[1]}-dim")
 
     print("computing axis vectors...")
     from sentence_transformers import SentenceTransformer
@@ -526,7 +614,12 @@ def main() -> None:
     # synthesized descriptions: one canonical string per kaomoji
     import json
     from llmoji.config import CLAUDE_HAIKU_SYNTHESIZED_PATH
-    descriptions_by_fw: dict[str, str] = {}
+    # Canonicalize the synthesized-description keys; on collision keep
+    # the description from the variant with the most contributing
+    # instances (n_descriptions). Mirrors the n-weighted merge that
+    # load_embeddings_canonical does for the embedding side.
+    from llmoji.taxonomy import canonicalize_kaomoji
+    desc_candidates: dict[str, list[tuple[int, str]]] = {}
     with open(CLAUDE_HAIKU_SYNTHESIZED_PATH) as f:
         for line in f:
             line = line.strip()
@@ -535,11 +628,27 @@ def main() -> None:
             r = json.loads(line)
             if "error" in r:
                 continue
-            descriptions_by_fw[r["first_word"]] = r["synthesized"]
+            canon = canonicalize_kaomoji(r["first_word"])
+            desc_candidates.setdefault(canon, []).append(
+                (int(r.get("n_descriptions", 1)), str(r["synthesized"])),
+            )
+    descriptions_by_fw: dict[str, str] = {
+        canon: max(cands, key=lambda c: c[0])[1]
+        for canon, cands in desc_candidates.items()
+    }
     df_clusters = section_clusters(fw, n, E, descriptions_by_fw)
 
     print("\n=== Section: per-model ===")
     rows = pd.read_json(CLAUDE_KAOMOJI_PATH, lines=True)
+    # Canonicalize first_word so per-model / per-project / bridge joins
+    # against df_axes (which is canonical) work correctly. Original
+    # first_word preserved as first_word_raw for audit.
+    rows = rows.assign(
+        first_word_raw=rows["first_word"],
+        first_word=rows["first_word"].map(
+            lambda s: canonicalize_kaomoji(s) if isinstance(s, str) else s,
+        ),
+    )
     df_per_model = section_per_model(rows, df_axes)
     print("\n=== Section: per-project ===")
     df_per_project = section_per_project(rows, df_axes)

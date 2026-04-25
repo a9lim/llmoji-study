@@ -118,3 +118,39 @@ def load_embeddings(path: Path) -> tuple[list[str], np.ndarray, np.ndarray]:
     emb_cols = [c for c in df.columns if c.startswith("e") and c[1:].isdigit()]
     E = df[emb_cols].to_numpy(dtype=float)
     return df["first_word"].tolist(), df["n"].to_numpy(dtype=int), E
+
+
+def load_embeddings_canonical(
+    path: Path,
+) -> tuple[list[str], np.ndarray, np.ndarray]:
+    """Same as :func:`load_embeddings` but merges entries that
+    canonicalize to the same form via
+    :func:`llmoji.taxonomy.canonicalize_kaomoji`.
+
+    Counts (``n``) sum across variants; embeddings are averaged weighted
+    by ``n`` then re-L2-normalized so cosine comparisons remain
+    well-behaved. Returns ``(canonical_first_words, n, E)``.
+    """
+    from .taxonomy import canonicalize_kaomoji
+
+    df: pd.DataFrame = pd.read_parquet(path)
+    df["canonical"] = df["first_word"].map(canonicalize_kaomoji)
+    emb_cols = [c for c in df.columns if c.startswith("e") and c[1:].isdigit()]
+    out_fw: list[str] = []
+    out_n: list[int] = []
+    out_E: list[np.ndarray] = []
+    for canon, sub in df.groupby("canonical"):
+        n_total = int(sub["n"].sum())
+        weights = sub["n"].to_numpy(dtype=float)
+        if weights.sum() <= 0:
+            weights = np.ones_like(weights)
+        weights = weights / weights.sum()
+        E_sub = sub[emb_cols].to_numpy(dtype=float)
+        E_avg = (E_sub * weights[:, None]).sum(axis=0)
+        norm = float(np.linalg.norm(E_avg))
+        if norm > 0:
+            E_avg = E_avg / norm
+        out_fw.append(str(canon))
+        out_n.append(n_total)
+        out_E.append(E_avg)
+    return out_fw, np.array(out_n, dtype=int), np.asarray(out_E)
