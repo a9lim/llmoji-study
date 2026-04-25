@@ -34,32 +34,13 @@ from llmoji.config import (
     EMOTIONAL_EXPERIMENT,
     FIGURES_DIR,
 )
-from llmoji.emotional_analysis import _use_cjk_font, load_emotional_features
-
-
-QUADRANT_ORDER = ["HP", "LP", "HN", "LN", "NB"]
-QUADRANT_COLORS = {
-    "HP": "#d62728",  # red -- high-arousal positive
-    "LP": "#2ca02c",  # green -- low-arousal positive
-    "HN": "#ff7f0e",  # orange -- high-arousal negative
-    "LN": "#1f77b4",  # blue -- low-arousal negative
-    "NB": "#7f7f7f",  # gray -- neutral baseline
-}
-
-
-def _per_face_dominant_quadrant(df: pd.DataFrame) -> dict[str, str]:
-    """For each first_word, return its dominant quadrant -- most
-    frequently emitted in. Ties broken by QUADRANT_ORDER position
-    (earlier wins)."""
-    out: dict[str, str] = {}
-    for fw, sub in df.groupby("first_word"):
-        counts = Counter(sub["quadrant"].tolist())
-        # find max count
-        max_count = max(counts.values())
-        # break ties by quadrant order priority
-        candidates = [q for q in QUADRANT_ORDER if counts.get(q, 0) == max_count]
-        out[fw] = candidates[0] if candidates else "NB"
-    return out
+from llmoji.emotional_analysis import (
+    QUADRANT_COLORS,
+    QUADRANT_ORDER,
+    _use_cjk_font,
+    load_emotional_features,
+    per_face_dominant_quadrant,
+)
 
 
 def _add_quadrant_legend(ax) -> None:
@@ -92,7 +73,7 @@ def plot_face_pca_by_quadrant(
     pca = PCA(n_components=2)
     Y = pca.fit_transform(M)
 
-    quadrant = _per_face_dominant_quadrant(df)
+    quadrant = per_face_dominant_quadrant(df)
     colors = [QUADRANT_COLORS[quadrant.get(fw, "NB")] for fw in fdf["first_word"]]
     sizes = np.clip(15 + 30 * np.log1p(fdf["n"]), 15, 250)
 
@@ -145,7 +126,7 @@ def plot_face_probe_scatter(
         })
     fdf = pd.DataFrame(rows)
 
-    quadrant = _per_face_dominant_quadrant(df)
+    quadrant = per_face_dominant_quadrant(df)
     colors = [QUADRANT_COLORS[quadrant.get(fw, "NB")] for fw in fdf["first_word"]]
     sizes = np.clip(15 + 30 * np.log1p(fdf["n"]), 15, 250)
 
@@ -206,7 +187,7 @@ def plot_face_cosine_heatmap(
     M = np.asarray(means)
 
     # Sort by dominant quadrant (HP < LP < HN < LN < NB), then by emission count desc within quadrant
-    quadrant = _per_face_dominant_quadrant(df)
+    quadrant = per_face_dominant_quadrant(df)
     fdf["quadrant"] = [quadrant[fw] for fw in fdf["first_word"]]
     fdf["q_order"] = fdf["quadrant"].map({q: i for i, q in enumerate(QUADRANT_ORDER)})
     sort_idx = fdf.sort_values(["q_order", "n"], ascending=[True, False]).index.to_numpy()
@@ -275,7 +256,7 @@ def main() -> None:
     print(f"  {len(df)} kaomoji-bearing rows; "
           f"{df['first_word'].nunique()} unique faces; X {X.shape}")
 
-    quadrant = _per_face_dominant_quadrant(df)
+    quadrant = per_face_dominant_quadrant(df)
     counts = Counter(quadrant.values())
     print("  faces by dominant quadrant:",
           {q: counts.get(q, 0) for q in QUADRANT_ORDER})

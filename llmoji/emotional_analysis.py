@@ -35,6 +35,32 @@ import pandas as pd
 KAOMOJI_START_CHARS = set("([（｛ヽ٩ᕕ╰╭╮┐┌＼¯໒＼ヾっ")
 
 
+# Russell-quadrant palette + ordering. Shared with scripts/17_v3_face_scatters.py
+# so per-face plots use a consistent colour scheme.
+QUADRANT_ORDER = ["HP", "LP", "HN", "LN", "NB"]
+QUADRANT_COLORS = {
+    "HP": "#d62728",  # red — high-arousal positive
+    "LP": "#2ca02c",  # green — low-arousal positive
+    "HN": "#ff7f0e",  # orange — high-arousal negative
+    "LN": "#1f77b4",  # blue — low-arousal negative
+    "NB": "#7f7f7f",  # gray — neutral baseline
+}
+
+
+def per_face_dominant_quadrant(df: pd.DataFrame) -> dict[str, str]:
+    """For each first_word, return its dominant emission quadrant —
+    the quadrant it appears in most. Ties broken by QUADRANT_ORDER
+    position (earlier wins)."""
+    from collections import Counter
+    out: dict[str, str] = {}
+    for fw, sub in df.groupby("first_word"):
+        counts = Counter(sub["quadrant"].tolist())
+        max_count = max(counts.values())
+        candidates = [q for q in QUADRANT_ORDER if counts.get(q, 0) == max_count]
+        out[str(fw)] = candidates[0] if candidates else "NB"
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Loaders
 # ---------------------------------------------------------------------------
@@ -96,7 +122,14 @@ def load_emotional_features(
     )
     if len(df) == 0:
         return df, X
-    df = df.assign(quadrant=df["prompt_id"].str[:2].str.upper())
+    from .taxonomy import canonicalize_kaomoji
+    df = df.assign(
+        quadrant=df["prompt_id"].str[:2].str.upper(),
+        first_word_raw=df["first_word"],
+        first_word=df["first_word"].map(
+            lambda s: canonicalize_kaomoji(s) if isinstance(s, str) else s,
+        ),
+    )
     mask = np.asarray([
         isinstance(s, str) and len(s) > 0 and s[0] in KAOMOJI_START_CHARS
         for s in df["first_word"]
@@ -122,11 +155,18 @@ def load_v1v2_neutral_baseline_features(
     )
     if len(df) == 0:
         return df, X
+    from .taxonomy import canonicalize_kaomoji
     mask = (
         (df["condition"] == "kaomoji_prompted")
         & (df["prompt_valence"] == 0)
     ).to_numpy()
     df_nb = df.loc[mask].assign(quadrant="NB").reset_index(drop=True)
+    df_nb = df_nb.assign(
+        first_word_raw=df_nb["first_word"],
+        first_word=df_nb["first_word"].map(
+            lambda s: canonicalize_kaomoji(s) if isinstance(s, str) else s,
+        ),
+    )
     X_nb = X[mask]
     # Also apply the kaomoji first-char filter for consistency with v3.
     kao_mask = np.asarray([
@@ -172,18 +212,17 @@ def plot_kaomoji_cosine_heatmap(
     X: np.ndarray,
     out_path: str,
     *,
-    min_count: int = 3,
+    min_count: int = 0,
     center: bool = True,
 ) -> None:
     """Figure A: per-kaomoji mean hidden-state vector, pairwise cosine
-    similarity with hierarchical-clustering row order. Row labels
-    colored by taxonomy pole."""
+    similarity with hierarchical-clustering row order. Row/column
+    labels coloured by dominant emission quadrant (HP/LP/HN/LN/NB)."""
     import matplotlib.pyplot as plt
     from matplotlib.patches import Patch
     from scipy.cluster.hierarchy import linkage, leaves_list
     from scipy.spatial.distance import squareform
     from .hidden_state_analysis import cosine_similarity_matrix, group_mean_vectors
-    from .taxonomy import TAXONOMY
 
     _use_cjk_font()
 
@@ -208,8 +247,9 @@ def plot_kaomoji_cosine_heatmap(
     labels = keys_df["first_word"].iloc[order].to_numpy()
     label_counts = counts.iloc[order].to_numpy()
 
-    pole_color = {+1: "#c25a22", -1: "#2f6c57", 0: "#666"}
-    row_colors = [pole_color.get(TAXONOMY.get(str(k), 0), "#666") for k in labels]
+    quadrant_for = per_face_dominant_quadrant(df)
+    label_quadrants = [quadrant_for.get(str(k), "NB") for k in labels]
+    row_colors = [QUADRANT_COLORS[q] for q in label_quadrants]
 
     n = len(labels)
     fig, ax = plt.subplots(figsize=(max(7, 0.28 * n + 4), max(7, 0.28 * n + 3)))
@@ -224,22 +264,22 @@ def plot_kaomoji_cosine_heatmap(
     for tick, color in zip(ax.get_yticklabels(), row_colors):
         tick.set_color(color)
     centering_note = "grand-mean centered; " if center else "uncentered; "
+    filter_note = "" if min_count <= 1 else f"n ≥ {min_count}; "
     ax.set_title(
         f"Figure A: per-kaomoji HIDDEN-STATE cosine similarity  "
-        f"({centering_note}n ≥ {min_count}; {n} kaomoji)"
+        f"({centering_note}{filter_note}{n} kaomoji)\n"
+        "rows/cols hierarchically clustered; tick colour = dominant emission quadrant"
     )
     cb = fig.colorbar(im, ax=ax, shrink=0.7, label="cosine similarity")
     cb.ax.tick_params(labelsize=8)
 
     legend_handles = [
-        Patch(color=pole_color[+1], label="taxonomy: happy"),
-        Patch(color=pole_color[-1], label="taxonomy: sad"),
-        Patch(color=pole_color[0], label="other / unlabeled"),
+        Patch(color=QUADRANT_COLORS[q], label=q) for q in QUADRANT_ORDER
     ]
     ax.legend(
         handles=legend_handles,
         loc="lower left", bbox_to_anchor=(1.15, 0.0),
-        frameon=False, fontsize=8,
+        frameon=False, fontsize=8, title="dominant quadrant",
     )
     fig.tight_layout()
     fig.savefig(out_path, dpi=150, bbox_inches="tight")

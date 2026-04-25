@@ -228,6 +228,83 @@ def extract(text: str) -> KaomojiMatch:
     )
 
 
+# ---------------------------------------------------------------------------
+# Canonicalization: collapse trivial kaomoji variants
+# ---------------------------------------------------------------------------
+#
+# Two kaomoji can differ by a single character in three ways:
+#
+#   1. Pure typographic — full-width vs half-width parens, '_' vs '﹏'
+#      wavy underscore. These NFKC-normalize to the same string.
+#   2. Hand-gesture / arm modifier — `(๑˃ᴗ˂)ﻭ` vs `(๑˃ᴗ˂)`,
+#      `(っ˘▽˘ς)` vs `(っ˘▽˘)`, `(っ╥﹏╥)` vs `(╥﹏╥)`. Same face,
+#      with or without an arm reaching out.
+#   3. Eye / mouth / decoration change — `(◕‿◕)` vs `(♥‿♥)`,
+#      `(｡◕‿◕｡)` vs `(✿◕‿◕｡)`, `(っ˘▽˘ς)` vs `(っ˘ω˘ς)`. These are
+#      semantically distinct faces and should NOT collapse.
+#
+# `canonicalize_kaomoji` handles (1) and (2). (3) is preserved.
+# Borderline mouth-glyph case `ᴗ` / `‿` (subscript-curve smile in two
+# Unicode blocks) is unified to `‿` since the model emits both in the
+# same `(｡ᵕXᵕ｡)` skeleton with no distinct register.
+
+import re
+import unicodedata
+
+# Arm/hand modifiers that appear OUTSIDE the closing paren:
+#   (๑˃ᴗ˂)ﻭ  (っ╥﹏╥)っ
+_ARM_OUTSIDE = "ﻭっ"
+# Arm/hand modifiers that appear just INSIDE the closing paren:
+#   (っ˘▽˘ς)  (っ´ω`c)
+_ARM_INSIDE_TRAIL = "ςc"
+# Arm/hand modifiers that appear just INSIDE the opening paren (leading):
+#   (っ╥﹏╥)
+_ARM_INSIDE_LEAD = "っ"
+
+_TRAIL_OUTSIDE_RE = re.compile(rf"[{_ARM_OUTSIDE}]+$")
+_TRAIL_INSIDE_RE = re.compile(rf"[{_ARM_INSIDE_TRAIL}]+\)$")
+_LEAD_INSIDE_RE = re.compile(rf"^\([{_ARM_INSIDE_LEAD}]+")
+
+# Explicit typographic substitutions. Hand-picked over NFKC because NFKC
+# also compatibility-decomposes ` ´ ` (acute) and ` ˘ ` (breve) into
+# `space + combining-mark`, which destroys the eye glyphs in faces like
+# `(っ´ω`)` and `(˘▽˘)`. NFC leaves those intact; we then apply just the
+# specific compatibility-equivalences we want.
+_TYPO_SUBS: tuple[tuple[str, str], ...] = (
+    ("）", ")"),   # full-width close paren
+    ("（", "("),   # full-width open paren
+    ("ｃ", "c"),   # full-width Latin c (arm modifier)
+    ("﹏", "_"),   # small wavy low line vs underscore (treated as same)
+    ("ᴗ", "‿"),   # subscript-curve mouth -> connector underscore-curve
+)
+
+
+def canonicalize_kaomoji(s: str) -> str:
+    """Collapse trivial kaomoji variants to a canonical form.
+
+    Applies NFC normalization (preserves `´`, `˘`, `｡` which NFKC would
+    mangle), then a small whitelist of compatibility substitutions for
+    typographic equivalents (full-width parens, `﹏` vs `_`, `ᴗ` vs
+    `‿`), then strips arm/hand modifiers (`っ ς c ﻭ`) from face
+    boundaries. Eye/mouth/decoration changes are preserved.
+
+    Idempotent: ``canonicalize_kaomoji(canonicalize_kaomoji(s)) == canonicalize_kaomoji(s)``.
+
+    Empty input returns ``""``.
+    """
+    if not s:
+        return ""
+    s = unicodedata.normalize("NFC", s.strip())
+    for src, dst in _TYPO_SUBS:
+        s = s.replace(src, dst)
+    # Strip outside-paren trailing arm chars first so trailing-inside
+    # detection sees the closing paren.
+    s = _TRAIL_OUTSIDE_RE.sub("", s)
+    s = _LEAD_INSIDE_RE.sub("(", s)
+    s = _TRAIL_INSIDE_RE.sub(")", s)
+    return s
+
+
 def sanity_check() -> None:
     """Smoke-test the extractor."""
     # registered kaomoji

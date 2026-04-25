@@ -36,7 +36,7 @@ def main() -> None:
     print("loading v3 hidden-state features...")
     df, X = load_emotional_features(
         str(EMOTIONAL_DATA_PATH), DATA_DIR,
-        experiment=EMOTIONAL_EXPERIMENT, which="h_last",
+        experiment=EMOTIONAL_EXPERIMENT, which="h_mean",
     )
     print(f"loaded {len(df)} v3 kaomoji-bearing rows; X shape {X.shape}")
     if len(df) == 0:
@@ -49,7 +49,7 @@ def main() -> None:
     if PILOT_RAW_PATH.exists():
         baseline_df, baseline_X = load_v1v2_neutral_baseline_features(
             str(PILOT_RAW_PATH), DATA_DIR,
-            experiment=PILOT_EXPERIMENT, which="h_last",
+            experiment=PILOT_EXPERIMENT, which="h_mean",
         )
         print(f"loaded {len(baseline_df)} v1/v2 neutral-valence baseline rows")
 

@@ -59,11 +59,11 @@ def main() -> None:
     print(f"re-labeling kaomoji in {EMOTIONAL_DATA_PATH}")
     _relabel_in_place(EMOTIONAL_DATA_PATH)
 
-    print("loading hidden-state features (which=h_last, layer=max)...")
+    print("loading hidden-state features (which=h_mean, layer=max)...")
     df, X = load_emotional_features(
         str(EMOTIONAL_DATA_PATH), DATA_DIR,
         experiment=EMOTIONAL_EXPERIMENT,
-        which="h_last",
+        which="h_mean",
     )
     print(f"loaded {len(df)} kaomoji-bearing rows; X shape {X.shape}")
     if len(df) == 0:
