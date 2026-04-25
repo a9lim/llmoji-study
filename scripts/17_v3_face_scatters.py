@@ -30,9 +30,7 @@ from sklearn.decomposition import PCA
 
 from llmoji.config import (
     DATA_DIR,
-    EMOTIONAL_DATA_PATH,
-    EMOTIONAL_EXPERIMENT,
-    FIGURES_DIR,
+    current_model,
 )
 from llmoji.emotional_analysis import (
     QUADRANT_COLORS,
@@ -242,15 +240,17 @@ def plot_face_cosine_heatmap(
 
 
 def main() -> None:
-    if not EMOTIONAL_DATA_PATH.exists():
-        print(f"no data at {EMOTIONAL_DATA_PATH}")
+    M = current_model()
+    if not M.emotional_data_path.exists():
+        print(f"no data at {M.emotional_data_path}")
         sys.exit(1)
     _use_cjk_font()
 
+    print(f"model: {M.short_name}")
     print("loading v3 hidden-state features (which=h_mean)...")
     df, X = load_emotional_features(
-        str(EMOTIONAL_DATA_PATH), DATA_DIR,
-        experiment=EMOTIONAL_EXPERIMENT, which="h_mean",
+        str(M.emotional_data_path), DATA_DIR,
+        experiment=M.experiment, which="h_mean",
     )
     df = df[df["first_word"].notna() & (df["first_word"] != "")].reset_index(drop=True)
     print(f"  {len(df)} kaomoji-bearing rows; "
@@ -261,16 +261,16 @@ def main() -> None:
     print("  faces by dominant quadrant:",
           {q: counts.get(q, 0) for q in QUADRANT_ORDER})
 
-    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+    M.figures_dir.mkdir(parents=True, exist_ok=True)
 
-    out1 = FIGURES_DIR / "fig_v3_face_pca_by_quadrant.png"
+    out1 = M.figures_dir / "fig_v3_face_pca_by_quadrant.png"
     print("\nplotting per-face PCA by quadrant...")
     s1 = plot_face_pca_by_quadrant(df, X, out1)
     print(f"  wrote {out1}")
     print(f"  PC1 {s1['explained_variance_ratio'][0]*100:.1f}%, "
           f"PC2 {s1['explained_variance_ratio'][1]*100:.1f}%")
 
-    out2 = FIGURES_DIR / "fig_v3_face_probe_scatter.png"
+    out2 = M.figures_dir / "fig_v3_face_probe_scatter.png"
     print("\nplotting per-face probe scatter (probe_means)...")
     s2 = plot_face_probe_scatter(df, out2)
     print(f"  wrote {out2}")
@@ -278,7 +278,7 @@ def main() -> None:
     print(f"  Pearson(mean happy.sad, mean angry.calm) across faces: "
           f"r={s2['probe_pair_pearson_r']:+.3f}, p={s2['probe_pair_p']:.3g}")
 
-    out3 = FIGURES_DIR / "fig_v3_face_cosine_heatmap.png"
+    out3 = M.figures_dir / "fig_v3_face_cosine_heatmap.png"
     print("\nplotting per-face cosine heatmap (centered)...")
     s3 = plot_face_cosine_heatmap(df, X, out3)
     print(f"  wrote {out3}")
