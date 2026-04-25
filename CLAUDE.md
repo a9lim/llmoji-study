@@ -36,8 +36,10 @@ Binding rules:
 
 Hidden-state pipeline + kaomoji canonicalization landed; v3 re-run
 complete (800 generations + per-row .npz sidecars), figures
-regenerated. v1/v2 re-run not yet done — pre-registered as gated on
-v3 hidden-state findings, which now justify it but no urgent need.
+regenerated. v3 replicated on Qwen3.6-27B at parity (800 + sidecars);
+multi-model parameterization via `LLMOJI_MODEL=qwen|ministral|gemma`.
+v1/v2 re-run not yet done — pre-registered as gated on v3 hidden-
+state findings, which now justify it but no urgent need.
 
 Design + plan docs live in `docs/superpowers/plans/` — one per
 experiment, written before the run, treated as the pre-registration
@@ -87,6 +89,65 @@ only — no pre-registered pass/fail. Plan:
 - Within-kaomoji consistency to mean (h_mean, hidden-state space):
   most kaomoji 0.92–0.99, lowest are the cross-quadrant emitters
   (`(｡•́︿•̀｡)` 0.94, `(╯°□°)` 0.95, `(⊙_⊙)` 0.94).
+
+### Pilot v3 — Qwen3.6-27B replication
+
+Same prompts, same seeds, same instructions as gemma v3.
+`thinking=False` because Qwen3.6 is a reasoning model (closest-to-
+equivalent comparison). 800 generations, 0 errors, 100% bracket-
+start compliance. Hidden-state sidecars at `data/hidden/v3_qwen/`.
+Plan: `docs/superpowers/plans/2026-04-24-v3-qwen-replication.md`.
+Multi-model wiring via `LLMOJI_MODEL=qwen` (registry in
+`config.MODEL_REGISTRY`).
+
+**Findings (post-run, hidden-state space):**
+
+- 73 unique kaomoji forms (vs gemma's 33) — 2.2× broader
+  vocabulary at the same N=800. Faces by dominant quadrant
+  HP 10 / LP 21 / HN 11 / LN 14 / NB 17.
+- Russell-quadrant PCA: PC1 14.9%, PC2 8.3% (gemma 13.0 / 7.5).
+  Separation ratios PC1 2.34 / PC2 1.93 (gemma 2.02 / 2.73).
+  Same axis structure but the dominant axis flips — Qwen
+  separates valence (PC1) more cleanly than activation (PC2),
+  gemma was the reverse.
+- Per-quadrant centroids in PC1/PC2:
+  HP (-22.5, -30.3), LP (-15.4, -2.7), HN (+30.6, +21.1),
+  LN (+33.9, -4.9), NB (-23.7, +29.4).
+  HN and LN cluster right-side (positive valence, distress);
+  HP / LP / NB cluster left-side; arousal mostly on PC2.
+- Cross-quadrant emitters analogous to gemma's `(｡•́︿•̀｡)`:
+  `(；ω；)` (n=71; LN 64 + HN 5 + LP 2),
+  `(｡•́︿•̀｡)` (n=22; LN 15 + HN 4 + NB 2 + LP 1) — same form
+  gemma uses cross-quadrant,
+  `(；´д｀)` (n=31; HN 15 + LN 15 + NB 1) — splits HN/LN evenly.
+- Qwen has a dedicated HN shocked/distress register:
+  `(>_<)` 29, `(╥_╥)` 25, `(；′⌒\`)` 22, `(；´Д｀)` 22,
+  `(╯°□°)` 21. The `(╯°□°)` table-flip glyph appears in both
+  models — only HN-coded form shared between gemma's and Qwen's
+  vocabulary.
+- Default / cross-context form `(≧◡≦)` n=106 — HP 39 + LP 38 +
+  NB 28. Qwen's analog of gemma's neutral-default `(｡◕‿◕｡)`,
+  but with much wider quadrant spread (gemma's default was
+  HP/NB-heavy, not LP).
+- Within-kaomoji consistency: 0.88–0.99 across the 38
+  faces with n≥3, lowest are the cross-quadrant emitters
+  (consistent with gemma's pattern).
+- **Probe geometry diverges sharply:** Pearson(mean happy.sad,
+  mean angry.calm) across faces is r=−0.136 (p=0.25) on Qwen vs
+  r=−0.934 (p=2.31e-15) on gemma. The valence-collapse problem
+  that motivated v3 (probes nearly anti-aligned on gemma) does
+  not appear on Qwen — saklas's contrastive probes recover
+  near-orthogonal happy.sad / angry.calm directions on Qwen3.6.
+  v1/v2-style probe-space analysis would be substantially less
+  collapsed on this model. Cross-model architecture/training
+  difference, not a saklas issue.
+- Procedural note: the runner's per-quadrant "emission rate"
+  log line is gated on `kaomoji_label != 0` (TAXONOMY match),
+  not on bracket-start compliance. For Qwen this reads as
+  HP 28% / LP 13% / HN 2.5% / LN 11% / NB 12% — purely a
+  consequence of the gemma-tuned TAXONOMY not covering Qwen's
+  vocabulary, NOT instruction-following failure. Compliance
+  itself is 100%.
 
 ### Claude-faces — eriskii-style scrape (non-gemma, non-steering)
 
@@ -252,6 +313,29 @@ in a user turn", not "start every content block" — tool-use
 continuations skip the kaomoji. Smaller denominator than naive
 counting suggests.
 
+### v3 runner's per-quadrant "emission rate" is TAXONOMY coverage,
+not instruction compliance
+
+`scripts/03_emotional_run.py` checkpoint output reads e.g. "HP: 28%
+kaomoji-bearing". The denominator is rows in quadrant; the numerator
+is rows where `kaomoji_label != 0` (TAXONOMY match). For non-gemma
+models the gemma-tuned TAXONOMY drops to 10–30% coverage, making
+this log line look like instruction-following collapse when it isn't.
+Real compliance (bracket-start, the v3 loader's actual filter) is
+~100% on every model so far. Real check: `awk` for first-char in
+`([{（｛`, not the runner's log line.
+
+### Python stdout buffering hides long-run progress in tee'd logs
+
+`print()` to a piped stream is block-buffered (~4–8KB). For an 800-
+generation run with one progress line per gen, `tee logs/run.log`
+shows nothing for 30–60 minutes because the buffer doesn't fill
+until many lines accumulate. JSONL writes are fine (they `out.flush()`
+explicitly). For monitoring during a run: tail the JSONL via
+`wc -l data/...jsonl` rather than the log, OR add `flush=True` to
+the runner's `print()` calls (not yet done — pre-existing scripts
+work fine for offline log review after the run completes).
+
 ## Commands
 
 ```bash
@@ -266,11 +350,18 @@ python scripts/00_vocab_sample.py
 python scripts/01_pilot_run.py
 python scripts/02_pilot_analysis.py
 
-# v3 (naturalistic, 800 generations)
+# v3 (naturalistic, 800 generations) — gemma default
 python scripts/03_emotional_run.py
 python scripts/04_emotional_analysis.py             # Fig A/B/C + summary TSV
 python scripts/13_emotional_pca_valence_arousal.py  # Russell-quadrant PCA
 python scripts/17_v3_face_scatters.py               # per-face PCA + cosine + probe scatter
+
+# v3 on a non-gemma model (registry: gemma | qwen | ministral)
+LLMOJI_MODEL=qwen python scripts/03_emotional_run.py
+LLMOJI_MODEL=qwen python scripts/04_emotional_analysis.py
+LLMOJI_MODEL=qwen python scripts/13_emotional_pca_valence_arousal.py
+LLMOJI_MODEL=qwen python scripts/17_v3_face_scatters.py
+# outputs land at data/{short_name}_emotional_*, figures/{short_name}/*
 
 # Cross-pilot + v3-extension analyses
 python scripts/10_cross_pilot_clustering.py
