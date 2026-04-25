@@ -17,6 +17,9 @@ data/hidden/
 .venv/
 .env
 
+# run logs — ad-hoc tee'd output, not part of the experimental record
+logs/
+
 # editor cruft
 .DS_Store
 .idea/
