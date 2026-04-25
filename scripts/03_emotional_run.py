@@ -27,11 +27,9 @@ from llmoji.capture import run_sample
 from llmoji.config import (
     DATA_DIR,
     EMOTIONAL_CONDITION,
-    EMOTIONAL_DATA_PATH,
-    EMOTIONAL_EXPERIMENT,
     EMOTIONAL_SEEDS_PER_CELL,
-    MODEL_ID,
     PROBE_CATEGORIES,
+    current_model,
 )
 from llmoji.emotional_prompts import EMOTIONAL_PROMPTS
 from llmoji.prompts import Prompt
@@ -106,10 +104,14 @@ def _emission_rate_by_quadrant(path: Path) -> dict[str, tuple[int, int]]:
 
 def main() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    dropped = _drop_error_rows(EMOTIONAL_DATA_PATH)
+    M = current_model()
+    print(f"model: {M.short_name} ({M.model_id})")
+    print(f"output: {M.emotional_data_path}")
+    print(f"experiment: {M.experiment}")
+    dropped = _drop_error_rows(M.emotional_data_path)
     if dropped:
         print(f"dropped {dropped} prior error rows for retry")
-    done = _already_done(EMOTIONAL_DATA_PATH)
+    done = _already_done(M.emotional_data_path)
     total = len(EMOTIONAL_PROMPTS) * EMOTIONAL_SEEDS_PER_CELL
     remaining = total - len(done)
     print(f"total cells: {total}; already done: {len(done)}; remaining: {remaining}")
@@ -117,11 +119,11 @@ def main() -> None:
         print("nothing to do.")
         return
 
-    print(f"loading {MODEL_ID} ...")
+    print(f"loading {M.model_id} ...")
     t_load = time.time()
-    with SaklasSession.from_pretrained(MODEL_ID, device="auto", probes=PROBE_CATEGORIES) as session:
+    with SaklasSession.from_pretrained(M.model_id, device="auto", probes=PROBE_CATEGORIES) as session:
         print(f"loaded in {time.time() - t_load:.1f}s; beginning emotional-battery run")
-        with EMOTIONAL_DATA_PATH.open("a") as out:
+        with M.emotional_data_path.open("a") as out:
             i = 0
             for ep in EMOTIONAL_PROMPTS:
                 # Wrap the EmotionalPrompt as a pilot-style Prompt for run_sample.
@@ -141,7 +143,7 @@ def main() -> None:
                             condition=EMOTIONAL_CONDITION,
                             seed=seed,
                             hidden_dir=DATA_DIR,
-                            experiment=EMOTIONAL_EXPERIMENT,
+                            experiment=M.experiment,
                         )
                     except Exception as e:
                         err_row = {
@@ -164,13 +166,13 @@ def main() -> None:
                     )
                     # per-quadrant emission status every 80 rows
                     if i % 80 == 0:
-                        stats = _emission_rate_by_quadrant(EMOTIONAL_DATA_PATH)
+                        stats = _emission_rate_by_quadrant(M.emotional_data_path)
                         print("    emission rate by quadrant:")
                         for q in ("HP", "LP", "HN", "LN", "NB"):
                             k, n = stats[q]
                             rate = (k / n) if n else 0.0
                             print(f"      {q}: {k}/{n} kaomoji-bearing ({rate:.0%})")
-    print(f"\ndone. wrote rows to {EMOTIONAL_DATA_PATH}")
+    print(f"\ndone. wrote rows to {M.emotional_data_path}")
 
 
 if __name__ == "__main__":
