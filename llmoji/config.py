@@ -150,3 +150,82 @@ ERISKII_PER_MODEL_TSV = DATA_DIR / "eriskii_per_model.tsv"
 ERISKII_PER_PROJECT_TSV = DATA_DIR / "eriskii_per_project.tsv"
 ERISKII_USER_KAOMOJI_CORR_TSV = DATA_DIR / "eriskii_user_kaomoji_axis_corr.tsv"
 ERISKII_COMPARISON_MD = DATA_DIR / "eriskii_comparison.md"
+
+
+# ---------------------------------------------------------------------------
+# Multi-model registry (added 2026-04-24 for v3 cross-model replication)
+# ---------------------------------------------------------------------------
+#
+# v3 was originally written assuming a single MODEL_ID. To replicate v3
+# on Qwen3.6-27B and (later) Ministral without forking the four v3
+# entry-point scripts, we register per-model output paths here and
+# select between them via $LLMOJI_MODEL. Default ("gemma") preserves
+# every existing path bit-for-bit.
+#
+# v1/v2 paths are NOT model-keyed — those experiments are gemma-only
+# because saklas has no steering-vector calibration for qwen3_5 or
+# Ministral-3-8B. Adding model entries for them here is harmless;
+# v1/v2 scripts simply ignore the registry.
+
+import os
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class ModelPaths:
+    """Per-model paths for the v3 emotional-disclosure pipeline.
+
+    `model_id` must match the saklas-cached tensor filename casing
+    (see CLAUDE.md gotcha: `safe_model_id` is case-preserving).
+    `short_name` is the slug used in derived paths.
+    `experiment` is the hidden-state-sidecar subdir name under
+    `data/hidden/`. Distinct experiment names per model are required
+    so sidecars don't collide.
+    """
+    model_id: str
+    short_name: str
+    emotional_data_path: Path
+    emotional_summary_path: Path
+    experiment: str
+    figures_dir: Path
+
+
+MODEL_REGISTRY: dict[str, ModelPaths] = {
+    "gemma": ModelPaths(
+        model_id="google/gemma-4-31b-it",
+        short_name="gemma",
+        emotional_data_path=DATA_DIR / "emotional_raw.jsonl",
+        emotional_summary_path=DATA_DIR / "emotional_summary.tsv",
+        experiment="v3",
+        figures_dir=FIGURES_DIR,
+    ),
+    "qwen": ModelPaths(
+        model_id="Qwen/Qwen3.6-27B",
+        short_name="qwen",
+        emotional_data_path=DATA_DIR / "qwen_emotional_raw.jsonl",
+        emotional_summary_path=DATA_DIR / "qwen_emotional_summary.tsv",
+        experiment="v3_qwen",
+        figures_dir=FIGURES_DIR / "qwen",
+    ),
+    "ministral": ModelPaths(
+        model_id="mistralai/Ministral-3-8B-Instruct-2512",
+        short_name="ministral",
+        emotional_data_path=DATA_DIR / "ministral_emotional_raw.jsonl",
+        emotional_summary_path=DATA_DIR / "ministral_emotional_summary.tsv",
+        experiment="v3_ministral",
+        figures_dir=FIGURES_DIR / "ministral",
+    ),
+}
+
+
+def current_model() -> ModelPaths:
+    """Resolve the active model from `$LLMOJI_MODEL`. Defaults to
+    'gemma' (back-compat). Raises KeyError on an unrecognized name so
+    typos fail loudly."""
+    name = os.environ.get("LLMOJI_MODEL", "gemma")
+    if name not in MODEL_REGISTRY:
+        raise KeyError(
+            f"unknown LLMOJI_MODEL={name!r}; "
+            f"known: {sorted(MODEL_REGISTRY)}"
+        )
+    return MODEL_REGISTRY[name]
