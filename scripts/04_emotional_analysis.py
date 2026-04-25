@@ -16,10 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from llmoji.config import (
     DATA_DIR,
-    EMOTIONAL_DATA_PATH,
-    EMOTIONAL_EXPERIMENT,
-    EMOTIONAL_SUMMARY_PATH,
-    FIGURES_DIR,
+    current_model,
 )
 from llmoji.emotional_analysis import (
     load_emotional_features,
@@ -53,16 +50,19 @@ def _relabel_in_place(path: Path) -> None:
 
 
 def main() -> None:
-    if not EMOTIONAL_DATA_PATH.exists():
-        print(f"no data at {EMOTIONAL_DATA_PATH}; run scripts/03_emotional_run.py first")
+    M = current_model()
+    if not M.emotional_data_path.exists():
+        print(f"no data at {M.emotional_data_path}; "
+              f"run LLMOJI_MODEL={M.short_name} python scripts/03_emotional_run.py first")
         return
-    print(f"re-labeling kaomoji in {EMOTIONAL_DATA_PATH}")
-    _relabel_in_place(EMOTIONAL_DATA_PATH)
+    print(f"model: {M.short_name}; data: {M.emotional_data_path}")
+    print(f"re-labeling kaomoji in {M.emotional_data_path}")
+    _relabel_in_place(M.emotional_data_path)
 
     print("loading hidden-state features (which=h_mean, layer=max)...")
     df, X = load_emotional_features(
-        str(EMOTIONAL_DATA_PATH), DATA_DIR,
-        experiment=EMOTIONAL_EXPERIMENT,
+        str(M.emotional_data_path), DATA_DIR,
+        experiment=M.experiment,
         which="h_mean",
     )
     print(f"loaded {len(df)} kaomoji-bearing rows; X shape {X.shape}")
@@ -70,7 +70,6 @@ def main() -> None:
         print("nothing to plot; the v3 run needs to land hidden-state sidecars first")
         return
 
-    # Per-quadrant emission summary.
     print("\nper-quadrant kaomoji emission (first-word filter):")
     for q in ("HP", "LP", "HN", "LN", "NB"):
         q_rows = df[df["quadrant"] == q]
@@ -78,7 +77,6 @@ def main() -> None:
         uniq = int(q_rows["first_word"].nunique()) if n else 0
         print(f"  {q}: {n} kaomoji-bearing rows; {uniq} distinct forms")
 
-    # Top kaomoji per quadrant.
     print("\ntop-5 first_words per quadrant (by count):")
     for q in ("HP", "LP", "HN", "LN", "NB"):
         q_rows = df[df["quadrant"] == q]
@@ -87,10 +85,10 @@ def main() -> None:
         for km, c in top.items():
             print(f"    {km}  ({c})")
 
-    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-    fig_a = FIGURES_DIR / "fig_emo_a_kaomoji_sim.png"
-    fig_b = FIGURES_DIR / "fig_emo_b_kaomoji_consistency.png"
-    fig_c = FIGURES_DIR / "fig_emo_c_kaomoji_quadrant.png"
+    M.figures_dir.mkdir(parents=True, exist_ok=True)
+    fig_a = M.figures_dir / "fig_emo_a_kaomoji_sim.png"
+    fig_b = M.figures_dir / "fig_emo_b_kaomoji_consistency.png"
+    fig_c = M.figures_dir / "fig_emo_c_kaomoji_quadrant.png"
 
     print("\nwriting figures...")
     plot_kaomoji_cosine_heatmap(df, X, str(fig_a))
@@ -101,8 +99,8 @@ def main() -> None:
     print(f"  wrote {fig_c}")
 
     summary = summary_table(df, X)
-    summary.to_csv(EMOTIONAL_SUMMARY_PATH, sep="\t", index=False)
-    print(f"\nwrote per-kaomoji summary to {EMOTIONAL_SUMMARY_PATH}")
+    summary.to_csv(M.emotional_summary_path, sep="\t", index=False)
+    print(f"\nwrote per-kaomoji summary to {M.emotional_summary_path}")
     print(summary.to_string(index=False))
 
 
