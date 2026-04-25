@@ -15,11 +15,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from llmoji.config import (
     DATA_DIR,
-    EMOTIONAL_DATA_PATH,
-    EMOTIONAL_EXPERIMENT,
-    FIGURES_DIR,
     PILOT_EXPERIMENT,
     PILOT_RAW_PATH,
+    current_model,
 )
 from llmoji.emotional_analysis import (
     load_emotional_features,
@@ -29,32 +27,37 @@ from llmoji.emotional_analysis import (
 
 
 def main() -> None:
-    if not EMOTIONAL_DATA_PATH.exists():
-        print(f"no data at {EMOTIONAL_DATA_PATH}; run scripts/03_emotional_run.py first")
+    M = current_model()
+    if not M.emotional_data_path.exists():
+        print(f"no data at {M.emotional_data_path}; "
+              f"run LLMOJI_MODEL={M.short_name} python scripts/03_emotional_run.py first")
         return
 
+    print(f"model: {M.short_name}")
     print("loading v3 hidden-state features...")
     df, X = load_emotional_features(
-        str(EMOTIONAL_DATA_PATH), DATA_DIR,
-        experiment=EMOTIONAL_EXPERIMENT, which="h_mean",
+        str(M.emotional_data_path), DATA_DIR,
+        experiment=M.experiment, which="h_mean",
     )
     print(f"loaded {len(df)} v3 kaomoji-bearing rows; X shape {X.shape}")
     if len(df) == 0:
         print("nothing to plot; the v3 run needs to land hidden-state sidecars first")
         return
 
-    # Optional v1/v2 neutral baseline — adds an NB-style comparator
-    # from the v1/v2 factual-question register.
+    # v1/v2 baseline overlay only applies to the gemma run (PILOT_RAW_PATH
+    # is gemma-only — no Qwen/Ministral steering data exists). Quietly skip
+    # the overlay for non-gemma models even if a stray PILOT_RAW_PATH file
+    # exists.
     baseline_df = baseline_X = None
-    if PILOT_RAW_PATH.exists():
+    if M.short_name == "gemma" and PILOT_RAW_PATH.exists():
         baseline_df, baseline_X = load_v1v2_neutral_baseline_features(
             str(PILOT_RAW_PATH), DATA_DIR,
             experiment=PILOT_EXPERIMENT, which="h_mean",
         )
         print(f"loaded {len(baseline_df)} v1/v2 neutral-valence baseline rows")
 
-    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-    fig_path = FIGURES_DIR / "fig_v3_pca_valence_arousal.png"
+    M.figures_dir.mkdir(parents=True, exist_ok=True)
+    fig_path = M.figures_dir / "fig_v3_pca_valence_arousal.png"
     stats = plot_v3_pca_valence_arousal(
         df, X, str(fig_path),
         baseline_df=baseline_df, baseline_X=baseline_X,
