@@ -232,21 +232,55 @@ def extract(text: str) -> KaomojiMatch:
 # Canonicalization: collapse trivial kaomoji variants
 # ---------------------------------------------------------------------------
 #
-# Two kaomoji can differ by a single character in three ways:
+# Two kaomoji can differ in five cosmetic-only ways that we collapse, and one
+# semantically-meaningful way that we preserve.
 #
-#   1. Pure typographic — full-width vs half-width parens, '_' vs '﹏'
-#      wavy underscore. These NFKC-normalize to the same string.
-#   2. Hand-gesture / arm modifier — `(๑˃ᴗ˂)ﻭ` vs `(๑˃ᴗ˂)`,
-#      `(っ˘▽˘ς)` vs `(っ˘▽˘)`, `(っ╥﹏╥)` vs `(╥﹏╥)`. Same face,
-#      with or without an arm reaching out.
-#   3. Eye / mouth / decoration change — `(◕‿◕)` vs `(♥‿♥)`,
-#      `(｡◕‿◕｡)` vs `(✿◕‿◕｡)`, `(っ˘▽˘ς)` vs `(っ˘ω˘ς)`. These are
-#      semantically distinct faces and should NOT collapse.
+# Cosmetic (collapsed):
 #
-# `canonicalize_kaomoji` handles (1) and (2). (3) is preserved.
-# Borderline mouth-glyph case `ᴗ` / `‿` (subscript-curve smile in two
-# Unicode blocks) is unified to `‿` since the model emits both in the
-# same `(｡ᵕXᵕ｡)` skeleton with no distinct register.
+#   A. Invisible format characters: U+2060 WORD JOINER, U+200B/C/D zero-width
+#      space/non-joiner/joiner, U+FEFF byte-order mark, U+0602 ARABIC
+#      FOOTNOTE MARKER. Qwen occasionally emits these between every glyph
+#      of a kaomoji, e.g. `(⁠◕⁠‿⁠◕⁠✿⁠)` is the
+#      same expression as `(◕‿◕✿)`.
+#   B. Half-width vs full-width punctuation: `>`/`＞`, `<`/`＜`, `;`/`；`,
+#      `:`/`：`, `_`/`＿`, `*`/`＊`, `~`/`￣`. Hand-picked over NFKC because
+#      NFKC also compatibility-decomposes `´` and `˘` into space + combining
+#      marks, which destroys eye glyphs in `(っ´ω`)` and `(˘▽˘)`.
+#   C. Internal whitespace inside the bracket span: `( ; ω ; )` is the same
+#      as `(；ω；)`. Strip only ASCII spaces; non-ASCII spacing characters
+#      are part of the face.
+#   D. Cyrillic case: `Д`/`д` co-occur in the same `(；´X｀)` distressed-face
+#      skeleton at near-50/50 ratio, so the model isn't choosing between
+#      them semantically. Lowercase all Cyrillic capitals U+0410–U+042F.
+#   E. Near-identical glyph pairs:
+#        E1. Degree-like circular eyes/decorations: `°` (U+00B0 DEGREE SIGN),
+#            `º` (U+00BA MASCULINE ORDINAL), `˚` (U+02DA RING ABOVE) all fold
+#            to `°`. Gemma's `(°Д°)` and `(ºДº)` are the same shocked face.
+#        E2. Middle-dot variants: `・` (U+30FB KATAKANA MIDDLE DOT) and `･`
+#            (U+FF65 HALFWIDTH KATAKANA MIDDLE DOT) fold to `・`. Qwen's
+#            `(´・ω・`)` and `(´･ω･`)` are the same expression. Smaller-size
+#            middle dots (`·` U+00B7, `⋅` U+22C5) are NOT folded — they
+#            could plausibly be a distinct register.
+#   F. Hand/arm modifiers at face boundaries: `(๑˃ᴗ˂)ﻭ` vs `(๑˃ᴗ˂)`,
+#      `(っ˘▽˘ς)` vs `(っ˘▽˘)`. Stripped at the bracket boundary only —
+#      same face with or without an arm reaching out.
+#
+# Semantically meaningful (preserved):
+#
+#   * Eye / mouth / decoration changes that aren't covered by E1/E2 above.
+#     `(◕‿◕)` vs `(♥‿♥)` vs `(✿◕‿◕｡)` are distinct expressions.
+#   * Borderline mouth-glyph case `ᴗ` vs `‿` is unified to `‿` since the
+#     model emits both in the same `(｡ᵕXᵕ｡)` skeleton with no distinct
+#     register.
+#
+# Order of operations matters:
+#   1. NFC normalize (preserves `´`, `˘`, `｡` which NFKC would mangle).
+#   2. Strip invisible format chars (A) — must be early so they don't
+#      interfere with subsequent regex / equality checks.
+#   3. Apply `_TYPO_SUBS` (existing arm-c-fold + B + E1 + E2).
+#   4. Strip internal whitespace (C).
+#   5. Cyrillic case fold (D).
+#   6. Strip arm modifiers (F).
 
 import re
 import unicodedata
@@ -265,28 +299,76 @@ _TRAIL_OUTSIDE_RE = re.compile(rf"[{_ARM_OUTSIDE}]+$")
 _TRAIL_INSIDE_RE = re.compile(rf"[{_ARM_INSIDE_TRAIL}]+\)$")
 _LEAD_INSIDE_RE = re.compile(rf"^\([{_ARM_INSIDE_LEAD}]+")
 
-# Explicit typographic substitutions. Hand-picked over NFKC because NFKC
-# also compatibility-decomposes ` ´ ` (acute) and ` ˘ ` (breve) into
-# `space + combining-mark`, which destroys the eye glyphs in faces like
-# `(っ´ω`)` and `(˘▽˘)`. NFC leaves those intact; we then apply just the
-# specific compatibility-equivalences we want.
+# Rule A: invisible format characters that occasionally interleave kaomoji
+# glyphs without changing the expression. Listed by code point so the
+# source stays legible:
+#   U+200B ZERO WIDTH SPACE
+#   U+200C ZERO WIDTH NON-JOINER
+#   U+200D ZERO WIDTH JOINER
+#   U+2060 WORD JOINER
+#   U+FEFF ZERO WIDTH NO-BREAK SPACE / BOM
+#   U+0602 ARABIC FOOTNOTE MARKER (observed as a stray byte between
+#   `>` and `<` in Qwen `(๑>؂<๑)`)
+_INVISIBLE_CHARS_RE = re.compile(
+    "[​‌‍⁠﻿؂]"
+)
+
+# Hand-picked typographic / glyph substitutions. Hand-picked over NFKC
+# because NFKC also compatibility-decomposes `´` (acute) and `˘` (breve)
+# into space + combining marks, mangling eye glyphs in `(っ´ω`)` and
+# `(˘▽˘)`. NFC leaves those intact; we then apply just the specific
+# compatibility-equivalences we want.
 _TYPO_SUBS: tuple[tuple[str, str], ...] = (
+    # --- existing arm/paren folds ---
     ("）", ")"),   # full-width close paren
     ("（", "("),   # full-width open paren
     ("ｃ", "c"),   # full-width Latin c (arm modifier)
     ("﹏", "_"),   # small wavy low line vs underscore (treated as same)
     ("ᴗ", "‿"),   # subscript-curve mouth -> connector underscore-curve
+    # --- B: half/full-width punctuation pairs ---
+    ("＞", ">"),   # FULLWIDTH GREATER-THAN SIGN
+    ("＜", "<"),   # FULLWIDTH LESS-THAN SIGN
+    ("；", ";"),   # FULLWIDTH SEMICOLON
+    ("：", ":"),   # FULLWIDTH COLON
+    ("＿", "_"),   # FULLWIDTH LOW LINE
+    ("＊", "*"),   # FULLWIDTH ASTERISK
+    ("￣", "~"),   # FULLWIDTH MACRON
+    # --- E1: degree-like circular glyphs ---
+    ("º", "°"),    # MASCULINE ORDINAL INDICATOR -> DEGREE SIGN
+    ("˚", "°"),    # RING ABOVE -> DEGREE SIGN
+    # --- E2: middle-dot fold ---
+    ("･", "・"),   # HALFWIDTH KATAKANA MIDDLE DOT -> KATAKANA MIDDLE DOT
 )
+
+
+def _cyrillic_lower(s: str) -> str:
+    """Rule D: lowercase Cyrillic capitals U+0410–U+042F.
+
+    Leaves all non-Cyrillic-capital characters untouched, including
+    other Unicode case-bearing letters (Greek, etc.) which haven't been
+    observed as cosmetic-only variants in this corpus.
+    """
+    return "".join(
+        c.lower() if 0x0410 <= ord(c) <= 0x042F else c
+        for c in s
+    )
 
 
 def canonicalize_kaomoji(s: str) -> str:
     """Collapse trivial kaomoji variants to a canonical form.
 
-    Applies NFC normalization (preserves `´`, `˘`, `｡` which NFKC would
-    mangle), then a small whitelist of compatibility substitutions for
-    typographic equivalents (full-width parens, `﹏` vs `_`, `ᴗ` vs
-    `‿`), then strips arm/hand modifiers (`っ ς c ﻭ`) from face
-    boundaries. Eye/mouth/decoration changes are preserved.
+    Applies, in order:
+      1. NFC normalization (preserves `´`, `˘`, `｡` which NFKC would mangle).
+      2. Strip invisible format chars (rule A — U+200B/C/D, U+2060, U+FEFF,
+         U+0602).
+      3. Apply `_TYPO_SUBS` (existing arm/paren folds + rule B half/full-width
+         + rules E1/E2 near-identical-glyph folds).
+      4. Strip ASCII spaces inside the `(...)` bracket span (rule C).
+      5. Lowercase Cyrillic capitals (rule D).
+      6. Strip arm modifiers from face boundaries (rule F — `っ ς c ﻭ`).
+
+    Eye/mouth/decoration changes that aren't covered by rules E1/E2 are
+    preserved.
 
     Idempotent: ``canonicalize_kaomoji(canonicalize_kaomoji(s)) == canonicalize_kaomoji(s)``.
 
@@ -295,8 +377,12 @@ def canonicalize_kaomoji(s: str) -> str:
     if not s:
         return ""
     s = unicodedata.normalize("NFC", s.strip())
+    s = _INVISIBLE_CHARS_RE.sub("", s)
     for src, dst in _TYPO_SUBS:
         s = s.replace(src, dst)
+    if s.startswith("(") and s.endswith(")"):
+        s = "(" + s[1:-1].replace(" ", "") + ")"
+    s = _cyrillic_lower(s)
     # Strip outside-paren trailing arm chars first so trailing-inside
     # detection sees the closing paren.
     s = _TRAIL_OUTSIDE_RE.sub("", s)
@@ -306,7 +392,8 @@ def canonicalize_kaomoji(s: str) -> str:
 
 
 def sanity_check() -> None:
-    """Smoke-test the extractor."""
+    """Smoke-test the extractor and canonicalizer."""
+    # --- extract() ---
     # registered kaomoji
     assert extract("(｡◕‿◕｡) I had a great day!").label == +1
     assert extract("(｡•́︿•̀｡) That's so sad.").label == -1
@@ -322,6 +409,40 @@ def sanity_check() -> None:
     assert m.first_word == "(｡o_O｡)", repr(m.first_word)
     # empty
     assert extract("").label == 0
+
+    # --- canonicalize_kaomoji ---
+    ck = canonicalize_kaomoji
+    # idempotence on the empty / whitespace inputs
+    assert ck("") == ""
+    assert ck("   ") == ""
+    # rule A: strip word-joiner / ZWSP / Arabic footnote marker
+    assert ck("(⁠◕⁠‿⁠◕⁠✿⁠)") == "(◕‿◕✿)"
+    assert ck("(๑>؂<๑)") == "(๑><๑)"
+    # rule B: half/full-width punctuation
+    assert ck("(＞_＜)") == "(>_<)"
+    assert ck("(；ω；)") == "(;ω;)"
+    # rule C: strip internal ASCII whitespace inside brackets
+    assert ck("( ; ω ; )") == "(;ω;)"
+    assert ck("( ;´Д｀)") == "(;´д｀)"
+    # rule D: Cyrillic case fold
+    assert ck("(；´Д｀)") == "(;´д｀)"
+    assert ck("(；´д｀)") == "(;´д｀)"
+    # rule E1: degree-like glyphs
+    assert ck("(°Д°)") == "(°д°)"
+    assert ck("(ºДº)") == "(°д°)"
+    assert ck("(˚Д˚)") == "(°д°)"
+    # rule E2: middle-dot fold
+    assert ck("(´・ω・`)") == "(´・ω・`)"
+    assert ck("(´･ω･`)") == "(´・ω・`)"
+    # rule F (existing): arm modifiers
+    assert ck("(๑˃ᴗ˂)ﻭ") == "(๑˃‿˂)"
+    assert ck("(っ╥﹏╥)っ") == "(╥_╥)"
+    # idempotence on a complex example
+    once = ck("( ⁠;⁠ ´⁠Д⁠｀⁠ )")
+    twice = ck(once)
+    assert once == twice, (once, twice)
+    # eye change preserved (NOT collapsed by E)
+    assert ck("(◕‿◕)") != ck("(♥‿♥)")
 
 
 if __name__ == "__main__":
