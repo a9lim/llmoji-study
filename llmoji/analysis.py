@@ -212,13 +212,26 @@ def _use_cjk_font() -> None:
     """Configure a matplotlib font fallback chain that covers ~100% of
     observed kaomoji characters. matplotlib 3.6+ falls back per-glyph
     through this list. See emotional_analysis._use_cjk_font for the
-    character-coverage rationale."""
+    character-coverage rationale.
+
+    Also registers the project-local `data/fonts/NotoEmoji-Regular.ttf`
+    (monochrome) so SMP emoji glyphs that appear inside some
+    Qwen-emitted forms render instead of showing as missing-glyph
+    rectangles."""
     import matplotlib
     import matplotlib.font_manager as fm
+    from pathlib import Path
+    repo_root = Path(__file__).resolve().parent.parent
+    emoji_font = repo_root / "data" / "fonts" / "NotoEmoji-Regular.ttf"
+    if emoji_font.exists() and "Noto Emoji" not in {f.name for f in fm.fontManager.ttflist}:
+        try:
+            fm.fontManager.addfont(str(emoji_font))
+        except Exception:
+            pass
     chain = [
         "Noto Sans CJK JP", "Arial Unicode MS", "DejaVu Sans", "DejaVu Serif",
         "Tahoma", "Noto Sans Canadian Aboriginal", "Heiti TC",
-        "Hiragino Sans", "Apple Symbols",
+        "Hiragino Sans", "Apple Symbols", "Noto Emoji", "Helvetica Neue",
     ]
     available = {f.name for f in fm.fontManager.ttflist}
     chain = [n for n in chain if n in available]

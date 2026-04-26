@@ -42,11 +42,21 @@ from llmoji.taxonomy import canonicalize_kaomoji
 
 def _use_cjk_font() -> None:
     """Synced with llmoji/analysis.py, llmoji/emotional_analysis.py,
-    scripts/09_claude_faces_plot.py — keep these four chains in sync."""
+    scripts/09_claude_faces_plot.py, scripts/16_eriskii_replication.py
+    — keep these five chains in sync."""
+    import matplotlib.font_manager as fm
+    from pathlib import Path
+    repo_root = Path(__file__).resolve().parent.parent
+    emoji_font = repo_root / "data" / "fonts" / "NotoEmoji-Regular.ttf"
+    if emoji_font.exists() and "Noto Emoji" not in {f.name for f in fm.fontManager.ttflist}:
+        try:
+            fm.fontManager.addfont(str(emoji_font))
+        except Exception:
+            pass
     plt.rcParams["font.family"] = [
         "Noto Sans CJK JP", "Arial Unicode MS", "DejaVu Sans",
         "DejaVu Serif", "Tahoma", "Noto Sans Canadian Aboriginal",
-        "Heiti TC",
+        "Heiti TC", "Noto Emoji", "Helvetica Neue",
     ]
 
 

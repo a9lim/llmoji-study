@@ -1,8 +1,9 @@
 """Eriskii-replication step 3: analysis + figures.
 
 Sections in build order:
-  - axis projection: data/eriskii_axes.tsv +
-    figures/eriskii_axis_<name>.png × 21
+  - axis projection: data/eriskii_axes.tsv (TSV only — per-axis
+    ranked-bar figures dropped, the per-model / per-project
+    heatmaps already summarize axis structure)
   - clusters: data/eriskii_clusters.tsv +
     figures/eriskii_clusters_tsne.png
   - per-model: data/eriskii_per_model.tsv +
@@ -45,10 +46,18 @@ def _use_cjk_font() -> None:
     09_claude_faces_plot.py — copy here for consistency."""
     import matplotlib
     import matplotlib.font_manager as fm
+    from pathlib import Path
+    repo_root = Path(__file__).resolve().parent.parent
+    emoji_font = repo_root / "data" / "fonts" / "NotoEmoji-Regular.ttf"
+    if emoji_font.exists() and "Noto Emoji" not in {f.name for f in fm.fontManager.ttflist}:
+        try:
+            fm.fontManager.addfont(str(emoji_font))
+        except Exception:
+            pass
     chain = [
         "Noto Sans CJK JP", "Arial Unicode MS", "DejaVu Sans", "DejaVu Serif",
         "Tahoma", "Noto Sans Canadian Aboriginal", "Heiti TC",
-        "Hiragino Sans", "Apple Symbols",
+        "Hiragino Sans", "Apple Symbols", "Noto Emoji", "Helvetica Neue",
     ]
     available = {f.name for f in fm.fontManager.ttflist}
     chain = [n for n in chain if n in available]
@@ -61,42 +70,16 @@ def section_axes(
     n: np.ndarray,
     P: np.ndarray,
 ) -> pd.DataFrame:
-    """Write eriskii_axes.tsv + one ranked-bar figure per axis."""
-    import matplotlib.pyplot as plt
-
+    """Write eriskii_axes.tsv. Per-axis ranked-bar PNGs intentionally
+    dropped — the per-model / per-project axis heatmaps already
+    summarize the same axis structure, and 21 single-axis bar charts
+    cluttered figures/ without adding insight."""
     df = pd.DataFrame({"first_word": fw, "n": n})
     for j, name in enumerate(ERISKII_AXES):
         df[name] = P[:, j]
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     df.to_csv(ERISKII_AXES_TSV, sep="\t", index=False)
     print(f"wrote {ERISKII_AXES_TSV}  ({len(df)} kaomoji × {len(ERISKII_AXES)} axes)")
-
-    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-    for j, name in enumerate(ERISKII_AXES):
-        scores = P[:, j]
-        order = np.argsort(-scores)
-        top = order[:15]
-        bot = order[-15:][::-1]
-        idxs = list(top) + list(bot)
-        labels = [fw[i] for i in idxs]
-        vals = [scores[i] for i in idxs]
-        counts = [n[i] for i in idxs]
-
-        fig, ax = plt.subplots(figsize=(6, 8))
-        colors = plt.cm.viridis(np.array(counts) / max(counts))
-        y = np.arange(len(idxs))
-        ax.barh(y, vals, color=colors)
-        ax.set_yticks(y)
-        ax.set_yticklabels(labels, fontsize=10)
-        ax.invert_yaxis()
-        ax.axhline(14.5, color="black", linewidth=0.5, alpha=0.4)
-        ax.set_xlabel(f"{name} projection (cosine)")
-        ax.set_title(f"top-15 / bottom-15 on {name}\n(bar color = emission count)")
-        fig.tight_layout()
-        out = FIGURES_DIR / f"eriskii_axis_{name}.png"
-        fig.savefig(out, dpi=150, bbox_inches="tight")
-        plt.close(fig)
-        print(f"  wrote {out}")
     return df
 
 

@@ -183,9 +183,24 @@ def load_v1v2_neutral_baseline_features(
 
 def _use_cjk_font() -> None:
     """Configure matplotlib font-family as a fallback *chain* covering
-    the kaomoji character set — see CLAUDE.md font-fallback gotcha."""
+    the kaomoji character set — see CLAUDE.md font-fallback gotcha.
+
+    Also registers the project-local `data/fonts/NotoEmoji-Regular.ttf`
+    (monochrome) so SMP emoji glyphs that appear inside some
+    Qwen-emitted forms — e.g. `(🌫️🐕✨)`, `(🥺💧)` — render instead of
+    showing as missing-glyph rectangles. macOS ships only color-emoji
+    TTC which matplotlib's text engine cannot rasterize.
+    """
     import matplotlib
     import matplotlib.font_manager as fm
+    from pathlib import Path
+    repo_root = Path(__file__).resolve().parent.parent
+    emoji_font = repo_root / "data" / "fonts" / "NotoEmoji-Regular.ttf"
+    if emoji_font.exists() and "Noto Emoji" not in {f.name for f in fm.fontManager.ttflist}:
+        try:
+            fm.fontManager.addfont(str(emoji_font))
+        except Exception:
+            pass
     chain = [
         "Noto Sans CJK JP",
         "Arial Unicode MS",
@@ -194,7 +209,10 @@ def _use_cjk_font() -> None:
         "Tahoma",
         "Noto Sans Canadian Aboriginal",
         "Heiti TC",
-        "Hiragino Sans", "Apple Symbols",
+        "Hiragino Sans",
+        "Apple Symbols",
+        "Noto Emoji",
+        "Helvetica Neue",  # covers stray punctuation like U+2E1D ⸝
     ]
     available = {f.name for f in fm.fontManager.ttflist}
     chain = [n for n in chain if n in available]

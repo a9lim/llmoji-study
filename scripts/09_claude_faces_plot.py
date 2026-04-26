@@ -32,10 +32,18 @@ def _use_cjk_font() -> None:
     See llmoji.emotional_analysis._use_cjk_font for rationale."""
     import matplotlib
     import matplotlib.font_manager as fm
+    from pathlib import Path
+    repo_root = Path(__file__).resolve().parent.parent
+    emoji_font = repo_root / "data" / "fonts" / "NotoEmoji-Regular.ttf"
+    if emoji_font.exists() and "Noto Emoji" not in {f.name for f in fm.fontManager.ttflist}:
+        try:
+            fm.fontManager.addfont(str(emoji_font))
+        except Exception:
+            pass
     chain = [
         "Noto Sans CJK JP", "Arial Unicode MS", "DejaVu Sans", "DejaVu Serif",
         "Tahoma", "Noto Sans Canadian Aboriginal", "Heiti TC",
-        "Hiragino Sans", "Apple Symbols",
+        "Hiragino Sans", "Apple Symbols", "Noto Emoji", "Helvetica Neue",
     ]
     available = {f.name for f in fm.fontManager.ttflist}
     chain = [n for n in chain if n in available]
