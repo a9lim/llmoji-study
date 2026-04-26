@@ -160,6 +160,57 @@ Multi-model wiring via `LLMOJI_MODEL=qwen` (registry in
   vocabulary, NOT instruction-following failure. Compliance
   itself is 100%.
 
+### Vocab pilot — Ministral-3-14B-Instruct-2512
+
+Same prompts (the 30 v1/v2 PROMPTS), same seed, same instructions
+as the original gemma vocab sample. 30 generations, descriptive
+only. Plan:
+`docs/superpowers/plans/2026-04-25-ministral-vocab-pilot.md`.
+
+**Findings:**
+
+- Bracket-start (real instruction-following) rate: 30/30 = 100%.
+  Saklas probe bootstrap on the 14B succeeded in 80s (12 probes,
+  ~6.7s/probe); no cached vectors needed.
+- Distinct leading tokens: 10 forms across 30 generations
+  (compare gemma 30-row vocab sample: 8 forms; Qwen v3 800-row
+  sample: 73 forms). Diversity at N=30 is ballpark gemma, far
+  below Qwen's per-row spread.
+- Top forms: `(◕‿◕✿)` ×14 (positive + neutral default), `(╥﹏╥)`
+  ×8 (negative default), then 8 singletons.
+- Dialect signature: Japanese-register `(◕X◕)` / `(╥X╥)` family,
+  same as gemma's `(｡◕‿◕｡)` / `(｡•́︿•̀｡)` core, but with two
+  distinctive divergences: (a) the default positive uses a
+  flower-arm decoration `✿` rather than gemma's cheek dots `｡X｡`;
+  (b) Mistral uniquely embeds Unicode emoji *inside* kaomoji
+  brackets — `(🏃‍♂️💨🏆)` for "got the job," `(🌿)` / `(🌕✨)` /
+  `(☀️)` / `(☀️\U0001259d)` for neutral nature/weather prompts.
+  Neither gemma nor Qwen produced emoji-augmented brackets in
+  their respective samples. Possible French/European cultural
+  register expressing through emoji-as-decoration on top of the
+  Japanese kaomoji frame; one observation, no inference.
+- TAXONOMY coverage: 0/30 hits, 30/30 misses. The gemma-tuned
+  dict doesn't cover any Mistral form. Same gotcha as Qwen and
+  fully expected.
+- Valence-tracking is sharp at this N: 8/10 positive prompts and
+  4/10 neutral prompts → `(◕‿◕✿)`; 9/10 negative prompts → some
+  variant of `(╥X╥)`. Tighter than gemma's 30-row valence split,
+  largely because Mistral's vocab at N=30 is smaller (10 forms
+  vs gemma's 8 — but distribution-mass is more concentrated on
+  the top two forms, ~73% vs gemma's ~50%).
+- Sufficient breadth/dialect-difference to motivate a v3 run on
+  Ministral? Equivocal. Pro: instruction-following is perfect,
+  probe bootstrap works, the emoji-augmented register is novel
+  cross-model evidence. Con: the kaomoji vocabulary at this N is
+  narrower than gemma's and far narrower than Qwen's, so the
+  v3-style per-face geometric analysis would have fewer faces
+  with n≥3 to work with than either prior model. Worth
+  brainstorming separately, not auto-triggered.
+- Tokenizer warning at load: "incorrect regex pattern… set
+  `fix_mistral_regex=True`". Cosmetic — output looked clean,
+  bracket-start compliance is 100% — but worth flagging in
+  Gotchas if a v3 Ministral run is greenlit.
+
 ### Claude-faces — eriskii-style scrape (non-gemma, non-steering)
 
 Scrapes kaomoji-bearing assistant messages from
