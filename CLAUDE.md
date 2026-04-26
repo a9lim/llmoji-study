@@ -97,6 +97,14 @@ only — no pre-registered pass/fail. Plan:
   merge doesn't move the 800-row PCA materially). Pearson(mean
   happy.sad, mean angry.calm) across faces still r=−0.936
   (n=32 faces, was −0.934 at n=33).
+  Figure refresh 2026-04-25 (post-canonicalization): face-level
+  figures (Fig C, fig_v3_face_*) now color each face by an RGB
+  blend of `QUADRANT_COLORS` weighted by per-quadrant emission
+  count, replacing the prior dominant-quadrant winner-take-all
+  scheme. Cross-quadrant emitters (the `(｡•́︿•̀｡)` LN/HN family)
+  render as visible mixes; pure-quadrant faces stay at endpoint
+  colors. Palette retuned to canonical-Russell mid-saturated:
+  HN red, HP gold, LP green, LN blue, NB gray.
 
 ### Pilot v3 — Qwen3.6-27B replication
 
@@ -174,6 +182,13 @@ under aggressive canonicalization rules A–E):**
   architecture/training difference, not a saklas issue.
   (Was r=−0.136 pre-canonicalization at n=73 faces; near-zero
   finding stable under the merge refresh.)
+  Figure refresh 2026-04-25: per-face proportional RGB-blend
+  coloring on the four face-level figures. The `(;´д｀)` family
+  (n=70; HN 37 + LN 31 + NB 2) now reads as visibly purple, the
+  `(;ω;)` LN-dominant form (n=82; LN 75 + HN 5 + HP 2) reads as
+  deep blue with a slight red cast — the old dominant-quadrant
+  scheme rendered both as pure HN-orange / pure LN-blue
+  respectively.
 - Procedural note: the runner's per-quadrant "emission rate"
   log line is gated on `kaomoji_label != 0` (TAXONOMY match),
   not on bracket-start compliance. For Qwen this reads as
