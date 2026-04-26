@@ -89,6 +89,14 @@ only — no pre-registered pass/fail. Plan:
 - Within-kaomoji consistency to mean (h_mean, hidden-state space):
   most kaomoji 0.92–0.99, lowest are the cross-quadrant emitters
   (`(｡•́︿•̀｡)` 0.94, `(╯°□°)` 0.95, `(⊙_⊙)` 0.94).
+- Re-run 2026-04-25 under aggressive canonicalization (rules A–E):
+  33 → 32 forms (the `(°Д°)`/`(ºДº)` shocked-face pair merged
+  under rules D + E1). PCA / separation numbers above are the
+  post-merge values: PC1 12.98%, PC2 7.49%, separation ratios
+  PC1 2.03, PC2 2.74 (was 13.0 / 7.5, 2.02 / 2.73 — single-form
+  merge doesn't move the 800-row PCA materially). Pearson(mean
+  happy.sad, mean angry.calm) across faces still r=−0.936
+  (n=32 faces, was −0.934 at n=33).
 
 ### Pilot v3 — Qwen3.6-27B replication
 
@@ -100,23 +108,28 @@ Plan: `docs/superpowers/plans/2026-04-24-v3-qwen-replication.md`.
 Multi-model wiring via `LLMOJI_MODEL=qwen` (registry in
 `config.MODEL_REGISTRY`).
 
-**Findings (post-run, hidden-state space):**
+**Findings (post-run, hidden-state space; numbers updated 2026-04-25
+under aggressive canonicalization rules A–E):**
 
-- 73 unique kaomoji forms (vs gemma's 33) — 2.2× broader
-  vocabulary at the same N=800. Faces by dominant quadrant
-  HP 10 / LP 21 / HN 11 / LN 14 / NB 17.
-- Russell-quadrant PCA: PC1 14.9%, PC2 8.3% (gemma 13.0 / 7.5).
-  Separation ratios PC1 2.34 / PC2 1.93 (gemma 2.02 / 2.73).
-  Same axis structure but the dominant axis flips: Qwen
-  separates valence (PC1) more cleanly than activation (PC2),
-  gemma was the reverse.
+- 65 unique kaomoji forms (was 73 pre-aggressive-canonicalization;
+  vs gemma's 32) — 2.0× broader vocabulary at the same N=800.
+  Faces by dominant quadrant HP 10 / LP 20 / HN 9 / LN 11 / NB 15
+  (was 10/21/11/14/17 — modest reshuffle as merged forms picked
+  new dominant quadrants).
+- Russell-quadrant PCA: PC1 14.87%, PC2 8.29% (gemma 12.98 /
+  7.49). Separation ratios PC1 2.20 / PC2 1.89 (was 2.34 / 1.93;
+  gemma 2.03 / 2.74). Same axis structure: Qwen separates
+  valence (PC1) more cleanly than activation (PC2), gemma is the
+  reverse.
 - Per-quadrant centroids in PC1/PC2:
-  HP (-22.5, -30.3), LP (-15.4, -2.7), HN (+30.6, +21.1),
-  LN (+33.9, -4.9), NB (-23.7, +29.4).
+  HP (-22.5, -30.3), LP (-15.2, -2.5), HN (+30.7, +22.0),
+  LN (+31.2, -4.6), NB (-23.1, +29.4). LN drifted from +33.9 to
+  +31.2 on PC1 as the `(;ω;)` family rebalanced under merging;
+  other quadrants stable to within ±1.0 on each axis.
 - Geometric finding: positive-cluster and negative-cluster
   arousal axes are **anti-parallel on PC2**, not collinear.
   HP→LP spread is (+7, +28) — positive cluster widens upward.
-  HN→LN spread is (+3, -26) — negative cluster widens downward.
+  HN→LN spread is (+0.5, -27) — negative cluster widens downward.
   So PC2 is not a single shared arousal dimension; it's two
   internal arousal dimensions, one per valence half, pointing
   opposite ways. Gemma by contrast gives essentially one shared
@@ -127,31 +140,40 @@ Multi-model wiring via `LLMOJI_MODEL=qwen` (registry in
   Russell circumplex with arousal expressed independently within
   each valence half.
 - Cross-quadrant emitters analogous to gemma's `(｡•́︿•̀｡)`:
-  `(；ω；)` (n=71; LN 64 + HN 5 + LP 2),
+  `(;ω;)` (n=82; LN 75 + HN 5 + HP 2 — absorbed the
+  ASCII-padded `( ; ω ; )` variant, +14% from pre-merge n=71),
   `(｡•́︿•̀｡)` (n=22; LN 15 + HN 4 + NB 2 + LP 1) — same form
-  gemma uses cross-quadrant,
-  `(；´д｀)` (n=31; HN 15 + LN 15 + NB 1) — splits HN/LN evenly.
+  gemma uses cross-quadrant; unchanged since no merge available,
+  `(;´д｀)` (n=70; HN 37 + LN 31 + NB 2 — absorbed the Cyrillic-
+  case `(；´Д｀)` and ASCII-padded `( ;´Д｀)` variants under rules
+  D + C, was n=31 alone for `(；´д｀)` plus n=39 for the merged
+  variants pre-canonicalization).
 - Qwen has a dedicated HN shocked/distress register:
-  `(>_<)` 29, `(╥_╥)` 25, `(；′⌒\`)` 22, `(；´Д｀)` 22,
+  `(;´д｀)` 37, `(>_<)` 34, `(╥_╥)` 25, `(;′⌒\`)` 22,
   `(╯°□°)` 21. The `(╯°□°)` table-flip glyph appears in both
   models — only HN-coded form shared between gemma's and Qwen's
-  vocabulary.
+  vocabulary. (`(>_<)` itself is now total n=36 across all
+  quadrants, having absorbed the full-width `(＞_＜)` variant.)
 - Default / cross-context form `(≧◡≦)` n=106 — HP 39 + LP 38 +
   NB 28. Qwen's analog of gemma's neutral-default `(｡◕‿◕｡)`,
   but with much wider quadrant spread (gemma's default was
-  HP/NB-heavy, not LP).
-- Within-kaomoji consistency: 0.88–0.99 across the 38
-  faces with n≥3, lowest are the cross-quadrant emitters
-  (consistent with gemma's pattern).
+  HP/NB-heavy, not LP). Unchanged by the canonicalization
+  refresh.
+- Within-kaomoji consistency: 0.89–0.99 across the 33 faces
+  with n≥3 (was 0.88–0.99 across 38 faces; some n=2 forms now
+  cross n=3 and others shift; still lowest among the
+  cross-quadrant emitters).
 - **Probe geometry diverges sharply:** Pearson(mean happy.sad,
-  mean angry.calm) across faces is r=−0.136 (p=0.25) on Qwen vs
-  r=−0.934 (p=2.31e-15) on gemma. The valence-collapse problem
-  that motivated v3 (probes nearly anti-aligned on gemma) does
-  not appear on Qwen — saklas's contrastive probes recover
-  near-orthogonal happy.sad / angry.calm directions on Qwen3.6.
-  v1/v2-style probe-space analysis would be substantially less
-  collapsed on this model. Cross-model architecture/training
-  difference, not a saklas issue.
+  mean angry.calm) across faces is r=−0.117 (p=0.355) on Qwen
+  vs r=−0.936 (p=4.1e-15) on gemma. The valence-collapse
+  problem that motivated v3 (probes nearly anti-aligned on
+  gemma) does not appear on Qwen — saklas's contrastive probes
+  recover near-orthogonal happy.sad / angry.calm directions on
+  Qwen3.6. v1/v2-style probe-space analysis would be
+  substantially less collapsed on this model. Cross-model
+  architecture/training difference, not a saklas issue.
+  (Was r=−0.136 pre-canonicalization at n=73 faces; near-zero
+  finding stable under the merge refresh.)
 - Procedural note: the runner's per-quadrant "emission rate"
   log line is gated on `kaomoji_label != 0` (TAXONOMY match),
   not on bracket-start compliance. For Qwen this reads as
@@ -251,25 +273,76 @@ All v3 figures use `h_mean`.
 
 ## Kaomoji canonicalization
 
-`llmoji.taxonomy.canonicalize_kaomoji(s)` collapses near-duplicate
-forms. Applied at load time in `load_emotional_features` (v3) and
-`claude_faces.load_embeddings_canonical` (claude-faces). Three rules:
+`llmoji.taxonomy.canonicalize_kaomoji(s)` collapses cosmetic-only
+kaomoji variants. Applied at load time in `load_emotional_features`
+(v3) and `claude_faces.load_embeddings_canonical` (claude-faces).
+Six rules (extended 2026-04-25 from three to six after Qwen
+revealed substantial cosmetic-only variation that the original
+ruleset missed):
 
-1. NFC normalize (NOT NFKC — NFKC compatibility-decomposes `´` and
-   `˘` into space + combining marks, mangling face glyphs).
-2. Whitelisted typographic substitutions: `）` → `)`, `（` → `(`,
-   `ｃ` → `c`, `﹏` → `_`, `ᴗ` → `‿`.
-3. Strip arm-modifier characters from face boundaries: leading `っ`
-   inside `(`, trailing `[ςc]` inside `)`, trailing `[ﻭっ]` outside
-   `)`. Eye/mouth/decoration changes preserved.
+1. **NFC normalize** (NOT NFKC — NFKC compatibility-decomposes `´`
+   and `˘` into space + combining marks, mangling face glyphs).
+2. **Strip invisible format characters**: ZWSP/ZWNJ/ZWJ
+   (U+200B/C/D), WORD JOINER (U+2060), BOM (U+FEFF), and the
+   U+0602 ARABIC FOOTNOTE MARKER that Qwen occasionally emits as
+   a stray byte. The model sometimes interleaves U+2060 between
+   every glyph of a kaomoji; `(⁠◕⁠‿⁠◕⁠✿⁠)` collapses to `(◕‿◕✿)`.
+3. **Whitelisted typographic substitutions**:
+   - Existing arm folds: `）`→`)`, `（`→`(`, `ｃ`→`c`, `﹏`→`_`,
+     `ᴗ`→`‿`.
+   - Half/full-width punctuation: `＞`→`>`, `＜`→`<`, `；`→`;`,
+     `：`→`:`, `＿`→`_`, `＊`→`*`, `￣`→`~`.
+   - Near-identical glyph folds: `º`→`°`, `˚`→`°` (degree-like
+     circular eyes), `･`→`・` (middle-dot fold). NOT `·`/`⋅` —
+     those are smaller and could plausibly be a distinct register.
+4. **Strip ASCII spaces inside the bracket span**: `( ; ω ; )`
+   becomes `(;ω;)`. Only ASCII spaces; non-ASCII spacing
+   characters are part of the face. Applied only when the form
+   starts with `(` and ends with `)`.
+5. **Lowercase Cyrillic capitals** (U+0410–U+042F): `Д` → `д`.
+   The two forms co-occur in the same `(；´X｀)` distressed-face
+   skeleton at near-50/50 ratio in Qwen output, so the model
+   isn't choosing between them semantically.
+6. **Strip arm-modifier characters** from face boundaries:
+   leading `っ` inside `(`, trailing `[ςc]` inside `)`, trailing
+   `[ﻭっ]` outside `)`. Eye/mouth/decoration changes that aren't
+   covered by rule 3 are preserved.
 
-Effect: v3 42 → 33 forms (separation ratios PC1 0.96 → 2.02, PC2
-1.30 → 2.73). Claude-faces 160 → 156 (smaller because Claude's
-vocabulary doesn't lean on arm modifiers).
+Effect (post-aggressive-canonicalization, 2026-04-25):
+- Gemma v3: 42 → 33 → **32** (the `(°Д°)` / `(ºДº)` shocked-face
+  merge under rules 5 + 3-glyph-fold; original 42→33 was rules
+  1+3-arm+3-arm; PCA / separation ratios essentially unchanged at
+  PC1 12.98% / 7.49%, sep 2.03 / 2.74).
+- Qwen v3: original would have been 73 raw; aggressive
+  canonicalization gives **65** (the `(；ω；)` family absorbed
+  ASCII-padded variants → n=82, the `(;´д｀)` group merged
+  Cyrillic-case + ASCII-pad variants → n=70, `(>_<)` ↔ `(＞_＜)`
+  → n=36, `(◕‿◕✿)` ↔ word-joiner-decorated → n=16,
+  `(´・ω・`)` ↔ `(´･ω･`)` → n=17). Sep ratios PC1 2.20 / PC2 1.89
+  (was 2.34 / 1.93 pre-aggressive); cross-model probe-pair
+  Pearson r = -0.117 (was -0.136) — still near zero, near-
+  orthogonal probes preserved.
+- Ministral pilot: 9 → 9 (no merges available at this N).
+- Claude-faces: 160 → **144** raw rows (16 merge groups under
+  the new rules — middle-dot folds, `ᴗ`/`‿` belatedly applied
+  to claude-faces, internal-whitespace strips). The
+  `claude_faces_embed.parquet` is unaffected because
+  `load_embeddings_canonical` merges at load time. **However:**
+  `data/claude_haiku_synthesized.jsonl` has 16 collision groups
+  where multiple per-face Haiku-synthesized descriptions key to
+  the same canonical form. As of 2026-04-25 the eriskii outputs
+  (`eriskii_axes.tsv`, `eriskii_clusters.tsv`,
+  `eriskii_per_*.tsv`, `eriskii_user_kaomoji_axis_corr.tsv`,
+  `figures/eriskii_*`, `figures/claude_faces_interactive.html`)
+  are **stale w.r.t. the new canonicalization** — they reflect
+  pre-aggressive-canonicalization grouping. A separate plan
+  (re-synthesizing the 16 merge groups via Haiku and
+  regenerating the eriskii pipeline end-to-end) is the proper
+  fix; until then, treat eriskii numbers as historical baseline.
 
 JSONL keeps raw `first_word`; `first_word_raw` column exists for
-audit. Regenerate the per-kaomoji parquets if the canonicalization
-rule changes.
+audit. Regenerate the per-kaomoji parquets / figures if the
+canonicalization rule changes.
 
 ## Gotchas
 
@@ -358,14 +431,26 @@ conversation has more non-empty messages. Keep old exports.
 
 ### Matplotlib font fallback needs a list, not a string
 
-Kaomoji span 90+ non-ASCII non-CJK characters. No single font
-covers them. matplotlib 3.6+ supports per-glyph fallback via
+Kaomoji span 90+ non-ASCII non-CJK characters plus, on Qwen,
+Mistral, and Claude, SMP emoji glyphs (`🌫️`, `🐕`, `✨`, `💧`, …)
+embedded inside kaomoji brackets. No single system font covers
+them all. matplotlib 3.6+ supports per-glyph fallback via
 `rcParams["font.family"] = [...]`. `_use_cjk_font` helpers
-(in `analysis.py`, `emotional_analysis.py`,
-`scripts/09_claude_faces_plot.py`, `scripts/18_claude_faces_pca.py`)
-configure `Noto Sans CJK JP → Arial Unicode MS → DejaVu Sans →
-DejaVu Serif → Tahoma → Noto Sans Canadian Aboriginal → Heiti TC`.
-Keep these chains in sync.
+(in `llmoji/analysis.py`, `llmoji/emotional_analysis.py`,
+`scripts/09_claude_faces_plot.py`,
+`scripts/16_eriskii_replication.py`,
+`scripts/18_claude_faces_pca.py` — five copies, **keep in sync**)
+register a project-local monochrome emoji font
+(`data/fonts/NotoEmoji-Regular.ttf`, Google Noto Emoji variable
+font, 1.9MB, committed to the repo) and configure the chain
+`Noto Sans CJK JP → Arial Unicode MS → DejaVu Sans → DejaVu
+Serif → Tahoma → Noto Sans Canadian Aboriginal → Heiti TC →
+Hiragino Sans → Apple Symbols → Noto Emoji → Helvetica Neue`.
+The font-registration step is critical: macOS only ships a
+color-emoji TTC (`Apple Color Emoji.ttc`) which matplotlib's
+text engine cannot rasterize — `addfont()` on the
+project-local monochrome font is the workaround. `Helvetica
+Neue` covers stray punctuation glyphs like U+2E1D `⸝`.
 
 ### Kaomoji-prefix rate under Claude's "start each message"
 instruction is ~2.7%
