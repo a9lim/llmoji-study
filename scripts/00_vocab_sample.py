@@ -32,10 +32,9 @@ from llmoji.config import (
     DATA_DIR,
     KAOMOJI_INSTRUCTION,
     MAX_NEW_TOKENS,
-    MODEL_ID,
     PROBE_CATEGORIES,
     TEMPERATURE,
-    VOCAB_SAMPLE_PATH,
+    current_model,
 )
 from llmoji.prompts import PROMPTS
 from llmoji.taxonomy import TAXONOMY, extract
@@ -43,9 +42,12 @@ from llmoji.taxonomy import TAXONOMY, extract
 
 def main() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    M = current_model()
+    print(f"model: {M.short_name} ({M.model_id})")
+    print(f"output: {M.vocab_sample_path}")
 
-    print(f"loading {MODEL_ID} ...")
-    with SaklasSession.from_pretrained(MODEL_ID, device="auto", probes=PROBE_CATEGORIES) as session:
+    print(f"loading {M.model_id} ...")
+    with SaklasSession.from_pretrained(M.model_id, device="auto", probes=PROBE_CATEGORIES) as session:
         rows = []
         for i, prompt in enumerate(PROMPTS):
             messages = [
@@ -74,8 +76,8 @@ def main() -> None:
             tag = match.kaomoji if match.kaomoji else f"[other: {match.first_word!r}]"
             print(f"[{i+1:02d}/{len(PROMPTS)}] {prompt.id} {tag}")
 
-    VOCAB_SAMPLE_PATH.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
-    print(f"\nwrote {len(rows)} rows to {VOCAB_SAMPLE_PATH}")
+    M.vocab_sample_path.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    print(f"\nwrote {len(rows)} rows to {M.vocab_sample_path}")
 
     # --- summary ---
     first_words = Counter(r["first_word"] for r in rows)
@@ -83,13 +85,25 @@ def main() -> None:
     hits = {k: v for k, v in first_words.items() if k in registered}
     misses = {k: v for k, v in first_words.items() if k not in registered}
 
+    # Real instruction-following check is bracket-start, not TAXONOMY hit.
+    # The gemma-tuned TAXONOMY systematically under-counts non-gemma models
+    # (see CLAUDE.md gotcha "v3 runner's per-quadrant emission rate is
+    # TAXONOMY coverage, not instruction compliance").
+    bracket_starts = sum(
+        1 for r in rows
+        if r["first_word"] and r["first_word"][0] in "([{（｛"
+    )
+
     print("\n=== frequency of leading tokens ===")
     for k, v in sorted(first_words.items(), key=lambda kv: -kv[1]):
         mark = "in taxonomy" if k in registered else "MISS"
         print(f"  {v:3d}  {k!r:20s}  {mark}")
 
-    print(f"\n{sum(hits.values())}/{len(rows)} generations started with a registered kaomoji")
+    print(f"\n{sum(hits.values())}/{len(rows)} generations started with a "
+          f"taxonomy-registered kaomoji")
     print(f"{sum(misses.values())}/{len(rows)} did not")
+    print(f"{bracket_starts}/{len(rows)} started with a bracket "
+          f"(real instruction-following rate)")
     if misses:
         print("\nTop unregistered leading tokens to consider:")
         for k, v in sorted(misses.items(), key=lambda kv: -kv[1])[:10]:
@@ -97,7 +111,7 @@ def main() -> None:
         print(
             "\nIf any of these cover a real emotional axis and appear "
             "frequently, lock them into taxonomy.TAXONOMY *before* running "
-            "the pilot."
+            "any subsequent pilot on this model."
         )
 
 
