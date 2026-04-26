@@ -181,6 +181,8 @@ class ModelPaths:
     `experiment` is the hidden-state-sidecar subdir name under
     `data/hidden/`. Distinct experiment names per model are required
     so sidecars don't collide.
+    `vocab_sample_path` is where `scripts/00_vocab_sample.py` writes
+    its 30-row leading-token histogram for this model.
     """
     model_id: str
     short_name: str
@@ -188,6 +190,7 @@ class ModelPaths:
     emotional_summary_path: Path
     experiment: str
     figures_dir: Path
+    vocab_sample_path: Path
 
 
 MODEL_REGISTRY: dict[str, ModelPaths] = {
@@ -198,6 +201,7 @@ MODEL_REGISTRY: dict[str, ModelPaths] = {
         emotional_summary_path=DATA_DIR / "emotional_summary.tsv",
         experiment="v3",
         figures_dir=FIGURES_DIR,
+        vocab_sample_path=VOCAB_SAMPLE_PATH,
     ),
     "qwen": ModelPaths(
         model_id="Qwen/Qwen3.6-27B",
@@ -206,14 +210,16 @@ MODEL_REGISTRY: dict[str, ModelPaths] = {
         emotional_summary_path=DATA_DIR / "qwen_emotional_summary.tsv",
         experiment="v3_qwen",
         figures_dir=FIGURES_DIR / "qwen",
+        vocab_sample_path=DATA_DIR / "qwen_vocab_sample.jsonl",
     ),
     "ministral": ModelPaths(
-        model_id="mistralai/Ministral-3-8B-Instruct-2512",
+        model_id="mistralai/Ministral-3-14B-Instruct-2512",
         short_name="ministral",
         emotional_data_path=DATA_DIR / "ministral_emotional_raw.jsonl",
         emotional_summary_path=DATA_DIR / "ministral_emotional_summary.tsv",
         experiment="v3_ministral",
         figures_dir=FIGURES_DIR / "ministral",
+        vocab_sample_path=DATA_DIR / "ministral_vocab_sample.jsonl",
     ),
 }
 
