@@ -38,12 +38,20 @@ KAOMOJI_START_CHARS = set("([（｛ヽ٩ᕕ╰╭╮┐┌＼¯໒＼ヾっ")
 # Russell-quadrant palette + ordering. Shared with scripts/17_v3_face_scatters.py
 # so per-face plots use a consistent colour scheme.
 QUADRANT_ORDER = ["HP", "LP", "HN", "LN", "NB"]
+# Canonical Russell-circumplex mapping. Saturated enough that 50/50
+# RGB-linear mixes between adjacent-quadrant pairs are still
+# recognizable (HN+LN → muted purple, HP+LP → olive, etc.); perceived
+# luminance balanced ~L*55–62 across all 5 so weighted mixes don't
+# drift in brightness when one quadrant dominates by saturation alone.
+# Diagonal "contradictory" mixes (HN+LP "anger meets calm",
+# HP+LN "excited meets sad") fall to brown / desaturated gray —
+# informatively unusual.
 QUADRANT_COLORS = {
-    "HP": "#d62728",  # red — high-arousal positive
-    "LP": "#2ca02c",  # green — low-arousal positive
-    "HN": "#ff7f0e",  # orange — high-arousal negative
-    "LN": "#1f77b4",  # blue — low-arousal negative
-    "NB": "#7f7f7f",  # gray — neutral baseline
+    "HP": "#d49b3a",  # gold — high arousal, positive (excitement/joy)
+    "LP": "#4aa66a",  # green — low arousal, positive (calm/contentment)
+    "HN": "#d44a4a",  # red — high arousal, negative (anger/anxiety)
+    "LN": "#4a7ed4",  # blue — low arousal, negative (sadness/depression)
+    "NB": "#909090",  # gray — neutral baseline
 }
 
 
@@ -59,6 +67,58 @@ def per_face_dominant_quadrant(df: pd.DataFrame) -> dict[str, str]:
         candidates = [q for q in QUADRANT_ORDER if counts.get(q, 0) == max_count]
         out[str(fw)] = candidates[0] if candidates else "NB"
     return out
+
+
+def per_face_quadrant_weights(df: pd.DataFrame) -> dict[str, dict[str, float]]:
+    """For each first_word, return a dict mapping quadrant -> normalized
+    emission weight (sum to 1 across the 5 quadrants).
+
+    A face emitted in 21 LN rows + 20 HN rows + 0 elsewhere yields
+    ``{"LN": 0.512, "HN": 0.488, "HP": 0, "LP": 0, "NB": 0}``.
+    Faces with zero total emissions return all-zero weights (caller
+    should guard).
+    """
+    from collections import Counter
+    out: dict[str, dict[str, float]] = {}
+    for fw, sub in df.groupby("first_word"):
+        counts = Counter(sub["quadrant"].tolist())
+        total = sum(counts.values())
+        if total == 0:
+            out[str(fw)] = {q: 0.0 for q in QUADRANT_ORDER}
+            continue
+        out[str(fw)] = {
+            q: counts.get(q, 0) / total for q in QUADRANT_ORDER
+        }
+    return out
+
+
+def mix_quadrant_color(
+    weights: dict[str, float],
+) -> tuple[float, float, float]:
+    """Linear-RGB mix of `QUADRANT_COLORS` weighted by `weights`.
+
+    Weights are expected to sum to 1.0 across the 5 quadrants
+    (`per_face_quadrant_weights` produces them). Hex strings in
+    `QUADRANT_COLORS` are converted to (r, g, b) floats in [0, 1],
+    multiplied by the per-quadrant weight, and summed component-wise.
+    Returns a matplotlib-compatible RGB tuple.
+
+    A face that's 100% one quadrant returns that quadrant's pure
+    color; a face split 50/50 between two quadrants returns the RGB
+    midpoint; a face split evenly across all 5 returns the centroid
+    of the 5 base colors (close to mid-gray, which is the visually
+    "balanced" outcome).
+    """
+    from matplotlib.colors import to_rgb
+    r = g = b = 0.0
+    for q, w in weights.items():
+        if w <= 0 or q not in QUADRANT_COLORS:
+            continue
+        qr, qg, qb = to_rgb(QUADRANT_COLORS[q])
+        r += w * qr
+        g += w * qg
+        b += w * qb
+    return (r, g, b)
 
 
 # ---------------------------------------------------------------------------
@@ -608,16 +668,12 @@ def plot_v3_pca_valence_arousal(
 
     coords = pca.transform(np.asarray(group_vecs, dtype=np.float32))
 
-    quadrant_color = {
-        "HP": "#e9a01f", "LP": "#4a8a5a",
-        "HN": "#c9372d", "LN": "#3d68a8",
-        "NB": "#888888",
-    }
+    # Use the global QUADRANT_COLORS (canonical Russell palette).
 
     fig, ax = plt.subplots(figsize=(11, 9))
 
     for (km, q, n), pt in zip(groups, coords):
-        c = quadrant_color.get(q, "#666")
+        c = QUADRANT_COLORS.get(q, "#666")
         ax.scatter(pt[0], pt[1], c=c, s=40 + n * 4,
                    edgecolor="black", linewidth=0.4, alpha=0.78, zorder=3)
         if n >= 3:
@@ -639,7 +695,7 @@ def plot_v3_pca_valence_arousal(
             sub_coords.std(axis=0, ddof=0).tolist()
             if mask.sum() > 1 else [0.0, 0.0]
         )
-        c = quadrant_color.get(q_name, "#666")
+        c = QUADRANT_COLORS.get(q_name, "#666")
         ax.plot(centroid[0], centroid[1], marker="*", markersize=28,
                 color=c, markeredgecolor="black", markeredgewidth=1.6, zorder=5)
         ax.annotate(f"  {q_name}", (centroid[0], centroid[1]),
@@ -663,8 +719,8 @@ def plot_v3_pca_valence_arousal(
         ("NB", "NB (neutral baseline)"),
     ]
     legend_handles = [
-        Patch(color=quadrant_color[k], label=lbl)
-        for k, lbl in legend_labels if k in quadrant_color
+        Patch(color=QUADRANT_COLORS[k], label=lbl)
+        for k, lbl in legend_labels if k in QUADRANT_COLORS
     ]
     ax.legend(handles=legend_handles, loc="best", frameon=False,
               fontsize=9, title="Russell quadrant")
