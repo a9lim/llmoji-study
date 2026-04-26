@@ -499,13 +499,17 @@ def plot_kaomoji_quadrant_alignment(
     """Figure C: for each (kaomoji × quadrant) cell with n >=
     min_per_cell, cosine(cell_mean_hidden, quadrant_aggregate_hidden).
     Centered cosine — both cells and quadrant aggregates centered
-    against the same hidden-state pool mean."""
+    against the same hidden-state pool mean.
+
+    Y-axis row labels are tinted by per-face mixed quadrant color
+    (RGB blend of `QUADRANT_COLORS` weighted by per-quadrant
+    emission count). Cross-quadrant emitters render as visible
+    mixes; pure-quadrant faces stay at their endpoint color."""
     import matplotlib.pyplot as plt
     from matplotlib.patches import Rectangle
     from scipy.cluster.hierarchy import linkage, leaves_list
     from scipy.spatial.distance import squareform
     from .hidden_state_analysis import cosine_similarity_matrix, group_mean_vectors
-    from .taxonomy import TAXONOMY
 
     _use_cjk_font()
 
@@ -564,8 +568,16 @@ def plot_kaomoji_quadrant_alignment(
     cell_n = cell_n[order, :]
     row_counts = counts.iloc[order].to_numpy()
 
-    pole_color = {+1: "#c25a22", -1: "#2f6c57", 0: "#666"}
-    row_colors = [pole_color.get(TAXONOMY.get(k, 0), "#666") for k in kms_ordered]
+    # Row tint: per-face mixed quadrant color (RGB-linear blend of
+    # QUADRANT_COLORS weighted by emission distribution). More
+    # informative than the old TAXONOMY-pole 3-state coloring —
+    # cross-quadrant emitters render visibly mixed, e.g. a face
+    # that's 21 LN + 20 HN reads as purple instead of green/orange.
+    weights = per_face_quadrant_weights(df)
+    row_colors = [
+        mix_quadrant_color(weights.get(k, {q: 0.0 for q in QUADRANT_ORDER}))
+        for k in kms_ordered
+    ]
 
     n = len(kms_ordered)
     fig, ax = plt.subplots(figsize=(max(6, 0.8 * len(quadrants) + 3),
