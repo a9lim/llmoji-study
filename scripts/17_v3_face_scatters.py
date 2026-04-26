@@ -37,17 +37,26 @@ from llmoji.emotional_analysis import (
     QUADRANT_ORDER,
     _use_cjk_font,
     load_emotional_features,
+    mix_quadrant_color,
     per_face_dominant_quadrant,
+    per_face_quadrant_weights,
 )
 
 
 def _add_quadrant_legend(ax) -> None:
+    """Five-patch legend with the canonical Russell quadrant colors as
+    endpoints. Per-face dot colors are RGB-linear blends of these
+    endpoints proportional to the face's per-quadrant emission counts;
+    the legend caption documents that semantic."""
     handles = [
         plt.Line2D([0], [0], marker="o", linestyle="None", markersize=8,
                    color=QUADRANT_COLORS[q], label=q)
         for q in QUADRANT_ORDER
     ]
-    ax.legend(handles=handles, loc="best", framealpha=0.9, title="dominant quadrant")
+    ax.legend(
+        handles=handles, loc="best", framealpha=0.9,
+        title="quadrant (faces blended proportionally)",
+    )
 
 
 def plot_face_pca_by_quadrant(
@@ -71,8 +80,13 @@ def plot_face_pca_by_quadrant(
     pca = PCA(n_components=2)
     Y = pca.fit_transform(M)
 
-    quadrant = per_face_dominant_quadrant(df)
-    colors = [QUADRANT_COLORS[quadrant.get(fw, "NB")] for fw in fdf["first_word"]]
+    weights = per_face_quadrant_weights(df)
+    colors = [
+        mix_quadrant_color(
+            weights.get(fw, {q: 0.0 for q in QUADRANT_ORDER})
+        )
+        for fw in fdf["first_word"]
+    ]
     sizes = np.clip(15 + 30 * np.log1p(fdf["n"]), 15, 250)
 
     fig, ax = plt.subplots(figsize=(12, 9))
@@ -92,7 +106,7 @@ def plot_face_pca_by_quadrant(
     ax.set_ylabel(f"PC2 ({pca.explained_variance_ratio_[1]*100:.1f}%)")
     ax.set_title(
         f"v3 per-kaomoji h_mean PCA  ({len(fdf)} kaomoji)\n"
-        "colored by dominant emission quadrant"
+        "colored by per-face quadrant emission distribution (RGB blend)"
     )
     _add_quadrant_legend(ax)
     fig.tight_layout()
@@ -124,8 +138,13 @@ def plot_face_probe_scatter(
         })
     fdf = pd.DataFrame(rows)
 
-    quadrant = per_face_dominant_quadrant(df)
-    colors = [QUADRANT_COLORS[quadrant.get(fw, "NB")] for fw in fdf["first_word"]]
+    weights = per_face_quadrant_weights(df)
+    colors = [
+        mix_quadrant_color(
+            weights.get(fw, {q: 0.0 for q in QUADRANT_ORDER})
+        )
+        for fw in fdf["first_word"]
+    ]
     sizes = np.clip(15 + 30 * np.log1p(fdf["n"]), 15, 250)
 
     fig, ax = plt.subplots(figsize=(11, 9))
@@ -150,7 +169,7 @@ def plot_face_probe_scatter(
     ax.set_ylabel("mean angry.calm probe (whole-gen mean)  ->  positive = angry")
     ax.set_title(
         f"v3 per-kaomoji probe scatter  ({len(fdf)} kaomoji)\n"
-        "saklas bipolar probes (whole-generation means), colored by dominant quadrant"
+        "saklas bipolar probes (whole-generation means), colored by per-face quadrant blend"
     )
     _add_quadrant_legend(ax)
     fig.tight_layout()
@@ -216,11 +235,20 @@ def plot_face_cosine_heatmap(
     ax.set_xticklabels(fdf_sorted["first_word"], rotation=90, fontsize=8)
     ax.set_yticklabels(fdf_sorted["first_word"], fontsize=8)
 
-    # Tint y-axis labels by quadrant color so the structure is readable.
-    for tick, q in zip(ax.get_yticklabels(), fdf_sorted["quadrant"]):
-        tick.set_color(QUADRANT_COLORS[q])
-    for tick, q in zip(ax.get_xticklabels(), fdf_sorted["quadrant"]):
-        tick.set_color(QUADRANT_COLORS[q])
+    # Tint y/x axis labels by per-face mixed quadrant color (RGB blend
+    # of QUADRANT_COLORS by per-quadrant emission count). Faces in only
+    # one quadrant render as their endpoint color; cross-quadrant
+    # emitters render as visible mixes — `(;ω;)` (LN-heavy with HN
+    # tail) leans deep blue, `(;´д｀)` (HN/LN ~50/50) leans purple.
+    weights = per_face_quadrant_weights(df)
+    for tick, fw in zip(ax.get_yticklabels(), fdf_sorted["first_word"]):
+        tick.set_color(mix_quadrant_color(
+            weights.get(fw, {q: 0.0 for q in QUADRANT_ORDER})
+        ))
+    for tick, fw in zip(ax.get_xticklabels(), fdf_sorted["first_word"]):
+        tick.set_color(mix_quadrant_color(
+            weights.get(fw, {q: 0.0 for q in QUADRANT_ORDER})
+        ))
 
     # Quadrant boundary lines
     for i in q_changes:
