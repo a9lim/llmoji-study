@@ -24,3 +24,6 @@ logs/
 .DS_Store
 .idea/
 .vscode/
+
+# claude docs
+Docs/

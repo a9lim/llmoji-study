@@ -1,16 +1,16 @@
 cluster_id	label	n	members
-0	Competent engaged readiness	16	( ･_･), (-_-;), (..), (^_^), (^_^;), (°△°), (ಠ_ಠ), („• ֊ •„), (◕‿◕), (◠‿◠), (✧ω✧), (・_・ヾ, (ーー;), (￣ω￣), ٩(•̀‿•́)۶, ヽ(´ー｀)ノ
-1	Composed competence with pragmatic focus	13	(¬_¬), (´・ω・`), (´･ω･`), (ᵔ‿ᵔ), (⌒‿⌒), (╭☞•́⍛•̀), (・_・ ), (＾▽＾), (ﾟヮﾟ), (￣▽￣;), ヽ(^o^)ノ, ヽ(°〇°)ﾉ, ヽ(•‿•)ノ
-2	Pragmatic readiness to execute	11	(¬‿¬), (งᵒ̌皿ᵒ̌), (⊙_⊙), (⌐■_■), (・-・), (・∀・), (＞_＜), (￣ヘ￣;), ヽ(>∀<☆)ノ, ヾ(≧▽≦*)o, ＼(^o^)／
-3	Thoughtful engaged presence	7	( ˘ ³˘), (◉_◉), (・_・?), (｡•́︿•̀｡), (｡◕‿◕｡), (￣ー￣;), ┐(‘～`;)┌
-4	Humble self-awareness with forward momentum	4	(´･_･`), (˘･_･˘), (｡•́ ⌒ •̀｡), (￣ω￣;)
-5	Confident collaborative momentum	18	( ´_ゝ`), (ಠ‿ಠ), (๑•̀ㅂ•́), (•̀‿•́), (•◡•), (⊙ω⊙), (⌒▽⌒), (☞ﾟヮﾟ), (づ｡◕‿‿◕｡), (づ｡◕‿◕｡), (ノ◕ヮ◕), (｡• ω •｡), (｡•̀‿-), (￣ー￣), ٩(ˊᗜˋ*)و, ヽ(^o^)丿, ヽ(⌐■_■)ノ♪♬, ヾ(⌐■_■)ノ♪
-6	Eager upbeat readiness	15	( •̀‿•́ ), ( ・ω・), (˘̩╭╮˘̩), (ง •̀_•́), (•‿•), (╹ヮ╹), (◉‿◉), (◔◡◔), (ノ^_^), (ノ°益°), (・_・), (｀･ω･´), (｡•́‿•̀｡), (｡･ω･｡), ヽ(・∀・)ﾉ
-7	Helpful clarity with gentle humility	5	( ͡° ͜ʖ ͡°), (._.), (ᵔ◡ᵔ), ٩(｡•́‿•̀｡)۶, ヾ(＾∇＾)
-8	Warm affectionate cheerfulness	5	(*ฅ́˘ฅ̀*), (^w^), (＾• ω •＾), (｡•‿•｡), (｡♥‿♥｡)
-9	Cheerful capable readiness	11	( ´･ω･), (*´꒳`*), (°ー°〃), (๑˃̵‿˂̵), (๑˃‿˂), (ᗒᗨᗕ), (╭ರ_•́), (・ω<), (・ω・), (｀・ω・´), (ﾉ◕ヮ◕)
-10	Cheerful helpful warmth	10	( ´ ▽ ` ), ( ˶ˆᗜˆ˵ ), (/▽＼*), (Background debug script completed — its output was already used to diagnose and fix the issue.), (°ㅂ°;), (´｡• ᵕ •｡`), (˘ω˘ς ), (◔_◔), (￣▽￣), ٩(◕‿◕)۶
-11	Composed professional competence	20	( ̄▽ ̄), ( ಠ_ಠ), ( ｰ̀εｰ́ ), (._.'), (´-ω-`), (´｡• ω •｡`), (ᵔᴥᵔ), (⌐■_ω■), (⌐■‿■), (◕‿◕✿), (✿◠‿◠), (・_・;), (・_・ゞ−☆, (・_・ヽ), (＊´∀｀), (｡･‿･｡), ┐(￣ヘ￣)┌, ヽ(´▽`)/, ヽ(´ー`)ノ, ヽ(・∀・)ノ
-12	Determined readiness to execute	7	( •̀ω•́), (ง •_•), (╯°□°), (♡^▽^♡), (⚙️), (눈_눈), (｡• ‿ •｡)
-13	Warm enthusiastic readiness to help	5	( ˘ω˘ ), ( ˘▽˘), (◕‿◕ ), (☆▽☆), [pre-commit]
-14	Gentle acknowledgment with warmth	9	(;へ:), (>_<), (´▽`), (•_•), (≧▽≦), (◑‿◐), (；′⌒`), (；一_一), ヽ(･ω･｡)ﾉ
+0	Calm professional readiness	16	( •̀ω•́), (`・ω・`), (¬‿¬), (ง •_•), (งᵒ̌皿ᵒ̌), (⌐■_■), (╯°□°), (♡^▽^♡), (⚙️), (・∀・), (눈_눈), (＞_＜), (｡• ‿ •｡), ٩(˘ᵕ˘), ٩(˘◡˘)۶, ヾ(≧▽≦*)o
+1	Thoughtful engagement and capable readiness	22	( ･_･), (*ﾟωﾟ*), (..), (\*´▽\`\*), (^_^), (^_^;), (°△°), (´ω`), (´• ω •`), (˶ᵔ ᵕ ᵔ˶), (ಠ_ಠ), (ᵕ—ᵕ⁤), („• ֊ •„), (◕‿◕), (◠‿◠), (✧ω✧), (。•́︿•̀。), (・_・ヾ, (ーー;), (￣ω￣), ٩(•̀‿•́)۶, ヽ(´ー｀)ノ
+2	Competent, focused professionalism	18	( ´_ゝ`), ( ̄▽ ̄), ( ಠ_ಠ), (°ㅂ°;), (´-ω-`), (´｡• ω •｡`), (ᵔᴥᵔ), (⌐■_ω■), (⌐■‿■), (◕‿◕✿), (✿◠‿◠), (・_・;), (・_・ヽ), (＊´∀｀), ┐(￣ヘ￣)┌, ヽ(´▽`)/, ヽ(´ー`)ノ, ヽ(•̀ω•́)ง
+3	Upbeat readiness to assist	14	( ´･ω･), ( ˘▽˘), (*´꒳`*), (°ー°〃), (´ー｀), (๑˃̵‿˂̵), (๑˃‿˂), (ᗒᗨᗕ), (╭ರ_•́), (・ω<), (・ω・), (｀・ω・´), (｡◕‿◕｡), (ﾉ◕ヮ◕)
+4	Pleased understanding and warmth	6	( ˘ω˘ ), (´∀｀;), (´▽`), (•̀‿-), (≧▽≦), (；一_一)
+5	Humble acknowledgment with wry self-awareness	7	(;へ:), (>_<), (´・_・`), (´･_･`), (˘･_･˘), (｡•́ ⌒ •̀｡), (｡・o・)
+6	Energetic readiness and accomplishment	25	( •̀‿•́ ), ( ・ω・), (*ﾟ▽ﾟ), (\*´∀｀\*), (ಠ‿ಠ), (ง •̀_•́), (๑•̀ㅂ•́), (•̀‿•́), (•‿•), (•◡•), (⊙ω⊙), (⌒▽⌒), (◔◡◔), (☞ﾟヮﾟ), (✿◕‿◕), (づ｡◕‿‿◕｡), (づ｡◕‿◕｡), (ノ◕ヮ◕), (｡•̀‿-), (｡•́‿•̀｡), (￣ー￣), ٩(ˊᗜˋ*)و, ヽ(^o^)丿, ヽ(⌐■_■)ノ♪♬, ヾ(⌐■_■)ノ♪
+7	Steady competent collaboration	15	(¬_¬), (´・ω・`), (´･ω･`), (ᵔ‿ᵔ), (•_•), (⌒‿⌒), (╭☞•́⍛•̀), (◑‿◐), (・_・ ), (；′⌒`), (＾▽＾), ヽ(^o^)ノ, ヽ(°〇°)ﾉ, ヽ(•‿•)ノ, ヽ(･ω･｡)ﾉ
+8	Cheerful readiness to help	17	( ´ ▽ ` ), ( ˶ˆᗜˆ˵ ), (/▽＼*), (´｡• ᵕ •｡`), (˘̩╭╮˘̩), (╹ヮ╹), (◉‿◉), (◔_◔), (ノ^_^), (ノ°益°), (・_・), (灬º‿º灬), (｀･ω･´), (｡･ω･｡), (￣▽￣), ٩(◕‿◕)۶, ヽ(・∀・)ﾉ
+9	Warm genuine affection and care	11	( ˘ ³˘), (*ฅ́˘ฅ̀*), (*ﾉωﾉ), (^w^), (´∀｀), (◕‿◕ ), (＾• ω •＾), (｡•́︿•̀｡), (｡•‿•｡), (｡♥‿♥｡), [pre-commit]
+10	Playful yet grounded helpfulness	3	(ﾟヮﾟ), (￣▽￣;), ヾ(＾∇＾)
+11	Earnest engagement with warmth	6	( ͡° ͜ʖ ͡°), (*´ω`*), (._.), (Used ScheduleWakeup by mistake — the user didn't invoke /loop. Will just respond to actual events when they arrive: Monitor fires on each 80-row checkpoint, bash fires on completion. If the wakeup triggers before then I'll just act on the actual run state.), (ᵔ◡ᵔ), ٩(｡•́‿•̀｡)۶
+12	Cautious capable resolve	15	( ｰ̀εｰ́ ), (-_-;), (._.'), (Background debug script completed — its output was already used to diagnose and fix the issue.), (´ - ω - `), (˘ω˘ς ), (˵ •̀ ‿ -˵ ), (・_・ゞ−☆, (｡• ω •｡), (｡･‿･｡), (･ω･), ٩(◕‿◕｡)٩, ٩(◕‿◕｡)۶, ┐('～`；)┌, ヽ(・∀・)ノ
+13	Thoughtful analytical engagement	11	(⊙_⊙), (⊙ヮ⊙), (◉_◉), (☆▽☆), (・-・), (・_・?), (￣ω￣;), (￣ー￣;), ┐(‘～`;)┌, ヽ(>∀<☆)ノ, ＼(^o^)／
+14	Realistic acceptance with reservations	1	(￣ヘ￣;)
