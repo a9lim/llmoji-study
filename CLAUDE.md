@@ -452,9 +452,11 @@ embedded inside kaomoji brackets. No single system font covers
 them all. matplotlib 3.6+ supports per-glyph fallback via
 `rcParams["font.family"] = [...]`. `_use_cjk_font` helpers
 (in `llmoji/analysis.py`, `llmoji/emotional_analysis.py`,
+`llmoji/cross_pilot_analysis.py`,
 `scripts/09_claude_faces_plot.py`,
 `scripts/16_eriskii_replication.py`,
-`scripts/18_claude_faces_pca.py` — five copies, **keep in sync**)
+`scripts/17_v3_face_scatters.py`,
+`scripts/18_claude_faces_pca.py` — seven copies, **keep in sync**)
 register a project-local monochrome emoji font
 (`data/fonts/NotoEmoji-Regular.ttf`, Google Noto Emoji variable
 font, 1.9MB, committed to the repo) and configure the chain
@@ -567,7 +569,7 @@ llmoji/
                              # load_embeddings_canonical() merges variants
     eriskii_prompts.py       # locked Haiku prompts + 21-axis anchors
     eriskii.py               # axis projection + masking + haiku primitives
-  scripts/                   # 00–18; each is directly executable
+  scripts/                   # 00–20 + 99; each is directly executable
   docs/superpowers/plans/    # design+plan docs per experiment
   data/                      # *.jsonl, *.tsv, *.parquet, *.html (tracked)
   data/hidden/               # per-row .npz sidecars (gitignored)
