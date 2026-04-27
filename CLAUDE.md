@@ -443,6 +443,11 @@ locking a taxonomy for a new model. Under strong sad-steering, gemma
 abandons the dialect for ASCII minimalism (`(._.)`, `( . . . )`);
 extend the taxonomy from steered-arm output too.
 
+The labeled `TAXONOMY` / `ANGRY_CALM_TAXONOMY` dicts live in
+`llmoji_study.taxonomy_labels` (research-side; v1.0 split moved
+them out of the public package). Editing them and re-running the
+relabel snippet below is the dialect-extension flow.
+
 ### Re-labeling pilot data after taxonomy changes
 
 Changing `TAXONOMY` does NOT retroactively update the JSONL —
@@ -450,10 +455,15 @@ Changing `TAXONOMY` does NOT retroactively update the JSONL —
 calls `_relabel_in_place` at the start of every run, so labels stay
 fresh; for `pilot_raw.jsonl`, do it manually:
 ```python
-import json; from pathlib import Path; from llmoji.taxonomy import extract
-p = Path("data/pilot_raw.jsonl"); rows = [json.loads(l) for l in p.read_text().splitlines() if l]
+import json
+from pathlib import Path
+# extract_with_label is research-side — labels are gemma-tuned and
+# moved out of the public llmoji package in the v1.0 split.
+from llmoji_study.taxonomy_labels import extract_with_label
+p = Path("data/pilot_raw.jsonl")
+rows = [json.loads(l) for l in p.read_text().splitlines() if l]
 for r in rows:
-    m = extract(r["text"])
+    m = extract_with_label(r["text"])
     r.update(first_word=m.first_word, kaomoji=m.kaomoji, kaomoji_label=m.label)
 p.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
 ```
@@ -712,14 +722,20 @@ llmoji-study/
 Modules that USED to live here and now live in the `llmoji` package
 (import from `llmoji.*` instead):
 
-  - `llmoji.taxonomy` — TAXONOMY, KAOMOJI_START_CHARS,
-    is_kaomoji_candidate, extract, canonicalize_kaomoji
-  - `llmoji.scrape` — ScrapeRow + iter_all chain helper
-  - `llmoji.sources.journal` — generic kaomoji-journal reader
-  - `llmoji.sources.claude_export` — Claude.ai export reader
-  - `llmoji.backfill` — backfill_claude_code, backfill_codex
-  - `llmoji.haiku_prompts` — DESCRIBE_PROMPT_*, SYNTHESIZE_PROMPT,
-    HAIKU_MODEL_ID
+  - `llmoji.taxonomy` — KAOMOJI_START_CHARS, is_kaomoji_candidate,
+    `extract` (span-only), `KaomojiMatch` (slim),
+    canonicalize_kaomoji. The gemma-tuned `TAXONOMY` /
+    `ANGRY_CALM_TAXONOMY` / `label_on` are NOT in the package; they
+    live research-side at `llmoji_study.taxonomy_labels` (v1.0
+    review found pilot labels leaking into the public schema and
+    pulled them back here).
+  - `llmoji.scrape` — `ScrapeRow` (span-only schema; no
+    `kaomoji` / `kaomoji_label` fields) + `iter_all` chain helper.
+  - `llmoji.sources.journal` — generic kaomoji-journal reader.
+  - `llmoji.sources.claude_export` — Claude.ai export reader.
+  - `llmoji.backfill` — `backfill_claude_code`, `backfill_codex`.
+  - `llmoji.haiku_prompts` — `DESCRIBE_PROMPT_*`,
+    `SYNTHESIZE_PROMPT`, `HAIKU_MODEL_ID`.
 
 The CLI (`llmoji {install,uninstall,status,parse,analyze,upload}`)
 is exposed via `[project.scripts]` on `pip install llmoji`. Not

@@ -25,10 +25,17 @@ provider-agnostic CLI:
     primitives.
   - :mod:`llmoji_study.eriskii_anchors` — 21 anchored axes (positive
     and negative anchor strings).
+  - :mod:`llmoji_study.taxonomy_labels` — gemma-tuned ``TAXONOMY``
+    / ``ANGRY_CALM_TAXONOMY`` / ``label_on`` / label-aware
+    ``extract_with_label``. Were in ``llmoji.taxonomy`` pre-v1.0;
+    moved here in the v1.0 review fixes because they're
+    pilot-specific and don't belong in a provider-agnostic public
+    package.
 
-Modules previously here that moved to ``llmoji`` (the package):
-``taxonomy`` (canonical kaomoji rules + start-chars + extractor),
-``claude_scrape``, ``claude_hook_source``, ``claude_export_source``,
+Modules previously here that moved to ``llmoji`` (the public
+package): ``taxonomy`` (the canonicalization rules + KAOMOJI_START_CHARS
++ is_kaomoji_candidate + slim ``extract``), ``claude_scrape``,
+``claude_hook_source``, ``claude_export_source``,
 ``backfill_journals`` (now ``llmoji.scrape`` / ``llmoji.sources.*`` /
 ``llmoji.backfill``), and the Haiku prompt strings (now
 ``llmoji.haiku_prompts``).
