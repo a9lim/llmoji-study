@@ -3,6 +3,9 @@ name = "llmoji-study"
 version = "0.1.0"
 description = "Does kaomoji choice track internal state in local LMs? Research-side companion to the `llmoji` PyPI package."
 requires-python = ">=3.11"
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
+authors = [{ name = "a9lim", email = "mx@a9l.im" }]
 # Heavy ML deps live here. The data-collection / canonical-Haiku /
 # bundle-and-upload side is in the `llmoji` package; depend on it
 # directly so all six study scripts can `from llmoji import …`.

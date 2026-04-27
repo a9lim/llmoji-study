@@ -412,3 +412,8 @@ non-gemma model when it isn't.
 - [eriskii's Claude-faces catalog](https://eriskii.net/projects/claude-faces):
   the broader collection of kaomoji Claude uses across conversations,
   from which I seeded pre-registered taxonomy candidates.
+
+## License
+
+AGPL-3.0-or-later. See [LICENSE](LICENSE). The companion data-layer
+package [`llmoji`](https://github.com/a9lim/llmoji) is GPL-3.0-or-later.
