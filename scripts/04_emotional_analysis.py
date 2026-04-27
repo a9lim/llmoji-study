@@ -25,7 +25,7 @@ from llmoji_study.emotional_analysis import (
     plot_within_kaomoji_consistency,
     summary_table,
 )
-from llmoji.taxonomy import extract
+from llmoji_study.taxonomy_labels import extract_with_label as extract
 
 
 def _relabel_in_place(path: Path) -> None:

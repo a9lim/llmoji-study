@@ -98,7 +98,7 @@ def _by_condition(df: pd.DataFrame, condition: str) -> pd.DataFrame:
 def _axis_label(axis: str, first_word: object) -> int:
     """Look up a per-axis pole label for a first_word value. Tolerates
     non-string inputs (NaN rows, etc.) by returning the unmarked label."""
-    from llmoji.taxonomy import label_on
+    from llmoji_study.taxonomy_labels import label_on
     if not isinstance(first_word, str) or not first_word:
         return 0
     return label_on(axis, first_word)
@@ -373,7 +373,7 @@ def plot_kaomoji_heatmap(
     from scipy.cluster.hierarchy import linkage, leaves_list
     from scipy.spatial.distance import squareform
     from .hidden_state_analysis import cosine_similarity_matrix
-    from llmoji.taxonomy import TAXONOMY
+    from llmoji_study.taxonomy_labels import TAXONOMY
 
     # pool across all conditions — we want a per-kaomoji representation
     # summary, not a condition-stratified one.

@@ -695,6 +695,12 @@ llmoji-study/
                                # (research-side analysis primitives;
                                # not in the v1.0 frozen public surface)
     eriskii.py                 # axis projection + masking + haiku primitives
+    taxonomy_labels.py         # gemma-tuned TAXONOMY + ANGRY_CALM_TAXONOMY
+                               # + label_on + extract_with_label
+                               # (these were in llmoji.taxonomy pre-v1.0;
+                               # moved here because they're pilot-specific
+                               # and don't belong in a provider-agnostic
+                               # public package)
   scripts/                     # 00–22 + 99; each is directly executable
   docs/                        # design+plan docs per experiment
   data/                        # *.jsonl, *.tsv, *.parquet, *.html (tracked)

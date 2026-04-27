@@ -31,7 +31,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from llmoji_study.config import DATA_DIR
-from llmoji.taxonomy import TAXONOMY, canonicalize_kaomoji
+from llmoji.taxonomy import canonicalize_kaomoji
+from llmoji_study.taxonomy_labels import TAXONOMY
 
 QWEN_PATH = DATA_DIR / "qwen36_vocab_sample.jsonl"
 GEMMA_PATH = DATA_DIR / "vocab_sample.jsonl"

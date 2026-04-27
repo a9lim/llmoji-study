@@ -45,7 +45,7 @@ from llmoji_study.config import (
     TEMPERATURE,
 )
 from llmoji_study.prompts import PROMPTS
-from llmoji.taxonomy import TAXONOMY, extract
+from llmoji_study.taxonomy_labels import TAXONOMY, extract_with_label as extract
 
 # Hardcoded here, NOT in config.py — config.MODEL_ID is gemma and the v1/v2/v3
 # pipelines depend on that. This script is one-off cursory exploration.

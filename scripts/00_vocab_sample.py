@@ -37,7 +37,7 @@ from llmoji_study.config import (
     current_model,
 )
 from llmoji_study.prompts import PROMPTS
-from llmoji.taxonomy import TAXONOMY, extract
+from llmoji_study.taxonomy_labels import TAXONOMY, extract_with_label as extract
 
 
 def main() -> None:

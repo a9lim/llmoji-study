@@ -205,7 +205,7 @@ def plot_pooled_pca_scatter(
     from matplotlib.patches import Patch
     from sklearn.decomposition import PCA
     from .emotional_analysis import _use_cjk_font
-    from llmoji.taxonomy import TAXONOMY
+    from llmoji_study.taxonomy_labels import TAXONOMY
 
     _use_cjk_font()
 
@@ -266,7 +266,7 @@ def pooled_summary_table(
     probe-based version had (per-dim hidden-state means aren't
     interpretable; the consistency column is the summary stat)."""
     from .hidden_state_analysis import cosine_to_mean
-    from llmoji.taxonomy import TAXONOMY
+    from llmoji_study.taxonomy_labels import TAXONOMY
 
     rows: list[dict[str, Any]] = []
     if len(df) == 0:

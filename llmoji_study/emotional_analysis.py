@@ -384,7 +384,7 @@ def plot_within_kaomoji_consistency(
     signatures tighter than random same-size subsets."""
     import matplotlib.pyplot as plt
     from .hidden_state_analysis import cosine_to_mean
-    from llmoji.taxonomy import TAXONOMY
+    from llmoji_study.taxonomy_labels import TAXONOMY
 
     _use_cjk_font()
 
@@ -964,7 +964,7 @@ def summary_table(
     dominant_quadrant, HP_n, LP_n, HN_n, LN_n, NB_n.
     """
     from .hidden_state_analysis import cosine_to_mean
-    from llmoji.taxonomy import TAXONOMY
+    from llmoji_study.taxonomy_labels import TAXONOMY
 
     if len(df) == 0:
         return pd.DataFrame(columns=[
