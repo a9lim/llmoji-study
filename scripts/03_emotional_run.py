@@ -23,16 +23,16 @@ from saklas import SaklasSession
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from llmoji.capture import run_sample
-from llmoji.config import (
+from llmoji_study.capture import run_sample
+from llmoji_study.config import (
     DATA_DIR,
     EMOTIONAL_CONDITION,
     EMOTIONAL_SEEDS_PER_CELL,
     PROBE_CATEGORIES,
     current_model,
 )
-from llmoji.emotional_prompts import EMOTIONAL_PROMPTS
-from llmoji.prompts import Prompt
+from llmoji_study.emotional_prompts import EMOTIONAL_PROMPTS
+from llmoji_study.prompts import Prompt
 
 
 def _already_done(path: Path) -> set[tuple[str, int]]:

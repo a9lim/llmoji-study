@@ -28,11 +28,11 @@ import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
 
-from llmoji.config import (
+from llmoji_study.config import (
     DATA_DIR,
     current_model,
 )
-from llmoji.emotional_analysis import (
+from llmoji_study.emotional_analysis import (
     QUADRANT_COLORS,
     QUADRANT_ORDER,
     _use_cjk_font,

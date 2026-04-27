@@ -131,7 +131,7 @@ def load_embeddings_canonical(
     by ``n`` then re-L2-normalized so cosine comparisons remain
     well-behaved. Returns ``(canonical_first_words, n, E)``.
     """
-    from .taxonomy import canonicalize_kaomoji
+    from llmoji.taxonomy import canonicalize_kaomoji
 
     df: pd.DataFrame = pd.read_parquet(path)
     df["canonical"] = df["first_word"].map(canonicalize_kaomoji)

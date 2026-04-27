@@ -28,8 +28,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import numpy as np
 import pandas as pd
 
-from llmoji.claude_faces import EMBED_MODEL, load_embeddings
-from llmoji.config import (
+from llmoji_study.claude_faces import EMBED_MODEL, load_embeddings
+from llmoji_study.config import (
     CLAUDE_FACES_EMBED_DESCRIPTION_PATH,
     CLAUDE_KAOMOJI_PATH,
     DATA_DIR,
@@ -37,8 +37,8 @@ from llmoji.config import (
     ERISKII_AXES_TSV,
     FIGURES_DIR,
 )
-from llmoji.eriskii import compute_axis_vectors, project_onto_axes
-from llmoji.eriskii_prompts import AXIS_ANCHORS
+from llmoji_study.eriskii import compute_axis_vectors, project_onto_axes
+from llmoji_study.eriskii_anchors import AXIS_ANCHORS
 
 
 def _use_cjk_font() -> None:
@@ -99,11 +99,11 @@ def section_clusters(
     from sklearn.cluster import KMeans
     from sklearn.manifold import TSNE
 
-    from llmoji.config import (
+    from llmoji_study.config import (
         ERISKII_CLUSTERS_TSV, HAIKU_MODEL_ID,
     )
-    from llmoji.eriskii import label_cluster_via_haiku
-    from llmoji.eriskii_prompts import CLUSTER_LABEL_PROMPT
+    from llmoji_study.eriskii import label_cluster_via_haiku
+    from llmoji_study.eriskii_anchors import CLUSTER_LABEL_PROMPT
 
     if not os.environ.get("ANTHROPIC_API_KEY"):
         print("ERROR: set ANTHROPIC_API_KEY in the environment first")
@@ -320,8 +320,8 @@ def _heatmap(
 
 
 def section_per_model(rows: pd.DataFrame, axes_df: pd.DataFrame) -> pd.DataFrame:
-    from llmoji.config import ERISKII_PER_MODEL_TSV
-    from llmoji.eriskii import weighted_group_axis_stats
+    from llmoji_study.config import ERISKII_PER_MODEL_TSV
+    from llmoji_study.eriskii import weighted_group_axis_stats
     # Claude-side sources only (exclude codex-hook). Schema post-2026-04-27
     # unified-journal refactor: source ∈ {claude-hook, claude-ai-export,
     # codex-hook}. Pre-refactor this filter was source == "claude-code".
@@ -344,8 +344,8 @@ def section_per_model(rows: pd.DataFrame, axes_df: pd.DataFrame) -> pd.DataFrame
 
 
 def section_per_project(rows: pd.DataFrame, axes_df: pd.DataFrame) -> pd.DataFrame:
-    from llmoji.config import ERISKII_PER_PROJECT_TSV
-    from llmoji.eriskii import weighted_group_axis_stats
+    from llmoji_study.config import ERISKII_PER_PROJECT_TSV
+    from llmoji_study.eriskii import weighted_group_axis_stats
     # Same Claude-side filter as section_per_model — see note there.
     cc = rows[rows["source"].isin(["claude-hook", "claude-ai-export"])].copy()
     df = weighted_group_axis_stats(
@@ -369,8 +369,8 @@ def section_bridge(rows: pd.DataFrame, axes_df: pd.DataFrame) -> pd.DataFrame:
     import matplotlib.pyplot as plt
     from sentence_transformers import SentenceTransformer
 
-    from llmoji.config import ERISKII_USER_KAOMOJI_CORR_TSV
-    from llmoji.eriskii import user_kaomoji_axis_correlation
+    from llmoji_study.config import ERISKII_USER_KAOMOJI_CORR_TSV
+    from llmoji_study.eriskii import user_kaomoji_axis_correlation
 
     embedder = SentenceTransformer(EMBED_MODEL)
     df = user_kaomoji_axis_correlation(
@@ -409,7 +409,7 @@ def section_writeup(
     df_per_project: pd.DataFrame,
     df_bridge: pd.DataFrame,
 ) -> None:
-    from llmoji.config import ERISKII_COMPARISON_MD
+    from llmoji_study.config import ERISKII_COMPARISON_MD
 
     # Top-N kaomoji from our data (by emission count).
     top_us = df_axes.nlargest(20, "n")[["first_word", "n"]].copy()
@@ -582,7 +582,7 @@ def main() -> None:
     _use_cjk_font()
 
     print("loading description embeddings (canonicalized)...")
-    from llmoji.claude_faces import load_embeddings_canonical
+    from llmoji_study.claude_faces import load_embeddings_canonical
     fw, n, E = load_embeddings_canonical(CLAUDE_FACES_EMBED_DESCRIPTION_PATH)
     print(f"  {len(fw)} canonical kaomoji, {E.shape[1]}-dim")
 
@@ -600,7 +600,7 @@ def main() -> None:
     print("\n=== Section: clusters ===")
     # synthesized descriptions: one canonical string per kaomoji
     import json
-    from llmoji.config import CLAUDE_HAIKU_SYNTHESIZED_PATH
+    from llmoji_study.config import CLAUDE_HAIKU_SYNTHESIZED_PATH
     # Canonicalize the synthesized-description keys; on collision keep
     # the description from the variant with the most contributing
     # instances (n_descriptions). Mirrors the n-weighted merge that

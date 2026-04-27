@@ -23,8 +23,8 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from llmoji.claude_faces import load_embeddings
-from llmoji.config import CLAUDE_FACES_EMBED_PATH, FIGURES_DIR
+from llmoji_study.claude_faces import load_embeddings
+from llmoji_study.config import CLAUDE_FACES_EMBED_PATH, FIGURES_DIR
 
 
 def _use_cjk_font() -> None:

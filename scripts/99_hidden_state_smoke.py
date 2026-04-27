@@ -24,16 +24,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import numpy as np
 from saklas import SaklasSession
 
-from llmoji.capture import run_sample
-from llmoji.config import (
+from llmoji_study.capture import run_sample
+from llmoji_study.config import (
     DATA_DIR,
     MODEL_ID,
     PROBE_CATEGORIES,
     PROBES,
     STEERED_AXIS,
 )
-from llmoji.emotional_prompts import EMOTIONAL_PROMPTS
-from llmoji.hidden_state_io import hidden_state_path, load_hidden_states
+from llmoji_study.emotional_prompts import EMOTIONAL_PROMPTS
+from llmoji_study.hidden_state_io import hidden_state_path, load_hidden_states
 
 
 SMOKE_EXPERIMENT = "smoke"

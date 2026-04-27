@@ -16,8 +16,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from llmoji.config import DATA_DIR, EMOTIONAL_DATA_PATH, FIGURES_DIR, PROBES
-from llmoji.emotional_analysis import (
+from llmoji_study.config import DATA_DIR, EMOTIONAL_DATA_PATH, FIGURES_DIR, PROBES
+from llmoji_study.emotional_analysis import (
     compute_probe_correlations,
     load_rows,
     plot_probe_correlation_matrix,

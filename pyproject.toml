@@ -1,9 +1,13 @@
 [project]
-name = "llmoji"
-version = "0.0.1"
-description = "Does kaomoji choice track internal state in local LMs?"
+name = "llmoji-study"
+version = "0.1.0"
+description = "Does kaomoji choice track internal state in local LMs? Research-side companion to the `llmoji` PyPI package."
 requires-python = ">=3.11"
+# Heavy ML deps live here. The data-collection / canonical-Haiku /
+# bundle-and-upload side is in the `llmoji` package; depend on it
+# directly so all six study scripts can `from llmoji import …`.
 dependencies = [
+    "llmoji>=1.0,<2",
     "saklas>=1.4.6",
     "anthropic",
     "numpy",
@@ -21,4 +25,8 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["llmoji"]
+# We don't intend to publish this — it's a research repo. The wheel
+# config exists only so `pip install -e .` works for local dev (and
+# `from llmoji_study import …` if anyone ever wants it). The real
+# entry point is the scripts in `scripts/`.
+packages = ["llmoji_study"]

@@ -36,7 +36,7 @@ from .config import (
 from .hidden_capture import read_after_generate
 from .hidden_state_io import hidden_state_path, save_hidden_states
 from .prompts import Prompt
-from .taxonomy import extract
+from llmoji.taxonomy import extract
 
 
 @dataclass

@@ -17,8 +17,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from llmoji.claude_faces import compute_embeddings, load_rows, save_embeddings
-from llmoji.config import CLAUDE_FACES_EMBED_PATH, CLAUDE_KAOMOJI_PATH, DATA_DIR
+from llmoji_study.claude_faces import compute_embeddings, load_rows, save_embeddings
+from llmoji_study.config import CLAUDE_FACES_EMBED_PATH, CLAUDE_KAOMOJI_PATH, DATA_DIR
 
 
 def _default_device() -> str:

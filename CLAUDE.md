@@ -1,18 +1,31 @@
 # CLAUDE.md
 
+> **Companion package:** the data-collection / canonical-Haiku /
+> bundle-and-upload side moved to the
+> [`llmoji`](https://github.com/a9lim/llmoji) PyPI package as of the
+> 2026-04-27 split. For taxonomy / KAOMOJI_START_CHARS / Provider
+> interface / hook templates / Haiku prompts / the v1.0 frozen public
+> surface, see `../llmoji/CLAUDE.md`. This file covers the research
+> side only: probes, hidden state, MiniLM embedding, eriskii axis
+> projection, figures, all pilot scripts.
+
 ## What this is
 
-`llmoji` is a research project asking whether kaomoji choice in local
-causal LMs tracks internal activation state. Uses `saklas` for trait
-monitoring (contrastive-PCA probes) and activation steering. "Internal
-state" is operationalized as the per-row hidden state at the deepest
-probe layer; "causal handle" is whether steering shifts the kaomoji
-distribution. Motivated by Claude's use of kaomoji under user-provided
-"start each message with a kaomoji" instructions; gemma-4-31b-it is
-the local stand-in.
+`llmoji-study` is a research project asking whether kaomoji choice in
+local causal LMs tracks internal activation state. Uses `saklas` for
+trait monitoring (contrastive-PCA probes) and activation steering.
+"Internal state" is operationalized as the per-row hidden state at
+the deepest probe layer; "causal handle" is whether steering shifts
+the kaomoji distribution. Motivated by Claude's use of kaomoji under
+user-provided "start each message with a kaomoji" instructions;
+gemma-4-31b-it is the local stand-in.
 
-Not a library. No public API, no pypi release, no tests. Three-script
-pipelines per experiment (vocabulary sample → run → analysis).
+Not itself a library. No public API, no PyPI release, no tests.
+Three-script pipelines per experiment (vocabulary sample → run →
+analysis). Depends on the `llmoji` package for taxonomy /
+canonicalization / scrape sources / Haiku prompts; everything else
+(probes, hidden state, eriskii axes, figures) is research-side and
+local.
 
 ## Ethics — minimize trial scale
 
@@ -53,6 +66,15 @@ splits into per-source files (`claude_kaomoji_{export,hook}.jsonl`)
 + merged view; only what changed re-runs. 647 merged rows post-refactor
 (was 436 pre-refactor) — most of the bump is codex history finally
 captured.
+
+v1.0 package split landed 2026-04-27: `llmoji` (the PyPI package) now
+owns taxonomy / canonicalization / hook templates / scrape sources /
+backfill / Haiku prompts; this repo's local Python package was
+renamed `llmoji_study` and depends on `llmoji>=1.0,<2`. Hooks are
+now generated from templates in `llmoji._hooks` rather than
+hand-edited; the "KAOMOJI_START_CHARS in five places" gotcha is
+resolved (single source: `llmoji.taxonomy.KAOMOJI_START_CHARS`).
+Plan: `docs/2026-04-27-llmoji-package.md`.
 
 Design + plan docs live in `docs/` — one per
 experiment, written before the run, treated as the pre-registration
@@ -468,7 +490,7 @@ missed by 0.2–0.5 per probe.
 Anthropic's newer "export your data" returns
 `chat_messages[*].text = ""` for ~49% of conversations the older
 export populated fully. Metadata is preserved; text is gone.
-`llmoji.claude_export_source.iter_claude_export` reads every
+`llmoji.sources.claude_export.iter_claude_export` reads every
 configured export dir and keeps whichever copy of a given
 conversation has more non-empty messages. Keep old exports.
 
@@ -479,8 +501,8 @@ Mistral, and Claude, SMP emoji glyphs (`🌫️`, `🐕`, `✨`, `💧`, …)
 embedded inside kaomoji brackets. No single system font covers
 them all. matplotlib 3.6+ supports per-glyph fallback via
 `rcParams["font.family"] = [...]`. `_use_cjk_font` helpers
-(in `llmoji/analysis.py`, `llmoji/emotional_analysis.py`,
-`llmoji/cross_pilot_analysis.py`,
+(in `llmoji_study/analysis.py`, `llmoji_study/emotional_analysis.py`,
+`llmoji_study/cross_pilot_analysis.py`,
 `scripts/09_claude_faces_plot.py`,
 `scripts/16_eriskii_replication.py`,
 `scripts/17_v3_face_scatters.py`,
@@ -539,31 +561,40 @@ the `collaboration_mode` field is `"default"` for every observed
 turn_context, no subagent equivalent. So the codex hook + backfill
 have no sidechain check.
 
-### KAOMOJI_START_CHARS lives in five places — keep in sync
+### KAOMOJI_START_CHARS sync — RESOLVED via the v1.0 package split
 
-The kaomoji-opening glyph set
-(`( [ （ ｛ ヽ ヾ っ ٩ ᕕ ╰ ╭ ╮ ┐ ┌ ＼ ¯ ໒`) is the leading-prefix
-filter applied at every kaomoji touchpoint. Definitions:
-`llmoji/claude_export_source.py`, `llmoji/claude_hook_source.py`,
-`llmoji/backfill_journals.py` (`_KAOMOJI_START_CHARS`), plus inline
-`case` patterns in `~/.claude/hooks/kaomoji-log.sh` and
-`~/.codex/hooks/kaomoji-log.sh`. Five copies — same drill as the
-matplotlib-font helpers. Worth consolidating into `taxonomy.py`
-next time the set changes.
+Pre-split, the kaomoji-opening glyph set lived in five places. As of
+the v1.0 package split:
 
-### System-injection prefixes have a per-agent filter list
+- Python single source: `llmoji.taxonomy.KAOMOJI_START_CHARS`
+  (in the `llmoji` PyPI package).
+- Shell hooks: rendered at `llmoji install <provider>` time from
+  `llmoji/_hooks/<provider>.sh.tmpl` with `${KAOMOJI_START_CASE}`
+  substituted from the Python set.
+- This repo no longer carries its own copy — every research-side
+  module that needs the set imports from `llmoji.taxonomy`.
 
-`user_text` skips system-injected user-role payloads:
-- Claude: `"Base directory for this skill:"` (slash-command
-  activation dumps the skill body as a user message). Defined in
-  `llmoji/backfill_journals.py:_SYSTEM_INJECTED_PREFIXES`, mirrored
-  inline in `~/.claude/hooks/kaomoji-log.sh`.
-- Codex: `"# AGENTS.md"`, `"<environment_context>"`,
-  `"<INSTRUCTIONS>"`. Inline in both
-  `llmoji/backfill_journals.py:_replay_codex_rollout` and
-  `~/.codex/hooks/kaomoji-log.sh`.
+Three places that still hand-coordinate (matplotlib font helpers,
+which are research-side and unrelated): `llmoji_study/analysis.py`,
+`llmoji_study/emotional_analysis.py`, `llmoji_study/cross_pilot_analysis.py`,
+plus inline copies in scripts/09, 16, 17, 18. Keep those in sync
+with each other; that gotcha is independent of the kaomoji-set sync.
 
-Four sync points total, two per agent.
+### System-injection prefixes — managed by the package
+
+`user_text` skips system-injected user-role payloads. Both prefix
+lists live on the `llmoji.providers.*Provider` classes
+(`system_injected_prefixes`):
+
+- Claude Code: `"Base directory for this skill:"`
+- Codex: `"# AGENTS.md"`, `"<environment_context>"`, `"<INSTRUCTIONS>"`
+- Hermes: `[]` (hermes delivers `extra.user_message` pre-injection,
+  per the documented contract; pending live-traffic verification)
+
+The bash hook templates interpolate the lists at install time; the
+backfill module (`llmoji.backfill`) mirrors the same lists in its
+`CLAUDE_CODE_INJECTED_PREFIXES` / `CODEX_INJECTED_PREFIXES`
+constants. Single source per provider.
 
 ### Don't re-run the transcript scrape — the journal is canonical
 
@@ -590,6 +621,11 @@ work fine for offline log review after the run completes).
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
+# During dev: install both the public package (next door) and this
+# repo editable. Once `llmoji` is published to PyPI, the `-e
+# ../llmoji` line drops in favor of `pip install llmoji>=1.0,<2`
+# (declared in pyproject.toml).
+pip install -e ../llmoji
 pip install -e .   # saklas, sentence-transformers, pyarrow, plotly, anthropic
 
 # Smoke test the hidden-state pipeline (~5 min)
@@ -634,37 +670,55 @@ python scripts/18_claude_faces_pca.py               # PCA chart, eriskii-style
 ## Layout
 
 ```
-llmoji/
-  llmoji/
-    config.py                # MODEL_ID, PROBE_CATEGORIES, PROBES, paths
-    taxonomy.py              # 42-entry dict + extract() + canonicalize_kaomoji()
-    prompts.py               # 30 v1/v2 prompts
-    emotional_prompts.py     # 100 v3 prompts (5 quadrants × 20)
-    capture.py               # run_sample() → SampleRow + sidecar
-    hidden_capture.py        # read_after_generate() from saklas's buckets
-    hidden_state_io.py       # per-row .npz save/load
-    hidden_state_analysis.py # load_hidden_features, group_mean_vectors,
-                             # cosine_similarity_matrix, cosine_to_mean
-    analysis.py              # v1/v2 decision rules + figures
-    emotional_analysis.py    # v3 hidden-state figures + summary; loaders
-                             # apply canonicalize_kaomoji at load time
-    cross_pilot_analysis.py  # pooled v1v2 + v3 hidden-state clustering
-    claude_scrape.py         # ScrapeRow schema + iter_all
-    claude_hook_source.py    # ~/.claude + ~/.codex unified journal adapter
-    claude_export_source.py  # Claude.ai export adapter
-    backfill_journals.py     # one-shot replay of transcripts/rollouts
-                             # into the unified journals
-    claude_faces.py          # response-based per-kaomoji embeddings;
-                             # load_embeddings_canonical() merges variants
-    eriskii_prompts.py       # locked Haiku prompts + 21-axis anchors
-    eriskii.py               # axis projection + masking + haiku primitives
-  scripts/                   # 00–21 + 99; each is directly executable
-  docs/                      # design+plan docs per experiment
-  data/                      # *.jsonl, *.tsv, *.parquet, *.html (tracked)
-  data/hidden/               # per-row .npz sidecars (gitignored)
-  figures/                   # tracked
-  logs/                      # tee'd run output (gitignored)
+llmoji-study/
+  llmoji_study/                # research-side package; renamed from
+                               # `llmoji` in the v1.0 split because
+                               # the PyPI package owns that namespace
+    config.py                  # MODEL_ID, PROBE_CATEGORIES, PROBES,
+                               # paths; re-exports HAIKU_MODEL_ID
+                               # from llmoji.haiku_prompts so the
+                               # locked corpus value is single-source
+    prompts.py                 # 30 v1/v2 prompts
+    emotional_prompts.py       # 100 v3 prompts (5 quadrants × 20)
+    capture.py                 # run_sample() → SampleRow + sidecar
+    hidden_capture.py          # read_after_generate() from saklas's buckets
+    hidden_state_io.py         # per-row .npz save/load
+    hidden_state_analysis.py   # load_hidden_features, group_mean_vectors,
+                               # cosine_similarity_matrix, cosine_to_mean
+    analysis.py                # v1/v2 decision rules + figures
+    emotional_analysis.py      # v3 hidden-state figures + summary; loaders
+                               # apply canonicalize_kaomoji at load time
+    cross_pilot_analysis.py    # pooled v1v2 + v3 hidden-state clustering
+    claude_faces.py            # response-based per-kaomoji embeddings;
+                               # load_embeddings_canonical() merges variants
+    eriskii_anchors.py         # 21-axis AXIS_ANCHORS + CLUSTER_LABEL_PROMPT
+                               # (research-side analysis primitives;
+                               # not in the v1.0 frozen public surface)
+    eriskii.py                 # axis projection + masking + haiku primitives
+  scripts/                     # 00–22 + 99; each is directly executable
+  docs/                        # design+plan docs per experiment
+  data/                        # *.jsonl, *.tsv, *.parquet, *.html (tracked)
+  data/hidden/                 # per-row .npz sidecars (gitignored)
+  figures/                     # tracked
+  logs/                        # tee'd run output (gitignored)
 ```
+
+Modules that USED to live here and now live in the `llmoji` package
+(import from `llmoji.*` instead):
+
+  - `llmoji.taxonomy` — TAXONOMY, KAOMOJI_START_CHARS,
+    is_kaomoji_candidate, extract, canonicalize_kaomoji
+  - `llmoji.scrape` — ScrapeRow + iter_all chain helper
+  - `llmoji.sources.journal` — generic kaomoji-journal reader
+  - `llmoji.sources.claude_export` — Claude.ai export reader
+  - `llmoji.backfill` — backfill_claude_code, backfill_codex
+  - `llmoji.haiku_prompts` — DESCRIBE_PROMPT_*, SYNTHESIZE_PROMPT,
+    HAIKU_MODEL_ID
+
+The CLI (`llmoji {install,uninstall,status,parse,analyze,upload}`)
+is exposed via `[project.scripts]` on `pip install llmoji`. Not
+used by the research scripts — those go straight to the source
+adapters. See `../llmoji/CLAUDE.md` for the package side.
 
 ## Conventions
 
@@ -676,9 +730,13 @@ llmoji/
   relabel snippet above.
 - JSONL `row_uuid` links to its sidecar. Pre-refactor rows have
   `row_uuid == ""` and no sidecar; `load_hidden_features` drops them.
-- Pre-registered decisions go in `pyproject.toml` / `config.py` /
-  `prompts.py` / `emotional_prompts.py` / `taxonomy.py`. Changes
-  invalidate cross-run comparisons unless explicitly noted.
+- Pre-registered decisions go in `pyproject.toml` /
+  `llmoji_study/config.py` / `llmoji_study/prompts.py` /
+  `llmoji_study/emotional_prompts.py`, plus the package's frozen
+  v1.0 surface (`llmoji.taxonomy`, `llmoji.haiku_prompts`). Changes
+  to the package side are major-version events; changes here are
+  research-side and only invalidate cross-run comparisons within
+  this repo.
 - Experiment plans live in `docs/`. Plan first,
   run, then update CLAUDE.md to reference the plan rather than
   duplicate it.

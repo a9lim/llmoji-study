@@ -14,6 +14,11 @@ Sources are independently regeneratable; default reruns both
 (they're cheap). The journal is the single source of truth for every
 agent assistant turn — historical transcripts are replayed into it
 once via the backfill script, then live hooks append from there.
+
+Post v1.0 split: source adapters live in the `llmoji` PyPI package
+under `llmoji.sources.*`. The hook source used to be a Claude+Codex-
+hardcoded `iter_claude_hook`; now it's a generic `iter_journal(path,
+source=...)` that we call once per provider here.
 """
 
 from __future__ import annotations
@@ -27,21 +32,36 @@ from typing import Callable, Iterator
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from llmoji.claude_export_source import iter_claude_export
-from llmoji.claude_hook_source import iter_claude_hook
-from llmoji.claude_scrape import ScrapeRow
-from llmoji.config import (
+from llmoji.scrape import ScrapeRow
+from llmoji.sources.claude_export import iter_claude_export
+from llmoji.sources.journal import iter_journal
+from llmoji_study.config import (
+    CLAUDE_AI_EXPORT_DIRS,
+    CLAUDE_HOOK_JOURNAL_CLAUDE,
+    CLAUDE_HOOK_JOURNAL_CODEX,
     CLAUDE_KAOMOJI_EXPORT_PATH,
     CLAUDE_KAOMOJI_HOOK_PATH,
     CLAUDE_KAOMOJI_PATH,
     DATA_DIR,
 )
 
+
+def _iter_export() -> Iterator[ScrapeRow]:
+    return iter_claude_export(CLAUDE_AI_EXPORT_DIRS)
+
+
+def _iter_hook() -> Iterator[ScrapeRow]:
+    """Concatenate the two configured hook journals (Claude + Codex)
+    using the package's generic journal iterator."""
+    yield from iter_journal(CLAUDE_HOOK_JOURNAL_CLAUDE, source="claude")
+    yield from iter_journal(CLAUDE_HOOK_JOURNAL_CODEX, source="codex")
+
+
 ALL_SOURCES = ("export", "hook")
 
 SOURCES: dict[str, tuple[Path, Callable[[], Iterator[ScrapeRow]]]] = {
-    "export": (CLAUDE_KAOMOJI_EXPORT_PATH, iter_claude_export),
-    "hook": (CLAUDE_KAOMOJI_HOOK_PATH, iter_claude_hook),
+    "export": (CLAUDE_KAOMOJI_EXPORT_PATH, _iter_export),
+    "hook": (CLAUDE_KAOMOJI_HOOK_PATH, _iter_hook),
 }
 
 

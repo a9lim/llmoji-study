@@ -13,13 +13,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from llmoji.config import (
+from llmoji_study.config import (
     DATA_DIR,
     PILOT_EXPERIMENT,
     PILOT_RAW_PATH,
     current_model,
 )
-from llmoji.emotional_analysis import (
+from llmoji_study.emotional_analysis import (
     load_emotional_features,
     load_v1v2_neutral_baseline_features,
     plot_v3_pca_valence_arousal,

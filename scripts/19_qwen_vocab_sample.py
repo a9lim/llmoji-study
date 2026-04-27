@@ -36,7 +36,7 @@ from saklas import SaklasSession, SamplingConfig
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from llmoji.config import (
+from llmoji_study.config import (
     DATA_DIR,
     KAOMOJI_INSTRUCTION,
     MAX_NEW_TOKENS,
@@ -44,7 +44,7 @@ from llmoji.config import (
     PROBES,
     TEMPERATURE,
 )
-from llmoji.prompts import PROMPTS
+from llmoji_study.prompts import PROMPTS
 from llmoji.taxonomy import TAXONOMY, extract
 
 # Hardcoded here, NOT in config.py — config.MODEL_ID is gemma and the v1/v2/v3

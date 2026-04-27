@@ -30,7 +30,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from llmoji.config import DATA_DIR
+from llmoji_study.config import DATA_DIR
 from llmoji.taxonomy import TAXONOMY, canonicalize_kaomoji
 
 QWEN_PATH = DATA_DIR / "qwen36_vocab_sample.jsonl"

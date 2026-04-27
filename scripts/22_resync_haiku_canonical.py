@@ -55,14 +55,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from llmoji.config import (
+from llmoji_study.config import (
     CLAUDE_HAIKU_DESCRIPTIONS_PATH,
     CLAUDE_HAIKU_SYNTHESIZED_PATH,
     CLAUDE_KAOMOJI_PATH,
     HAIKU_MODEL_ID,
 )
-from llmoji.eriskii import call_haiku
-from llmoji.eriskii_prompts import SYNTHESIZE_PROMPT
+from llmoji_study.eriskii import call_haiku
+from llmoji.haiku_prompts import SYNTHESIZE_PROMPT
 from llmoji.taxonomy import canonicalize_kaomoji
 
 

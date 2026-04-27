@@ -31,8 +31,8 @@ import pandas as pd
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 
-from llmoji.claude_faces import load_embeddings_canonical
-from llmoji.config import (
+from llmoji_study.claude_faces import load_embeddings_canonical
+from llmoji_study.config import (
     CLAUDE_FACES_EMBED_DESCRIPTION_PATH,
     CLAUDE_KAOMOJI_PATH,
     FIGURES_DIR,

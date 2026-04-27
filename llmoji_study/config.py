@@ -134,8 +134,13 @@ CLAUDE_VOCAB_SAMPLE_PATH = DATA_DIR / "claude_vocab_sample.tsv"
 CLAUDE_FACES_EMBED_PATH = DATA_DIR / "claude_faces_embed.parquet"
 
 # --- eriskii-replication experiment (description-based embeddings + axes) ---
-# Locked Haiku version. Bumping invalidates description-corpus parity.
-HAIKU_MODEL_ID = "claude-haiku-4-5-20251001"
+# Locked Haiku version. Re-exported from the `llmoji` PyPI package
+# so the canonical-corpus value lives in one place — the v1.0 split
+# froze this string in `llmoji.haiku_prompts`; bumping it is a major
+# version bump there. Imported here for back-compat with every
+# research-side script that reads `from llmoji_study.config import
+# HAIKU_MODEL_ID`.
+from llmoji.haiku_prompts import HAIKU_MODEL_ID  # noqa: E402, F401
 
 # Stage-A sampling: per kaomoji, randomly sample up to this many
 # instances for per-instance Haiku description (eriskii used 4 with
@@ -146,9 +151,10 @@ INSTANCE_SAMPLE_SEED = 0
 
 # Order matters: this is the column order in eriskii_axes.tsv and the
 # heatmap-row order in per-model / per-project figures. Must stay in
-# sync with llmoji.eriskii_prompts.AXIS_ANCHORS. All 21 axes from
-# the eriskii.net page (note: "wryness" is the eriskii spelling, with
-# one n).
+# sync with `llmoji_study.eriskii_anchors.AXIS_ANCHORS` (research-
+# side; not part of the v1.0 frozen public surface). All 21 axes
+# from the eriskii.net page (note: "wryness" is the eriskii
+# spelling, with one n).
 ERISKII_AXES = [
     "warmth", "energy", "confidence", "playfulness", "empathy",
     "technicality", "positivity", "curiosity", "approval",

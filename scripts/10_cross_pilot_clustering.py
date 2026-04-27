@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from llmoji.config import (
+from llmoji_study.config import (
     DATA_DIR,
     EMOTIONAL_DATA_PATH,
     EMOTIONAL_EXPERIMENT,
@@ -18,7 +18,7 @@ from llmoji.config import (
     PILOT_EXPERIMENT,
     PILOT_RAW_PATH,
 )
-from llmoji.cross_pilot_analysis import (
+from llmoji_study.cross_pilot_analysis import (
     load_pooled_features,
     plot_pooled_cosine_heatmap,
     plot_pooled_pca_scatter,

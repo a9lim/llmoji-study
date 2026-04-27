@@ -10,8 +10,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from llmoji.config import DATA_DIR, EMOTIONAL_DATA_PATH, FIGURES_DIR
-from llmoji.emotional_analysis import (
+from llmoji_study.config import DATA_DIR, EMOTIONAL_DATA_PATH, FIGURES_DIR
+from llmoji_study.emotional_analysis import (
     load_rows,
     plot_prompt_kaomoji_matrix,
     prompt_kaomoji_matrix,

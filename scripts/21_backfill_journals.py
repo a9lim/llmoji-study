@@ -20,8 +20,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from llmoji.backfill_journals import backfill_claude, backfill_codex
-from llmoji.config import CLAUDE_HOOK_JOURNAL_CLAUDE, CLAUDE_HOOK_JOURNAL_CODEX
+from llmoji.backfill import backfill_claude_code, backfill_codex
+from llmoji_study.config import CLAUDE_HOOK_JOURNAL_CLAUDE, CLAUDE_HOOK_JOURNAL_CODEX
 
 CLAUDE_TRANSCRIPT_ROOT = Path.home() / ".claude" / "projects"
 CODEX_ROLLOUT_ROOT = Path.home() / ".codex" / "sessions"
@@ -30,7 +30,7 @@ CODEX_ROLLOUT_ROOT = Path.home() / ".codex" / "sessions"
 def main() -> int:
     print(f"backfilling {CLAUDE_HOOK_JOURNAL_CLAUDE} from {CLAUDE_TRANSCRIPT_ROOT}")
     t0 = time.time()
-    n_claude = backfill_claude(CLAUDE_TRANSCRIPT_ROOT, CLAUDE_HOOK_JOURNAL_CLAUDE)
+    n_claude = backfill_claude_code(CLAUDE_TRANSCRIPT_ROOT, CLAUDE_HOOK_JOURNAL_CLAUDE)
     dt = time.time() - t0
     print(f"  claude: {n_claude} rows in {dt:.1f}s")
 

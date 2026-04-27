@@ -21,8 +21,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import numpy as np
 import pandas as pd
 
-from llmoji.claude_faces import EMBED_DIM, EMBED_MODEL
-from llmoji.config import (
+from llmoji_study.claude_faces import EMBED_DIM, EMBED_MODEL
+from llmoji_study.config import (
     CLAUDE_FACES_EMBED_DESCRIPTION_PATH,
     CLAUDE_HAIKU_SYNTHESIZED_PATH,
     DATA_DIR,

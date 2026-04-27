@@ -30,7 +30,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from llmoji.config import (
+from llmoji_study.config import (
     CLAUDE_HAIKU_DESCRIPTIONS_PATH,
     CLAUDE_HAIKU_SYNTHESIZED_PATH,
     CLAUDE_KAOMOJI_PATH,
@@ -39,8 +39,8 @@ from llmoji.config import (
     INSTANCE_SAMPLE_CAP,
     INSTANCE_SAMPLE_SEED,
 )
-from llmoji.eriskii import call_haiku, mask_kaomoji
-from llmoji.eriskii_prompts import (
+from llmoji_study.eriskii import call_haiku, mask_kaomoji
+from llmoji.haiku_prompts import (
     DESCRIBE_PROMPT_NO_USER,
     DESCRIBE_PROMPT_WITH_USER,
     SYNTHESIZE_PROMPT,

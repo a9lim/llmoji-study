@@ -182,7 +182,7 @@ def load_emotional_features(
     )
     if len(df) == 0:
         return df, X
-    from .taxonomy import canonicalize_kaomoji
+    from llmoji.taxonomy import canonicalize_kaomoji
     df = df.assign(
         quadrant=df["prompt_id"].str[:2].str.upper(),
         first_word_raw=df["first_word"],
@@ -215,7 +215,7 @@ def load_v1v2_neutral_baseline_features(
     )
     if len(df) == 0:
         return df, X
-    from .taxonomy import canonicalize_kaomoji
+    from llmoji.taxonomy import canonicalize_kaomoji
     mask = (
         (df["condition"] == "kaomoji_prompted")
         & (df["prompt_valence"] == 0)
@@ -384,7 +384,7 @@ def plot_within_kaomoji_consistency(
     signatures tighter than random same-size subsets."""
     import matplotlib.pyplot as plt
     from .hidden_state_analysis import cosine_to_mean
-    from .taxonomy import TAXONOMY
+    from llmoji.taxonomy import TAXONOMY
 
     _use_cjk_font()
 
@@ -964,7 +964,7 @@ def summary_table(
     dominant_quadrant, HP_n, LP_n, HN_n, LN_n, NB_n.
     """
     from .hidden_state_analysis import cosine_to_mean
-    from .taxonomy import TAXONOMY
+    from llmoji.taxonomy import TAXONOMY
 
     if len(df) == 0:
         return pd.DataFrame(columns=[

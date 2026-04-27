@@ -16,8 +16,20 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from llmoji.claude_scrape import iter_all
-from llmoji.config import CLAUDE_VOCAB_SAMPLE_PATH, DATA_DIR
+# Source adapters live in the `llmoji` PyPI package post-split.
+# `iter_all` is now generic (chains arbitrary iterators) so we
+# call the per-source readers explicitly with the paths from
+# llmoji_study.config.
+from llmoji.scrape import iter_all
+from llmoji.sources.claude_export import iter_claude_export
+from llmoji.sources.journal import iter_journal
+from llmoji_study.config import (
+    CLAUDE_AI_EXPORT_DIRS,
+    CLAUDE_HOOK_JOURNAL_CLAUDE,
+    CLAUDE_HOOK_JOURNAL_CODEX,
+    CLAUDE_VOCAB_SAMPLE_PATH,
+    DATA_DIR,
+)
 
 
 def main() -> None:
@@ -25,7 +37,12 @@ def main() -> None:
     counts: Counter[str] = Counter()
     examples: dict[str, str] = {}
     total = 0
-    for row in iter_all():
+    rows = iter_all(
+        iter_claude_export(CLAUDE_AI_EXPORT_DIRS),
+        iter_journal(CLAUDE_HOOK_JOURNAL_CLAUDE, source="claude"),
+        iter_journal(CLAUDE_HOOK_JOURNAL_CODEX, source="codex"),
+    )
+    for row in rows:
         counts[row.first_word] += 1
         total += 1
         if row.first_word not in examples and row.surrounding_user:

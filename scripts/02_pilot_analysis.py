@@ -14,15 +14,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from llmoji.analysis import all_figures, evaluate_axis, load_rows
-from llmoji.config import (
+from llmoji_study.analysis import all_figures, evaluate_axis, load_rows
+from llmoji_study.config import (
     DATA_DIR,
     FIGURES_DIR,
     PILOT_EXPERIMENT,
     PILOT_RAW_PATH,
     STEERED_AXES,
 )
-from llmoji.hidden_state_analysis import load_hidden_features
+from llmoji_study.hidden_state_analysis import load_hidden_features
 
 
 def main() -> None:

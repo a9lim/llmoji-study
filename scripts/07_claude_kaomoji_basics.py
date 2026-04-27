@@ -20,7 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from llmoji.config import CLAUDE_KAOMOJI_PATH
+from llmoji_study.config import CLAUDE_KAOMOJI_PATH
 
 
 def main() -> None:

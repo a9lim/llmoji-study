@@ -28,7 +28,7 @@ from saklas import SaklasSession, SamplingConfig
 # Allow running as `python scripts/00_vocab_sample.py` from repo root
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from llmoji.config import (
+from llmoji_study.config import (
     DATA_DIR,
     KAOMOJI_INSTRUCTION,
     MAX_NEW_TOKENS,
@@ -36,7 +36,7 @@ from llmoji.config import (
     TEMPERATURE,
     current_model,
 )
-from llmoji.prompts import PROMPTS
+from llmoji_study.prompts import PROMPTS
 from llmoji.taxonomy import TAXONOMY, extract
 
 

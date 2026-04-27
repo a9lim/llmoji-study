@@ -1,4 +1,4 @@
-# llmoji
+# llmoji-study
 
 Does a language model's choice of kaomoji track something about its internal
 state? Claude is often asked to begin each message with a kaomoji reflecting
@@ -11,6 +11,13 @@ probes (a readout of state along a bipolar direction) and activation
 steering on the same directions (a causal intervention). If kaomoji choice
 is predictable from probe state, and if steering the axis shifts the
 kaomoji distribution, the behavior carries a signal beyond surface output.
+
+> **Companion package.** The data-collection side (kaomoji journal hooks,
+> taxonomy + canonicalization, two-stage Haiku synthesis pipeline,
+> bundle/upload CLI) is the [`llmoji`](https://github.com/a9lim/llmoji)
+> PyPI package as of the 2026-04-27 split. This repo is the research
+> side: probes, hidden state, MiniLM-based per-kaomoji embedding,
+> eriskii axis projection, all pilot scripts and figures.
 
 ## Pilot setup
 

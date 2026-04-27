@@ -14,11 +14,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from llmoji.config import (
+from llmoji_study.config import (
     DATA_DIR,
     current_model,
 )
-from llmoji.emotional_analysis import (
+from llmoji_study.emotional_analysis import (
     load_emotional_features,
     plot_kaomoji_cosine_heatmap,
     plot_kaomoji_quadrant_alignment,
