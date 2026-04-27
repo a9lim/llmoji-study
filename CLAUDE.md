@@ -41,6 +41,19 @@ multi-model parameterization via `LLMOJI_MODEL=qwen|ministral|gemma`.
 v1/v2 re-run not yet done — pre-registered as gated on v3 hidden-
 state findings, which now justify it but no urgent need.
 
+Claude-faces corpus mechanic refactored 2026-04-27: cooperating Stop
+hooks at `~/.claude/hooks/kaomoji-log.sh` and
+`~/.codex/hooks/kaomoji-log.sh` append a unified-schema row to a
+per-agent journal on every kaomoji-bearing assistant turn. A one-shot
+backfill (`scripts/21_backfill_journals.py`) replays history into the
+same journals, so they're the **single source of truth** for every
+agent assistant turn — Claude *and* Codex. Drops the legacy
+transcript-walking adapter (`claude_code_source.py` deleted). Scrape
+splits into per-source files (`claude_kaomoji_{export,hook}.jsonl`)
++ merged view; only what changed re-runs. 647 merged rows post-refactor
+(was 436 pre-refactor) — most of the bump is codex history finally
+captured.
+
 Design + plan docs live in `docs/superpowers/plans/` — one per
 experiment, written before the run, treated as the pre-registration
 record. Updating CLAUDE.md after a run refers to them rather than
@@ -248,12 +261,35 @@ only. Plan:
   bracket-start compliance is 100% — but worth flagging in
   Gotchas if a v3 Ministral run is greenlit.
 
-### Claude-faces — eriskii-style scrape (non-gemma, non-steering)
+### Claude-faces — journal-driven scrape (non-gemma, non-steering)
 
-Scrapes kaomoji-bearing assistant messages from
-`~/.claude/projects/**/*.jsonl` + Claude.ai exports listed in
-`CLAUDE_AI_EXPORT_DIRS`. 436 messages, 156 canonical kaomoji.
-Plan: `docs/superpowers/plans/2026-04-23-claude-faces-scrape-and-cluster.md`.
+Two cooperating Stop hooks (`~/.claude/hooks/kaomoji-log.sh`,
+`~/.codex/hooks/kaomoji-log.sh`) append a unified-schema JSONL row
+per kaomoji-bearing assistant turn to a per-agent journal
+(`~/.claude/kaomoji-journal.jsonl`, `~/.codex/kaomoji-journal.jsonl`).
+History gets replayed into the same journals via
+`scripts/21_backfill_journals.py` (one-shot; pause active sessions
+during the run). Plan:
+`docs/superpowers/plans/2026-04-23-claude-faces-scrape-and-cluster.md`.
+
+Unified row schema (6 fields, source inferred from journal path):
+`ts, model, cwd, kaomoji, user_text, assistant_text`. `kaomoji` is
+the leading non-letter prefix, ≥2 bytes, first char ∈
+`KAOMOJI_START_CHARS` (rows that fail the check aren't written).
+`assistant_text` has the leading kaomoji + surrounding whitespace
+stripped. `user_text` is the latest *real* human-typed prompt:
+sidechain (subagent) turns are dropped at write time on the Claude
+side via `isSidechain`; system-injected user-role payloads are
+filtered (Claude: `"Base directory for this skill:"`; Codex:
+`# AGENTS.md`, `<environment_context>`, `<INSTRUCTIONS>`).
+
+Scrape (`scripts/06_claude_scrape.py`) splits into per-source files
+— `data/claude_kaomoji_{export,hook}.jsonl` — and rewrites the
+merged `data/claude_kaomoji.jsonl` (export + hook) at the end.
+Default re-runs both cheap sources; pass `export` or `hook` to
+limit. **647 merged rows / 156 canonical kaomoji** post-refactor
+(587 claude-hook + 14 codex-hook + 46 export). Codex turns enter
+the corpus for the first time at this refactor.
 
 Eriskii-replication adds two-stage haiku description (per-instance
 descriptions → per-kaomoji synthesis → MiniLM embedding) projected
@@ -489,6 +525,64 @@ Real compliance (bracket-start, the v3 loader's actual filter) is
 ~100% on every model so far. Real check: `awk` for first-char in
 `([{（｛`, not the runner's log line.
 
+### Codex puts the kaomoji on the LAST agent message, Claude on the FIRST
+
+Opposite conventions. Claude's assistant message is one event with
+interleaved `text + tool_use + text` content blocks; the kaomoji-
+prefixed response is always the FIRST text block (later text is
+post-tool-call continuation, irrelevant to kaomoji analysis). Codex
+emits each agent message as a separate `event_msg.agent_message`
+event; progress messages go first during tool calls, the kaomoji-
+bearing summary lands last as `task_complete.last_agent_message`.
+The Codex hook + backfill key on `last_agent_message`, NOT on the
+first agent_message — flipping that would miss every kaomoji on
+multi-step Codex turns.
+
+### Sidechain filter is Claude-only
+
+`isSidechain: true` events in `~/.claude/projects/**/*.jsonl` mark
+subagent (Task-tool-spawned) sessions; both the live Claude hook
+and the backfill drop them at write time. Codex has no analog —
+the `collaboration_mode` field is `"default"` for every observed
+turn_context, no subagent equivalent. So the codex hook + backfill
+have no sidechain check.
+
+### KAOMOJI_START_CHARS lives in five places — keep in sync
+
+The kaomoji-opening glyph set
+(`( [ （ ｛ ヽ ヾ っ ٩ ᕕ ╰ ╭ ╮ ┐ ┌ ＼ ¯ ໒`) is the leading-prefix
+filter applied at every kaomoji touchpoint. Definitions:
+`llmoji/claude_export_source.py`, `llmoji/claude_hook_source.py`,
+`llmoji/backfill_journals.py` (`_KAOMOJI_START_CHARS`), plus inline
+`case` patterns in `~/.claude/hooks/kaomoji-log.sh` and
+`~/.codex/hooks/kaomoji-log.sh`. Five copies — same drill as the
+matplotlib-font helpers. Worth consolidating into `taxonomy.py`
+next time the set changes.
+
+### System-injection prefixes have a per-agent filter list
+
+`user_text` skips system-injected user-role payloads:
+- Claude: `"Base directory for this skill:"` (slash-command
+  activation dumps the skill body as a user message). Defined in
+  `llmoji/backfill_journals.py:_SYSTEM_INJECTED_PREFIXES`, mirrored
+  inline in `~/.claude/hooks/kaomoji-log.sh`.
+- Codex: `"# AGENTS.md"`, `"<environment_context>"`,
+  `"<INSTRUCTIONS>"`. Inline in both
+  `llmoji/backfill_journals.py:_replay_codex_rollout` and
+  `~/.codex/hooks/kaomoji-log.sh`.
+
+Four sync points total, two per agent.
+
+### Don't re-run the transcript scrape — the journal is canonical
+
+Pre-refactor the `code` source walked `~/.claude/projects/**/*.jsonl`
+on every invocation; that adapter is gone. History is replayed into
+the journal once via `21_backfill_journals.py`; live hooks append
+from there. Re-running the backfill OVERWRITES the journals — only
+do it (a) after a schema change, or (b) with active sessions paused
+(an in-flight turn would otherwise land in both the backfill via
+transcript and the live hook within the same second).
+
 ### Python stdout buffering hides long-run progress in tee'd logs
 
 `print()` to a piped stream is block-buffered (~4–8KB). For an 800-
@@ -533,8 +627,9 @@ python scripts/11_emotional_probe_correlations.py
 python scripts/12_emotional_prompt_matrix.py
 
 # Claude-faces + eriskii-replication (needs ANTHROPIC_API_KEY for 14 + 16)
+python scripts/21_backfill_journals.py        # one-shot; replay claude+codex history
 python scripts/05_claude_vocab_sample.py
-python scripts/06_claude_scrape.py
+python scripts/06_claude_scrape.py            # default: export + hook; --no-merge to skip merged view
 python scripts/07_claude_kaomoji_basics.py
 python scripts/08_claude_faces_embed.py
 python scripts/09_claude_faces_plot.py              # response-based t-SNE PNG
@@ -563,13 +658,15 @@ llmoji/
                              # apply canonicalize_kaomoji at load time
     cross_pilot_analysis.py  # pooled v1v2 + v3 hidden-state clustering
     claude_scrape.py         # ScrapeRow schema + iter_all
-    claude_code_source.py    # ~/.claude/projects walker
+    claude_hook_source.py    # ~/.claude + ~/.codex unified journal adapter
     claude_export_source.py  # Claude.ai export adapter
+    backfill_journals.py     # one-shot replay of transcripts/rollouts
+                             # into the unified journals
     claude_faces.py          # response-based per-kaomoji embeddings;
                              # load_embeddings_canonical() merges variants
     eriskii_prompts.py       # locked Haiku prompts + 21-axis anchors
     eriskii.py               # axis projection + masking + haiku primitives
-  scripts/                   # 00–20 + 99; each is directly executable
+  scripts/                   # 00–21 + 99; each is directly executable
   docs/superpowers/plans/    # design+plan docs per experiment
   data/                      # *.jsonl, *.tsv, *.parquet, *.html (tracked)
   data/hidden/               # per-row .npz sidecars (gitignored)

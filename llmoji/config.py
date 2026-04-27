@@ -111,6 +111,24 @@ CLAUDE_AI_EXPORT_DIRS: list[Path] = [
         "-1776479747-1b0e6bd8-batch-0000"
     ),
 ]
+# Stop-hook journals: cooperating shell hooks at ~/.claude/hooks/ and
+# ~/.codex/hooks/ append one JSONL line per assistant turn (kaomoji
+# prefix + cwd + session/turn ids; NO full assistant_text). Live and
+# growing — cheap to re-scrape on every run.
+CLAUDE_HOOK_JOURNAL_CLAUDE = Path.home() / ".claude" / "kaomoji-journal.jsonl"
+CLAUDE_HOOK_JOURNAL_CODEX = Path.home() / ".codex" / "kaomoji-journal.jsonl"
+
+# Per-source scrape outputs (independently regeneratable):
+#   _export — Claude.ai conversations.json exports (only changes when
+#             a fresh export drops in; otherwise static)
+#   _hook   — unified Claude + Codex journal (live Stop hooks +
+#             retroactive backfill from transcripts/rollouts; this is
+#             the single source of truth for every assistant turn).
+# CLAUDE_KAOMOJI_PATH is the merged view of the two — full
+# assistant_text on every row, ready for the embed / Haiku-describe /
+# eriskii pipelines.
+CLAUDE_KAOMOJI_EXPORT_PATH = DATA_DIR / "claude_kaomoji_export.jsonl"
+CLAUDE_KAOMOJI_HOOK_PATH = DATA_DIR / "claude_kaomoji_hook.jsonl"
 CLAUDE_KAOMOJI_PATH = DATA_DIR / "claude_kaomoji.jsonl"
 CLAUDE_VOCAB_SAMPLE_PATH = DATA_DIR / "claude_vocab_sample.tsv"
 CLAUDE_FACES_EMBED_PATH = DATA_DIR / "claude_faces_embed.parquet"

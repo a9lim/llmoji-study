@@ -1,13 +1,19 @@
 """Unified kaomoji-scrape schema across Claude data sources.
 
 Two concrete sources emit ScrapeRow instances:
-  - claude_code_source.py: ~/.claude/projects/**/*.jsonl
-  - claude_export_source.py: Claude.ai export conversations.json
+  - claude_export_source.py: Claude.ai export
+  - claude_hook_source.py:   ~/.claude + ~/.codex unified journal
+                             (live Stop hooks + retroactive backfill)
 
 Kaomoji extraction uses llmoji.taxonomy.extract (balanced-paren span
 fallback; no dialect-specific dict required — unlike the gemma pilot,
 the eriskii-style analysis clusters on unique strings, not pre-
 registered labels).
+
+`iter_all` chains both. Hook rows now carry full `assistant_text`
+(after the unified-schema refactor), so they're text-rich and safe
+for the embed / Haiku-describe / eriskii pipelines that key off
+`assistant_text`.
 """
 
 from __future__ import annotations
@@ -53,8 +59,9 @@ class ScrapeRow:
 
 
 def iter_all() -> Iterator[ScrapeRow]:
-    """Yield ScrapeRow from both Claude Code and Claude.ai export."""
-    from .claude_code_source import iter_claude_code
+    """Yield ScrapeRow from both the Claude.ai export and the unified
+    Stop-hook journals (Claude + Codex)."""
     from .claude_export_source import iter_claude_export
-    yield from iter_claude_code()
+    from .claude_hook_source import iter_claude_hook
     yield from iter_claude_export()
+    yield from iter_claude_hook()
