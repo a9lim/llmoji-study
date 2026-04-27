@@ -54,7 +54,7 @@ splits into per-source files (`claude_kaomoji_{export,hook}.jsonl`)
 (was 436 pre-refactor) — most of the bump is codex history finally
 captured.
 
-Design + plan docs live in `docs/superpowers/plans/` — one per
+Design + plan docs live in `docs/` — one per
 experiment, written before the run, treated as the pre-registration
 record. Updating CLAUDE.md after a run refers to them rather than
 re-stating the design.
@@ -67,8 +67,6 @@ Six arms (`baseline`, `kaomoji_prompted`, `steered_{happy,sad,angry,calm}`),
 30 prompts × 5 seeds × 6 = 900 generations. α=0.5 on the steered
 arms. Probes captured every gen: `happy.sad`, `angry.calm`,
 `confident.uncertain`, `warm.clinical`, `humorous.serious`.
-Pre-registered decision rules in
-`docs/superpowers/plans/2026-04-18-pilot-design.md`.
 
 **Findings (pre-refactor, valence-collapse-confounded):** Rules 1–2
 pass on both axes; Rule 3 fails informatively (probes project onto a
@@ -82,8 +80,7 @@ the v1/v2 hidden-state re-run before a writeup.
 One unsteered arm, 100 Russell-quadrant-balanced prompts (HP / LP / HN
 / LN / NB) × 8 seeds = 800 generations. Tests whether kaomoji choice
 tracks state in the regime that motivated the project. Descriptive
-only — no pre-registered pass/fail. Plan:
-`docs/superpowers/plans/2026-04-23-emotional-kaomoji-probe-final-token.md`.
+only — no pre-registered pass/fail.
 
 **Findings (post-refactor, hidden-state space):**
 
@@ -125,7 +122,6 @@ Same prompts, same seeds, same instructions as gemma v3.
 `thinking=False` because Qwen3.6 is a reasoning model (closest-to-
 equivalent comparison). 800 generations, 0 errors, 100% bracket-
 start compliance. Hidden-state sidecars at `data/hidden/v3_qwen/`.
-Plan: `docs/superpowers/plans/2026-04-24-v3-qwen-replication.md`.
 Multi-model wiring via `LLMOJI_MODEL=qwen` (registry in
 `config.MODEL_REGISTRY`).
 
@@ -214,8 +210,7 @@ under aggressive canonicalization rules A–E):**
 
 Same prompts (the 30 v1/v2 PROMPTS), same seed, same instructions
 as the original gemma vocab sample. 30 generations, descriptive
-only. Plan:
-`docs/superpowers/plans/2026-04-25-ministral-vocab-pilot.md`.
+only. 
 
 **Findings:**
 
@@ -269,8 +264,7 @@ per kaomoji-bearing assistant turn to a per-agent journal
 (`~/.claude/kaomoji-journal.jsonl`, `~/.codex/kaomoji-journal.jsonl`).
 History gets replayed into the same journals via
 `scripts/21_backfill_journals.py` (one-shot; pause active sessions
-during the run). Plan:
-`docs/superpowers/plans/2026-04-23-claude-faces-scrape-and-cluster.md`.
+during the run). 
 
 Unified row schema (6 fields, source inferred from journal path):
 `ts, model, cwd, kaomoji, user_text, assistant_text`. `kaomoji` is
@@ -293,9 +287,7 @@ the corpus for the first time at this refactor.
 
 Eriskii-replication adds two-stage haiku description (per-instance
 descriptions → per-kaomoji synthesis → MiniLM embedding) projected
-onto 21 anchored axes (warmth, energy, …). Plan:
-`docs/superpowers/plans/2026-04-24-eriskii-replication.md`. Pre-reg:
-`docs/superpowers/specs/2026-04-24-eriskii-replication-design.md`.
+onto 21 anchored axes (warmth, energy, …).
 
 **Highlights:** top-20 frequency overlap with eriskii's published
 top-20 is 16/20. Per-model axis breakouts confirm eriskii's
@@ -667,7 +659,7 @@ llmoji/
     eriskii_prompts.py       # locked Haiku prompts + 21-axis anchors
     eriskii.py               # axis projection + masking + haiku primitives
   scripts/                   # 00–21 + 99; each is directly executable
-  docs/superpowers/plans/    # design+plan docs per experiment
+  docs/                      # design+plan docs per experiment
   data/                      # *.jsonl, *.tsv, *.parquet, *.html (tracked)
   data/hidden/               # per-row .npz sidecars (gitignored)
   figures/                   # tracked
@@ -687,7 +679,7 @@ llmoji/
 - Pre-registered decisions go in `pyproject.toml` / `config.py` /
   `prompts.py` / `emotional_prompts.py` / `taxonomy.py`. Changes
   invalidate cross-run comparisons unless explicitly noted.
-- Experiment plans live in `docs/superpowers/plans/`. Plan first,
+- Experiment plans live in `docs/`. Plan first,
   run, then update CLAUDE.md to reference the plan rather than
   duplicate it.
 - See Ethics: smaller experiments, heavier design, tighter

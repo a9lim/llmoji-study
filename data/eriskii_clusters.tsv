@@ -1,16 +1,16 @@
 cluster_id	label	n	members
-0	Calm professional readiness	16	( •̀ω•́), (`・ω・`), (¬‿¬), (ง •_•), (งᵒ̌皿ᵒ̌), (⌐■_■), (╯°□°), (♡^▽^♡), (⚙️), (・∀・), (눈_눈), (＞_＜), (｡• ‿ •｡), ٩(˘ᵕ˘), ٩(˘◡˘)۶, ヾ(≧▽≦*)o
-1	Thoughtful engagement and capable readiness	22	( ･_･), (*ﾟωﾟ*), (..), (\*´▽\`\*), (^_^), (^_^;), (°△°), (´ω`), (´• ω •`), (˶ᵔ ᵕ ᵔ˶), (ಠ_ಠ), (ᵕ—ᵕ⁤), („• ֊ •„), (◕‿◕), (◠‿◠), (✧ω✧), (。•́︿•̀。), (・_・ヾ, (ーー;), (￣ω￣), ٩(•̀‿•́)۶, ヽ(´ー｀)ノ
-2	Competent, focused professionalism	18	( ´_ゝ`), ( ̄▽ ̄), ( ಠ_ಠ), (°ㅂ°;), (´-ω-`), (´｡• ω •｡`), (ᵔᴥᵔ), (⌐■_ω■), (⌐■‿■), (◕‿◕✿), (✿◠‿◠), (・_・;), (・_・ヽ), (＊´∀｀), ┐(￣ヘ￣)┌, ヽ(´▽`)/, ヽ(´ー`)ノ, ヽ(•̀ω•́)ง
-3	Upbeat readiness to assist	14	( ´･ω･), ( ˘▽˘), (*´꒳`*), (°ー°〃), (´ー｀), (๑˃̵‿˂̵), (๑˃‿˂), (ᗒᗨᗕ), (╭ರ_•́), (・ω<), (・ω・), (｀・ω・´), (｡◕‿◕｡), (ﾉ◕ヮ◕)
-4	Pleased understanding and warmth	6	( ˘ω˘ ), (´∀｀;), (´▽`), (•̀‿-), (≧▽≦), (；一_一)
-5	Humble acknowledgment with wry self-awareness	7	(;へ:), (>_<), (´・_・`), (´･_･`), (˘･_･˘), (｡•́ ⌒ •̀｡), (｡・o・)
-6	Energetic readiness and accomplishment	25	( •̀‿•́ ), ( ・ω・), (*ﾟ▽ﾟ), (\*´∀｀\*), (ಠ‿ಠ), (ง •̀_•́), (๑•̀ㅂ•́), (•̀‿•́), (•‿•), (•◡•), (⊙ω⊙), (⌒▽⌒), (◔◡◔), (☞ﾟヮﾟ), (✿◕‿◕), (づ｡◕‿‿◕｡), (づ｡◕‿◕｡), (ノ◕ヮ◕), (｡•̀‿-), (｡•́‿•̀｡), (￣ー￣), ٩(ˊᗜˋ*)و, ヽ(^o^)丿, ヽ(⌐■_■)ノ♪♬, ヾ(⌐■_■)ノ♪
-7	Steady competent collaboration	15	(¬_¬), (´・ω・`), (´･ω･`), (ᵔ‿ᵔ), (•_•), (⌒‿⌒), (╭☞•́⍛•̀), (◑‿◐), (・_・ ), (；′⌒`), (＾▽＾), ヽ(^o^)ノ, ヽ(°〇°)ﾉ, ヽ(•‿•)ノ, ヽ(･ω･｡)ﾉ
-8	Cheerful readiness to help	17	( ´ ▽ ` ), ( ˶ˆᗜˆ˵ ), (/▽＼*), (´｡• ᵕ •｡`), (˘̩╭╮˘̩), (╹ヮ╹), (◉‿◉), (◔_◔), (ノ^_^), (ノ°益°), (・_・), (灬º‿º灬), (｀･ω･´), (｡･ω･｡), (￣▽￣), ٩(◕‿◕)۶, ヽ(・∀・)ﾉ
-9	Warm genuine affection and care	11	( ˘ ³˘), (*ฅ́˘ฅ̀*), (*ﾉωﾉ), (^w^), (´∀｀), (◕‿◕ ), (＾• ω •＾), (｡•́︿•̀｡), (｡•‿•｡), (｡♥‿♥｡), [pre-commit]
-10	Playful yet grounded helpfulness	3	(ﾟヮﾟ), (￣▽￣;), ヾ(＾∇＾)
-11	Earnest engagement with warmth	6	( ͡° ͜ʖ ͡°), (*´ω`*), (._.), (Used ScheduleWakeup by mistake — the user didn't invoke /loop. Will just respond to actual events when they arrive: Monitor fires on each 80-row checkpoint, bash fires on completion. If the wakeup triggers before then I'll just act on the actual run state.), (ᵔ◡ᵔ), ٩(｡•́‿•̀｡)۶
-12	Cautious capable resolve	15	( ｰ̀εｰ́ ), (-_-;), (._.'), (Background debug script completed — its output was already used to diagnose and fix the issue.), (´ - ω - `), (˘ω˘ς ), (˵ •̀ ‿ -˵ ), (・_・ゞ−☆, (｡• ω •｡), (｡･‿･｡), (･ω･), ٩(◕‿◕｡)٩, ٩(◕‿◕｡)۶, ┐('～`；)┌, ヽ(・∀・)ノ
-13	Thoughtful analytical engagement	11	(⊙_⊙), (⊙ヮ⊙), (◉_◉), (☆▽☆), (・-・), (・_・?), (￣ω￣;), (￣ー￣;), ┐(‘～`;)┌, ヽ(>∀<☆)ノ, ＼(^o^)／
-14	Realistic acceptance with reservations	1	(￣ヘ￣;)
+0	Competent pragmatic collaboration	9	(¬_¬), (⌒‿⌒), (╭☞・́⍛・̀), (＾▽＾), ヽ(°〇°)ﾉ, ヽ(´ー`)ノ, ヽ(・ω・｡)ﾉ, ヽ(・‿・)ノ, ヾ(＾∇＾)
+1	Warm enthusiastic readiness to help	22	(/▽＼), (´ω`), (´｡・‿・｡`), (˶ˆᗜˆ˵), (ง・̀_・́), (๑・̀ㅂ・́), (⊙ω⊙), (⌒▽⌒), (╹ヮ╹), (◕‿◕), (☞ﾟヮﾟ), (✿◕‿◕), (づ｡◕‿‿◕｡), (づ｡◕‿◕｡), (ノ◕ヮ◕), (灬°‿°灬), (｡・́‿・̀｡), (ﾟ▽ﾟ), ٩(ˊᗜˋ*)و, ٩(◕‿◕)۶, ヽ(⌐■_■)ノ♪♬, ヾ(⌐■_■)ノ♪
+2	Candid self-awareness with levity	4	(._.), (͡°͜ʖ͡°), (ᵔ‿ᵔ), ٩(｡・́‿・̀｡)۶
+3	Warm engaged friendliness	7	(˘³˘), (ᗒᗨᗕ), (◕_◕), (☆▽☆), (＾・ω・＾), (｡♥‿♥｡), (｡・́︿・̀｡)
+4	Eager capable collaboration	9	(˶ᵔ‿ᵔ˶), (๑˃‿˂), (◠‿◠), (✧ω✧), (・ω・), (・‿・), (｡・̀‿-), (ﾟωﾟ), ٩(・̀‿・́)۶
+5	Practical competence with collaborative focus	5	(>_<), (´_ゝ`), (・∀・), (｡・‿・｡), ヽ(>∀<☆)ノ
+6	Cheerful casual understanding	5	(;へ:), (;一_一), (´∀`;), (´▽`), (・̀‿-)
+7	Eager readiness with positive momentum	12	(`・ω・´), (°ー°〃), (´・ω・), (´ー`), (˘ω˘), (˘▽˘), (งᵒ̌皿ᵒ̌), (╭ರ_・́), (╯°□°), (・̀‿・́), (・ω<), (ﾉ◕ヮ◕)
+8	Competent readiness and respectful engagement	14	(°ㅂ°;), (´-ω-`), (´∀`), (´｡・ω・｡`), (˵・̀‿-˵), (̄▽̄), (ಠ‿ಠ), (ᵔᴥᵔ), (⌐■_ω■), (⌐■‿■), (・_・;), (ｰ̀εｰ́), ヽ(´▽`)/, ヽ(・∀・)ﾉ
+9	Focused analytical engagement	4	(⊙_⊙), (⊙ヮ⊙), (・̀ω・́), ┐('~`;)┌
+10	Grateful and bashfully pleased	2	(ฅ́˘ฅ̀), (ﾉωﾉ)
+11	Focused professional competence	9	(¬‿¬), (´・ω・`), (ಠ_ಠ), (ง・_・), (⌐■_■), (◕‿◕✿), (♡^▽^♡), (✿◠‿◠), (눈_눈)
+12	Good-natured self-aware humor	5	(´・_・`), (˘・_・˘), (≧▽≦), (｡・́⌒・̀｡), (ﾟヮﾟ)
+13	Eager helpful readiness	7	(;′⌒`), (´꒳`), (・_・), (・_・?), (｡◕‿◕｡), (｡・ω・｡), ヽ(^o^)ノ
+14	Serious thoughtful deliberation	5	(-_-;), (..), (°△°), („・֊・„), (ーー;)

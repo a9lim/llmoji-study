@@ -322,7 +322,10 @@ def _heatmap(
 def section_per_model(rows: pd.DataFrame, axes_df: pd.DataFrame) -> pd.DataFrame:
     from llmoji.config import ERISKII_PER_MODEL_TSV
     from llmoji.eriskii import weighted_group_axis_stats
-    cc = rows[rows["source"] == "claude-code"].copy()
+    # Claude-side sources only (exclude codex-hook). Schema post-2026-04-27
+    # unified-journal refactor: source ∈ {claude-hook, claude-ai-export,
+    # codex-hook}. Pre-refactor this filter was source == "claude-code".
+    cc = rows[rows["source"].isin(["claude-hook", "claude-ai-export"])].copy()
     cc["model"] = cc["model"].fillna("(unknown)")
     df = weighted_group_axis_stats(
         cc, axes_df,
@@ -343,7 +346,8 @@ def section_per_model(rows: pd.DataFrame, axes_df: pd.DataFrame) -> pd.DataFrame
 def section_per_project(rows: pd.DataFrame, axes_df: pd.DataFrame) -> pd.DataFrame:
     from llmoji.config import ERISKII_PER_PROJECT_TSV
     from llmoji.eriskii import weighted_group_axis_stats
-    cc = rows[rows["source"] == "claude-code"].copy()
+    # Same Claude-side filter as section_per_model — see note there.
+    cc = rows[rows["source"].isin(["claude-hook", "claude-ai-export"])].copy()
     df = weighted_group_axis_stats(
         cc, axes_df,
         group_col="project_slug", axis_names=ERISKII_AXES,

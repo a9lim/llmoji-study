@@ -26,9 +26,7 @@ from pathlib import Path
 from typing import Iterator
 
 from .claude_scrape import ScrapeRow
-from .taxonomy import extract
-
-KAOMOJI_START_CHARS = set("([（｛ヽ٩ᕕ╰╭╮┐┌＼¯໒＼ヾっ")
+from .taxonomy import KAOMOJI_START_CHARS, extract
 
 
 def _project_slug_from_cwd(cwd: str | None) -> str:

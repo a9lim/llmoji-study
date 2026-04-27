@@ -25,5 +25,7 @@ logs/
 .idea/
 .vscode/
 
-# claude docs
-Docs/
+# Stage A/B Haiku resync backups — temp atomic-swap output of
+# scripts/22_resync_haiku_canonical.py; not part of the experimental
+# record.
+data/*.jsonl.bak.*

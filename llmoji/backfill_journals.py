@@ -28,21 +28,20 @@ import re
 from pathlib import Path
 from typing import Any, Iterator
 
-# Same set the hook uses + the live adapter — leading-glyph filter for
-# kaomoji prefixes. Kept in sync with claude_hook_source.py and the
-# inline `case` filter in both Stop hooks.
+from .taxonomy import is_kaomoji_candidate
+
 _KAOMOJI_LETTER_RE = re.compile(r"[A-Za-z]")
-_KAOMOJI_START_CHARS = frozenset("([（｛ヽ٩ᕕ╰╭╮┐┌＼¯໒＼ヾっ")
 
 
 def _kaomoji_prefix(text: str) -> str:
     """Mirror the shell hook's awk + sed pipeline.
 
     Take the first non-empty line, strip leading whitespace, drop
-    everything from the first ASCII letter, trim trailing whitespace.
-    Returns the prefix only if it (a) is ≥2 bytes and (b) starts with
-    a known kaomoji-opening glyph — the second guard rejects markdown
-    bullets, ASCII headers (``"##"``), list dashes (``"--"``), etc.
+    everything from the first ASCII letter, trim trailing whitespace,
+    then validate via ``is_kaomoji_candidate`` (≥2 bytes, ≤32 bytes,
+    starts with ``KAOMOJI_START_CHARS``, no backslash, no 4+-letter
+    run, balanced brackets if applicable). Returns ``""`` for prose,
+    markdown-escape artifacts, and other garbage.
     """
     first_line = ""
     for line in text.splitlines():
@@ -55,7 +54,7 @@ def _kaomoji_prefix(text: str) -> str:
     m = _KAOMOJI_LETTER_RE.search(stripped)
     prefix = stripped[: m.start()] if m else stripped
     prefix = prefix.rstrip()
-    if len(prefix) < 2 or prefix[0] not in _KAOMOJI_START_CHARS:
+    if not is_kaomoji_candidate(prefix):
         return ""
     return prefix
 
