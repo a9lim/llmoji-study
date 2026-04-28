@@ -1,8 +1,8 @@
 # llmoji-study
 
-> **Heads up:** this README and the writeups in `docs/` are
-> placeholders drafted by Claude. I'll write a polished version
-> once the experiments conclude. — a9
+> **this README and the writeups in `docs/` are
+> placeholders drafted by claude. i'll properly write a polished version
+> once the experiments conclude.**
 
 Does a language model's choice of kaomoji track something about its
 internal state? Claude is often asked to begin each message with a
