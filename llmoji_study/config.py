@@ -94,66 +94,42 @@ EMOTIONAL_SUMMARY_PATH = DATA_DIR / "emotional_summary.tsv"
 PILOT_EXPERIMENT = "v1v2"
 EMOTIONAL_EXPERIMENT = "v3"
 
-# --- claude-faces experiment (scrape + t-SNE cluster plot) ---
-CLAUDE_CODE_PROJECTS_DIR = Path.home() / ".claude" / "projects"
-# Claude.ai exports are non-idempotent across requests — newer exports
-# sometimes return empty content arrays for conversations that earlier
-# exports returned fully. List multiple export dirs here; the source
-# adapter unions them by conversation UUID, preferring whichever copy
-# has non-empty content.
-CLAUDE_AI_EXPORT_DIRS: list[Path] = [
-    Path(
-        "/Users/a9lim/Downloads/data-72de1230-b9fa-4c55-bc10-84a35b58d89c"
-        "-1777012863-4b01638a-batch-0000"
-    ),
-    Path(
-        "/Users/a9lim/Downloads/data-72de1230-b9fa-4c55-bc10-84a35b58d89c"
-        "-1776479747-1b0e6bd8-batch-0000"
-    ),
-]
-# Stop-hook journals: cooperating shell hooks at ~/.claude/hooks/ and
-# ~/.codex/hooks/ append one JSONL line per assistant turn (kaomoji
-# prefix + cwd + session/turn ids; NO full assistant_text). Live and
-# growing — cheap to re-scrape on every run.
-CLAUDE_HOOK_JOURNAL_CLAUDE = Path.home() / ".claude" / "kaomoji-journal.jsonl"
-CLAUDE_HOOK_JOURNAL_CODEX = Path.home() / ".codex" / "kaomoji-journal.jsonl"
-
-# Per-source scrape outputs (independently regeneratable):
-#   _export — Claude.ai conversations.json exports (only changes when
-#             a fresh export drops in; otherwise static)
-#   _hook   — unified Claude + Codex journal (live Stop hooks +
-#             retroactive backfill from transcripts/rollouts; this is
-#             the single source of truth for every assistant turn).
-# CLAUDE_KAOMOJI_PATH is the merged view of the two — full
-# assistant_text on every row, ready for the embed / Haiku-describe /
-# eriskii pipelines.
-CLAUDE_KAOMOJI_EXPORT_PATH = DATA_DIR / "claude_kaomoji_export.jsonl"
-CLAUDE_KAOMOJI_HOOK_PATH = DATA_DIR / "claude_kaomoji_hook.jsonl"
-CLAUDE_KAOMOJI_PATH = DATA_DIR / "claude_kaomoji.jsonl"
-CLAUDE_VOCAB_SAMPLE_PATH = DATA_DIR / "claude_vocab_sample.tsv"
-CLAUDE_FACES_EMBED_PATH = DATA_DIR / "claude_faces_embed.parquet"
+# --- claude-faces experiment (HF-corpus-driven, post-2026-04-27 refactor) ---
+#
+# Pre-refactor we scraped local Claude.ai exports + ~/.claude /
+# ~/.codex Stop-hook journals here, then ran two-stage Haiku
+# (per-instance describe → per-kaomoji synthesize) to get one
+# meaning string per face. That whole pipeline now lives on the
+# contributor side via the `llmoji` PyPI package (which writes its
+# Haiku-synthesized output to a public HF dataset). This repo
+# pulls the aggregated corpus instead of running it locally.
+#
+# Single source of truth for the harness side:
+#   ``a9lim/llmoji`` on HuggingFace, layout
+#   ``contributors/<32-hex>/bundle-<UTC>/{manifest,descriptions}.jsonl``.
+#
+# `scripts/06_claude_hf_pull.py` snapshot-downloads to
+# ``CLAUDE_DATASET_DIR``, then flattens by canonical kaomoji form
+# into ``CLAUDE_DESCRIPTIONS_PATH`` for the rest of the pipeline.
+CLAUDE_HF_REPO = "a9lim/llmoji"
+CLAUDE_DATASET_DIR = DATA_DIR / "hf_dataset"
+CLAUDE_DESCRIPTIONS_PATH = DATA_DIR / "claude_descriptions.jsonl"
+CLAUDE_FACES_EMBED_DESCRIPTION_PATH = DATA_DIR / "claude_faces_embed_description.parquet"
 
 # --- eriskii-replication experiment (description-based embeddings + axes) ---
-# Locked Haiku version. Re-exported from the `llmoji` PyPI package
-# so the canonical-corpus value lives in one place — the v1.0 split
-# froze this string in `llmoji.haiku_prompts`; bumping it is a major
-# version bump there. Imported here for back-compat with every
-# research-side script that reads `from llmoji_study.config import
-# HAIKU_MODEL_ID`.
+# Locked Haiku version. Re-exported from the `llmoji` PyPI package so
+# the canonical-corpus value lives in one place — the v1.0 split
+# froze this string in `llmoji.haiku_prompts`. Imported here for the
+# (now sole) call site: per-cluster Haiku labeling in
+# `scripts/16_eriskii_replication.py`. Per-instance / per-kaomoji
+# description and synthesis happens contributor-side and ships
+# pre-baked in the HF bundles.
 from llmoji.haiku_prompts import HAIKU_MODEL_ID  # noqa: E402, F401
 
-# Stage-A sampling: per kaomoji, randomly sample up to this many
-# instances for per-instance Haiku description (eriskii used 4 with
-# a floor for low-frequency faces). Floor is implicit — kaomoji with
-# fewer than the cap are fully sampled.
-INSTANCE_SAMPLE_CAP = 4
-INSTANCE_SAMPLE_SEED = 0
-
-# Order matters: this is the column order in eriskii_axes.tsv and the
-# heatmap-row order in per-model / per-project figures. Must stay in
-# sync with `llmoji_study.eriskii_anchors.AXIS_ANCHORS` (research-
-# side; not part of the v1.0 frozen public surface). All 21 axes
-# from the eriskii.net page (note: "wryness" is the eriskii
+# Order matters: this is the column order in eriskii_axes.tsv. Must
+# stay in sync with `llmoji_study.eriskii_anchors.AXIS_ANCHORS`
+# (research-side; not part of the v1.0 frozen public surface). All 21
+# axes from the eriskii.net page (note: "wryness" is the eriskii
 # spelling, with one n).
 ERISKII_AXES = [
     "warmth", "energy", "confidence", "playfulness", "empathy",
@@ -163,16 +139,13 @@ ERISKII_AXES = [
     "hope", "aggression", "exhaustion",
 ]
 
-CLAUDE_HAIKU_DESCRIPTIONS_PATH = DATA_DIR / "claude_haiku_descriptions.jsonl"
-CLAUDE_HAIKU_SYNTHESIZED_PATH = DATA_DIR / "claude_haiku_synthesized.jsonl"
-CLAUDE_FACES_EMBED_DESCRIPTION_PATH = DATA_DIR / "claude_faces_embed_description.parquet"
-
-# eriskii-replication output paths
+# eriskii-replication output paths. Pre-refactor we also produced
+# eriskii_per_model.tsv, eriskii_per_project.tsv, and
+# eriskii_user_kaomoji_axis_corr.tsv; the HF dataset doesn't carry
+# per-row model / project / user-text fields (everything is pooled
+# per-machine before upload), so those analyses are gone.
 ERISKII_AXES_TSV = DATA_DIR / "eriskii_axes.tsv"
 ERISKII_CLUSTERS_TSV = DATA_DIR / "eriskii_clusters.tsv"
-ERISKII_PER_MODEL_TSV = DATA_DIR / "eriskii_per_model.tsv"
-ERISKII_PER_PROJECT_TSV = DATA_DIR / "eriskii_per_project.tsv"
-ERISKII_USER_KAOMOJI_CORR_TSV = DATA_DIR / "eriskii_user_kaomoji_axis_corr.tsv"
 ERISKII_COMPARISON_MD = DATA_DIR / "eriskii_comparison.md"
 
 

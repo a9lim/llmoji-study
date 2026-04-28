@@ -1,85 +1,96 @@
-"""Basic descriptive stats on data/claude_kaomoji.jsonl.
+"""Basic descriptive stats on the contributor-submitted HF corpus.
 
-Prints:
-  - Total rows, by source
-  - Top-N first_words overall and per-source
-  - Breakdown by model (Claude Code only — export has no model info)
-  - Per-project top kaomoji (Claude Code)
-  - Per-month emission timeline
+Reads ``data/claude_descriptions.jsonl`` (the flat per-canonical
+output of ``scripts/06_claude_hf_pull.py``) and prints:
 
-Purely informational; doesn't write files. Saves an eyeballable
-summary before we commit to the clustering pipeline.
+  - Total canonical kaomoji, total emissions across contributors,
+    n_contributors, n_bundles.
+  - Top-N kaomoji by total count.
+  - Provider mix (claude_code / codex / hermes / mixed bundles).
+  - Llmoji-package-version distribution.
+
+Purely informational; doesn't write files.
 """
 
 from __future__ import annotations
 
 import json
 import sys
-from collections import Counter, defaultdict
+from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from llmoji_study.config import CLAUDE_KAOMOJI_PATH
+from llmoji_study.config import CLAUDE_DESCRIPTIONS_PATH
 
 
 def main() -> None:
-    if not CLAUDE_KAOMOJI_PATH.exists():
-        print(f"no data at {CLAUDE_KAOMOJI_PATH}; run scripts/06_claude_scrape.py first")
+    if not CLAUDE_DESCRIPTIONS_PATH.exists():
+        print(
+            f"no corpus at {CLAUDE_DESCRIPTIONS_PATH}; "
+            "run scripts/06_claude_hf_pull.py first"
+        )
         return
-    rows: list[dict] = [
-        json.loads(line) for line in CLAUDE_KAOMOJI_PATH.read_text().splitlines()
-        if line.strip()
-    ]
-    print(f"loaded {len(rows)} rows")
 
-    by_src: Counter[str] = Counter(r["source"] for r in rows)
-    print("\nby source:")
-    for s, n in by_src.most_common():
-        print(f"  {s}: {n}")
+    rows: list[dict] = []
+    with CLAUDE_DESCRIPTIONS_PATH.open() as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            rows.append(json.loads(line))
 
-    print("\ntop 20 first_words overall:")
-    overall = Counter(r["first_word"] for r in rows)
-    for fw, n in overall.most_common(20):
-        print(f"  {n:5d}  {fw}")
-
-    print("\ntop 10 per source:")
-    for src in ("claude-code", "claude-ai-export"):
-        c = Counter(r["first_word"] for r in rows if r["source"] == src)
-        if not c:
-            continue
-        print(f"  --- {src} ---")
-        for fw, n in c.most_common(10):
-            print(f"    {n:5d}  {fw}")
-
-    print("\nby model (claude-code only):")
-    m_counts: Counter[str] = Counter(
-        r["model"] or "(unknown)" for r in rows if r["source"] == "claude-code"
-    )
-    for m, n in m_counts.most_common():
-        print(f"  {m}: {n}")
-
-    print("\nper-model top-5 kaomoji:")
-    per_model: dict[str, Counter[str]] = defaultdict(Counter)
+    n_kaomoji = len(rows)
+    n_emissions = sum(int(r["count_total"]) for r in rows)
+    contributors: set[str] = set()
+    bundle_seen: set[tuple] = set()
+    provider_bundle_counts: Counter[str] = Counter()
+    version_bundle_counts: Counter[str] = Counter()
     for r in rows:
-        if r["source"] != "claude-code":
-            continue
-        per_model[r["model"] or "(unknown)"][r["first_word"]] += 1
-    for m, c in sorted(per_model.items(), key=lambda kv: -sum(kv[1].values())):
-        if sum(c.values()) < 20:
-            continue
-        print(f"  --- {m} ---")
-        for fw, n in c.most_common(5):
-            print(f"    {n:4d}  {fw}")
+        for d in r["descriptions"]:
+            contributors.add(d["contributor"])
+            # The per-canonical row doesn't expose bundle id directly,
+            # so use (contributor, providers tuple, llmoji_version) as
+            # a bundle fingerprint. Same machine running multiple
+            # `analyze` passes against different package versions
+            # counts as distinct bundles, which matches reality.
+            key = (
+                d["contributor"],
+                tuple(d.get("providers", [])),
+                d.get("llmoji_version", ""),
+            )
+            if key not in bundle_seen:
+                bundle_seen.add(key)
+                provider_key = "+".join(
+                    sorted(d.get("providers", []) or ["(none)"])
+                )
+                provider_bundle_counts[provider_key] += 1
+                version_bundle_counts[d.get("llmoji_version", "(unknown)")] += 1
 
-    print("\nper-month emission (yyyy-mm):")
-    per_month: Counter[str] = Counter()
-    for r in rows:
-        ts = r.get("timestamp") or ""
-        if len(ts) >= 7:
-            per_month[ts[:7]] += 1
-    for mm in sorted(per_month):
-        print(f"  {mm}: {per_month[mm]}")
+    print(f"canonical kaomoji: {n_kaomoji}")
+    print(f"total emissions:   {n_emissions}")
+    print(f"contributors:      {len(contributors)}")
+    print(f"bundles:           {len(bundle_seen)}")
+
+    print("\ntop 25 by total count:")
+    for r in rows[:25]:
+        print(
+            f"  {r['count_total']:5d}  {r['kaomoji']:<14}  "
+            f"({r['n_contributors']} contrib, {r['n_bundles']} bundles)"
+        )
+
+    print("\nbundles by provider mix:")
+    for k, v in provider_bundle_counts.most_common():
+        print(f"  {v:4d}  {k}")
+
+    print("\nbundles by llmoji version:")
+    for k, v in version_bundle_counts.most_common():
+        print(f"  {v:4d}  {k}")
+
+    print("\ncoverage histogram (n_contributors per kaomoji):")
+    cov: Counter[int] = Counter(r["n_contributors"] for r in rows)
+    for k in sorted(cov):
+        print(f"  {k} contributor(s): {cov[k]} kaomoji")
 
 
 if __name__ == "__main__":

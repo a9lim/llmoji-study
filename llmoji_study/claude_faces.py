@@ -1,22 +1,32 @@
 # pyright: reportArgumentType=false, reportAttributeAccessIssue=false, reportCallIssue=false, reportReturnType=false, reportPrivateImportUsage=false
-"""Per-kaomoji response-based embeddings.
+"""HF-corpus loaders + per-kaomoji description embeddings.
 
-For each unique first_word with count >= min_count, embed each
-occurrence's assistant_text (with the leading kaomoji stripped) using
-sentence-transformers/all-MiniLM-L6-v2, then mean-pool to a single
-384-dim vector per kaomoji. Eriskii-style analysis consumes these.
+Pre-refactor this module also did response-based embeddings on raw
+``data/claude_kaomoji.jsonl`` rows (whole assistant_text minus the
+leading kaomoji). Post-refactor that path is gone — the corpus is
+now the HF dataset ``a9lim/llmoji``, where every row is already
+pre-aggregated per-machine to ``(kaomoji, count, haiku_synthesis_description)``,
+so the only thing left to embed on the research side is the
+synthesized description string.
 
-Rationale for response-based (vs user-based): the user message is
-short and varied; the assistant's own text around the kaomoji is
-longer and carries the tonal context that drives which face was
-chosen. This matches option (B) in the design sketch.
+Public surface:
+
+  - :data:`EMBED_MODEL` / :data:`EMBED_DIM` — sentence-transformers
+    backbone, kept identical to the eriskii pipeline so axis vectors
+    line up.
+  - :func:`load_descriptions` — read
+    ``data/claude_descriptions.jsonl`` (the flat per-canonical output
+    of ``scripts/06_claude_hf_pull.py``).
+  - :func:`embed_descriptions` — for each kaomoji, embed every
+    per-bundle description, then weighted-mean by per-bundle count
+    and L2-renormalize. Returns ``(canonical_kaomoji, count_total, E)``.
+  - :func:`save_embeddings` / :func:`load_embeddings` — parquet round-trip.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
 from pathlib import Path
-from typing import Iterable
 
 import numpy as np
 import pandas as pd
@@ -26,131 +36,100 @@ EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 EMBED_DIM = 384
 
 
-@dataclass
-class KaomojiEmbed:
-    first_word: str
-    n: int
-    mean_embedding: np.ndarray  # shape (EMBED_DIM,)
+def load_descriptions(path: Path) -> list[dict]:
+    """Read the flat per-canonical-form JSONL emitted by
+    ``scripts/06_claude_hf_pull.py``.
+
+    Each row carries ``kaomoji`` (canonical), ``count_total``,
+    ``n_contributors``, ``n_bundles``, ``providers`` (list), and
+    ``descriptions`` (list of per-bundle dicts with
+    ``description``, ``count``, ``contributor``, ``providers``,
+    ``llmoji_version``).
+    """
+    rows: list[dict] = []
+    with path.open() as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            rows.append(json.loads(line))
+    return rows
 
 
-def _strip_leading(text: str, kaomoji: str) -> str:
-    """Remove a leading kaomoji occurrence from text so embeddings don't
-    collapse on the literal face string."""
-    stripped = text.lstrip()
-    if stripped.startswith(kaomoji):
-        return stripped[len(kaomoji):].lstrip()
-    return stripped
-
-
-def load_rows(path: Path) -> pd.DataFrame:
-    """Load data/claude_kaomoji.jsonl into a DataFrame."""
-    df: pd.DataFrame = pd.read_json(path, lines=True)
-    return df
-
-
-def compute_embeddings(
-    df: pd.DataFrame,
+def embed_descriptions(
+    rows: list[dict],
     *,
-    min_count: int = 3,
-    batch_size: int = 64,
     device: str | None = None,
     progress: bool = True,
-) -> list[KaomojiEmbed]:
-    """For each first_word with >= min_count rows, mean-pool an
-    embedding over its assistant_text occurrences (kaomoji stripped).
+) -> tuple[list[str], np.ndarray, np.ndarray]:
+    """For each canonical kaomoji, embed every per-bundle description
+    string, then weighted-mean by per-bundle count and L2-normalize.
 
-    Uses sentence-transformers on CPU by default. Pass device="mps"
-    on Apple Silicon for speed.
+    Returns ``(canonical_kaomoji, count_total, E)`` where ``E`` has
+    shape ``(n_kaomoji, EMBED_DIM)``.
     """
     from sentence_transformers import SentenceTransformer
 
-    counts = df["first_word"].value_counts()
-    keep = counts[counts >= min_count].index.tolist()
-    if not keep:
-        return []
-
-    sub = df[df["first_word"].isin(keep)].copy()
-    # strip leading kaomoji in place
-    sub["stripped"] = [
-        _strip_leading(str(t), str(fw))
-        for t, fw in zip(sub["assistant_text"], sub["first_word"])
-    ]
+    # Flatten to one row per (kaomoji, bundle-description) so we can
+    # batch a single encode call.
+    flat: list[tuple[int, str, int]] = []  # (parent_idx, text, count)
+    for i, r in enumerate(rows):
+        for d in r.get("descriptions", []):
+            text = (d.get("description") or "").strip()
+            if not text:
+                continue
+            count = int(d.get("count", 0))
+            flat.append((i, text, max(count, 1)))
+    if not flat:
+        return [], np.array([], dtype=int), np.empty((0, EMBED_DIM), dtype=float)
 
     model = SentenceTransformer(EMBED_MODEL, device=device)
-    texts: list[str] = sub["stripped"].tolist()
-    embs = model.encode(
-        texts,
-        batch_size=batch_size,
-        show_progress_bar=progress,
-        normalize_embeddings=True,
+    texts = [t for _, t, _ in flat]
+    embs = np.asarray(
+        model.encode(
+            texts,
+            batch_size=64,
+            show_progress_bar=progress,
+            normalize_embeddings=True,
+        ),
+        dtype=float,
     )
 
-    sub = sub.assign(emb_idx=range(len(sub)))
-    out: list[KaomojiEmbed] = []
-    for fw in keep:
-        idx = sub.loc[sub["first_word"] == fw, "emb_idx"].to_numpy()
-        if len(idx) == 0:
+    out_fw: list[str] = []
+    out_n: list[int] = []
+    out_E: list[np.ndarray] = []
+    for i, r in enumerate(rows):
+        idxs = [j for j, (pi, _, _) in enumerate(flat) if pi == i]
+        if not idxs:
             continue
-        mean = np.asarray(embs)[idx].mean(axis=0)
-        # renormalize the mean so cosine comparisons are well-behaved
-        norm = float(np.linalg.norm(mean))
+        weights = np.array([flat[j][2] for j in idxs], dtype=float)
+        weights = weights / weights.sum()
+        E_avg = (embs[idxs] * weights[:, None]).sum(axis=0)
+        norm = float(np.linalg.norm(E_avg))
         if norm > 0:
-            mean = mean / norm
-        out.append(KaomojiEmbed(first_word=str(fw), n=int(len(idx)), mean_embedding=mean))
-    return out
+            E_avg = E_avg / norm
+        out_fw.append(r["kaomoji"])
+        out_n.append(int(r.get("count_total", 0)))
+        out_E.append(E_avg)
+    return out_fw, np.asarray(out_n, dtype=int), np.asarray(out_E)
 
 
-def save_embeddings(embeds: Iterable[KaomojiEmbed], path: Path) -> None:
+def save_embeddings(
+    fw: list[str], n: np.ndarray, E: np.ndarray, path: Path,
+) -> None:
     """Persist per-kaomoji embeddings to parquet."""
     rows = []
-    for e in embeds:
-        row = {"first_word": e.first_word, "n": e.n}
-        for i, v in enumerate(e.mean_embedding.tolist()):
-            row[f"e{i:03d}"] = v
+    for fwi, ni, vec in zip(fw, n.tolist(), E.tolist()):
+        row = {"first_word": fwi, "n": int(ni)}
+        for k, v in enumerate(vec):
+            row[f"e{k:03d}"] = float(v)
         rows.append(row)
-    df = pd.DataFrame(rows)
-    df.to_parquet(path, index=False)
+    pd.DataFrame(rows).to_parquet(path, index=False)
 
 
 def load_embeddings(path: Path) -> tuple[list[str], np.ndarray, np.ndarray]:
-    """Return (first_words, counts, embedding matrix)."""
+    """Return ``(first_words, counts, embedding_matrix)``."""
     df: pd.DataFrame = pd.read_parquet(path)
     emb_cols = [c for c in df.columns if c.startswith("e") and c[1:].isdigit()]
     E = df[emb_cols].to_numpy(dtype=float)
     return df["first_word"].tolist(), df["n"].to_numpy(dtype=int), E
-
-
-def load_embeddings_canonical(
-    path: Path,
-) -> tuple[list[str], np.ndarray, np.ndarray]:
-    """Same as :func:`load_embeddings` but merges entries that
-    canonicalize to the same form via
-    :func:`llmoji.taxonomy.canonicalize_kaomoji`.
-
-    Counts (``n``) sum across variants; embeddings are averaged weighted
-    by ``n`` then re-L2-normalized so cosine comparisons remain
-    well-behaved. Returns ``(canonical_first_words, n, E)``.
-    """
-    from llmoji.taxonomy import canonicalize_kaomoji
-
-    df: pd.DataFrame = pd.read_parquet(path)
-    df["canonical"] = df["first_word"].map(canonicalize_kaomoji)
-    emb_cols = [c for c in df.columns if c.startswith("e") and c[1:].isdigit()]
-    out_fw: list[str] = []
-    out_n: list[int] = []
-    out_E: list[np.ndarray] = []
-    for canon, sub in df.groupby("canonical"):
-        n_total = int(sub["n"].sum())
-        weights = sub["n"].to_numpy(dtype=float)
-        if weights.sum() <= 0:
-            weights = np.ones_like(weights)
-        weights = weights / weights.sum()
-        E_sub = sub[emb_cols].to_numpy(dtype=float)
-        E_avg = (E_sub * weights[:, None]).sum(axis=0)
-        norm = float(np.linalg.norm(E_avg))
-        if norm > 0:
-            E_avg = E_avg / norm
-        out_fw.append(str(canon))
-        out_n.append(n_total)
-        out_E.append(E_avg)
-    return out_fw, np.array(out_n, dtype=int), np.asarray(out_E)

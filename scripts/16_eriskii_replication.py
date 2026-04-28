@@ -1,25 +1,36 @@
-"""Eriskii-replication step 3: analysis + figures.
+# pyright: reportArgumentType=false, reportAttributeAccessIssue=false, reportCallIssue=false, reportPrivateImportUsage=false
+"""Eriskii-replication: axis projection + Haiku-labeled clusters + writeup.
 
 Sections in build order:
-  - axis projection: data/eriskii_axes.tsv (TSV only — per-axis
-    ranked-bar figures dropped, the per-model / per-project
-    heatmaps already summarize axis structure)
-  - clusters: data/eriskii_clusters.tsv +
-    figures/eriskii_clusters_tsne.png
-  - per-model: data/eriskii_per_model.tsv +
-    figures/eriskii_per_model_axes_{mean,std}.png
-  - per-project: data/eriskii_per_project.tsv +
-    figures/eriskii_per_project_axes_{mean,std}.png
-  - mechanistic bridge: data/eriskii_user_kaomoji_axis_corr.tsv +
-    figures/eriskii_user_kaomoji_axis_corr.png
-  - narrative writeup: data/eriskii_comparison.md
+  - axis projection: ``data/eriskii_axes.tsv`` (per-kaomoji × 21 axes)
+  - clusters: ``data/eriskii_clusters.tsv`` +
+    ``figures/eriskii_clusters_tsne.png`` + interactive plotly HTML at
+    ``figures/claude_faces_interactive.html``
+  - narrative writeup: ``data/eriskii_comparison.md``
+
+Pre-2026-04-27, this script also produced
+``eriskii_per_model.tsv`` / ``eriskii_per_project.tsv`` and the
+``surrounding_user → kaomoji`` mechanistic-bridge correlation. Those
+all needed per-row ``model`` / ``project_slug`` / ``surrounding_user``
+fields, which only existed in the local-scrape pipeline. Post-refactor
+the corpus is the HF dataset ``a9lim/llmoji``, where every row is
+already pooled per-machine to ``(kaomoji, count, description)`` — so
+those analyses are gone. The eriskii axis projection + clustering
+pieces work fine on per-canonical descriptions alone and are kept.
+
+Inputs:
+  - ``data/claude_faces_embed_description.parquet`` (from script 15)
+  - ``data/claude_descriptions.jsonl`` (from script 06; for cluster-
+    label prompts, which need the description string per kaomoji)
 
 Usage:
-  python scripts/16_eriskii_replication.py
+    ANTHROPIC_API_KEY=... python scripts/16_eriskii_replication.py
 """
 
 from __future__ import annotations
 
+import json
+import os
 import sys
 from pathlib import Path
 
@@ -30,23 +41,27 @@ import pandas as pd
 
 from llmoji_study.claude_faces import EMBED_MODEL, load_embeddings
 from llmoji_study.config import (
+    CLAUDE_DESCRIPTIONS_PATH,
     CLAUDE_FACES_EMBED_DESCRIPTION_PATH,
-    CLAUDE_KAOMOJI_PATH,
     DATA_DIR,
     ERISKII_AXES,
     ERISKII_AXES_TSV,
+    ERISKII_CLUSTERS_TSV,
+    ERISKII_COMPARISON_MD,
     FIGURES_DIR,
+    HAIKU_MODEL_ID,
 )
-from llmoji_study.eriskii import compute_axis_vectors, project_onto_axes
-from llmoji_study.eriskii_anchors import AXIS_ANCHORS
+from llmoji_study.eriskii import (
+    compute_axis_vectors, label_cluster_via_haiku, project_onto_axes,
+)
+from llmoji_study.eriskii_anchors import AXIS_ANCHORS, CLUSTER_LABEL_PROMPT
 
 
 def _use_cjk_font() -> None:
     """Same fallback chain used in analysis.py / emotional_analysis.py /
-    09_claude_faces_plot.py — copy here for consistency."""
+    18_claude_faces_pca.py — keep these in sync."""
     import matplotlib
     import matplotlib.font_manager as fm
-    from pathlib import Path
     repo_root = Path(__file__).resolve().parent.parent
     emoji_font = repo_root / "data" / "fonts" / "NotoEmoji-Regular.ttf"
     if emoji_font.exists() and "Noto Emoji" not in {f.name for f in fm.fontManager.ttflist}:
@@ -65,15 +80,25 @@ def _use_cjk_font() -> None:
         matplotlib.rcParams["font.family"] = chain
 
 
+def _representative_descriptions(corpus_rows: list[dict]) -> dict[str, str]:
+    """Map canonical kaomoji → a single representative description
+    (the highest-count per-bundle synthesis). Used as the description
+    string passed to Haiku in the cluster-labeling prompt."""
+    out: dict[str, str] = {}
+    for r in corpus_rows:
+        descs = r.get("descriptions", [])
+        if not descs:
+            continue
+        # corpus rows are already sorted (-count, contributor) by the
+        # pull script, so the first entry is the most-evidenced one.
+        out[r["kaomoji"]] = descs[0]["description"]
+    return out
+
+
 def section_axes(
-    fw: list[str],
-    n: np.ndarray,
-    P: np.ndarray,
+    fw: list[str], n: np.ndarray, P: np.ndarray,
 ) -> pd.DataFrame:
-    """Write eriskii_axes.tsv. Per-axis ranked-bar PNGs intentionally
-    dropped — the per-model / per-project axis heatmaps already
-    summarize the same axis structure, and 21 single-axis bar charts
-    cluttered figures/ without adding insight."""
+    """Write eriskii_axes.tsv (one row per kaomoji × 21 axis cols)."""
     df = pd.DataFrame({"first_word": fw, "n": n})
     for j, name in enumerate(ERISKII_AXES):
         df[name] = P[:, j]
@@ -89,21 +114,11 @@ def section_clusters(
     E: np.ndarray,
     descriptions_by_fw: dict[str, str],
 ) -> pd.DataFrame:
-    """t-SNE + KMeans(k=15) + Haiku per-cluster labels.
-
-    `descriptions_by_fw` maps first_word → synthesized one-sentence
-    description (the Stage-B output of script 14)."""
-    import os
+    """t-SNE + KMeans(k=15) + Haiku per-cluster labels."""
     import anthropic
     import matplotlib.pyplot as plt
     from sklearn.cluster import KMeans
     from sklearn.manifold import TSNE
-
-    from llmoji_study.config import (
-        ERISKII_CLUSTERS_TSV, HAIKU_MODEL_ID,
-    )
-    from llmoji_study.eriskii import label_cluster_via_haiku
-    from llmoji_study.eriskii_anchors import CLUSTER_LABEL_PROMPT
 
     if not os.environ.get("ANTHROPIC_API_KEY"):
         print("ERROR: set ANTHROPIC_API_KEY in the environment first")
@@ -127,9 +142,7 @@ def section_clusters(
     cluster_rows = []
     for c in sorted(set(int(x) for x in clusters)):
         member_idx = [i for i, ci in enumerate(clusters) if int(ci) == c]
-        members: list[tuple[str, str]] = [
-            (fw[i], descriptions_by_fw.get(fw[i], "")) for i in member_idx
-        ]
+        members = [(fw[i], descriptions_by_fw.get(fw[i], "")) for i in member_idx]
         try:
             label = label_cluster_via_haiku(
                 client, members,
@@ -153,7 +166,7 @@ def section_clusters(
     df_clusters.to_csv(ERISKII_CLUSTERS_TSV, sep="\t", index=False)
     print(f"wrote {ERISKII_CLUSTERS_TSV}")
 
-    # labeled t-SNE figure
+    # Static labeled t-SNE figure.
     palette = plt.cm.tab20.colors + plt.cm.tab20b.colors
     fig, ax = plt.subplots(figsize=(14, 10))
     sizes = np.clip(15 + 60 * np.log1p(n), 15, 250)
@@ -161,14 +174,12 @@ def section_clusters(
     ax.scatter(xy[:, 0], xy[:, 1], c=colors, s=sizes, alpha=0.85,
                edgecolor="white", linewidth=0.4)
 
-    # annotate top-30 most frequent kaomoji
     top_idx = np.argsort(-n)[:30]
     for i in top_idx:
         ax.annotate(fw[i], xy=(xy[i, 0], xy[i, 1]),
                     xytext=(4, 4), textcoords="offset points",
                     fontsize=10, color="#222")
 
-    # cluster name at each cluster centroid
     for c in sorted(cluster_labels):
         mask = clusters == c
         cx = float(xy[mask, 0].mean())
@@ -188,8 +199,6 @@ def section_clusters(
     plt.close(fig)
     print(f"wrote {out}")
 
-    # Interactive plotly HTML — same xy, clusters, and Haiku labels as
-    # the static figure so hovering matches what's in eriskii_clusters_tsne.
     _write_interactive_clusters_html(
         xy, fw, n, clusters, cluster_labels, descriptions_by_fw,
         out_path=FIGURES_DIR / "claude_faces_interactive.html",
@@ -207,12 +216,9 @@ def _write_interactive_clusters_html(
     *,
     out_path: Path,
 ) -> None:
-    """Plotly HTML with the eriskii-clusters_tsne layout and clustering.
-
-    One trace per cluster so the legend toggles clusters on/off and the
-    Haiku-derived label appears in the legend. Hover shows the kaomoji,
-    cluster label, emission count, and (truncated) synthesized
-    description."""
+    """Plotly HTML mirroring the static eriskii_clusters_tsne.png
+    layout. One trace per cluster so the legend toggles clusters
+    on/off. Hover surfaces kaomoji + cluster + count + description."""
     try:
         import plotly.graph_objects as go
     except ImportError:
@@ -225,7 +231,6 @@ def _write_interactive_clusters_html(
         "#aec7e8", "#ffbb78", "#98df8a", "#ff9896", "#c5b0d5",
         "#c49c94", "#f7b6d2", "#dbdb8d", "#9edae5", "#ad494a",
     ]
-
     sizes = np.clip(8 + 6 * np.log1p(n), 8, 36)
 
     def _truncate(s: str, lim: int = 140) -> str:
@@ -277,169 +282,27 @@ def _write_interactive_clusters_html(
     print(f"wrote {out_path}")
 
 
-def _heatmap(
-    df_long: pd.DataFrame,
-    *,
-    group_col: str,
-    value_col: str,
-    out_path: Path,
-    title: str,
-):
-    """Pivot long-form to (group × axis), draw heatmap, save."""
-    import matplotlib.pyplot as plt
-    pivot = df_long.pivot(index=group_col, columns="axis", values=value_col)
-    # preserve canonical axis order
-    pivot = pivot[ERISKII_AXES]
-    pivot = pivot.sort_index()  # alphabetical groups; tweak if needed
-
-    fig, ax = plt.subplots(figsize=(13, max(2, 0.5 * len(pivot) + 2)))
-    vmin, vmax = float(np.nanmin(pivot.values)), float(np.nanmax(pivot.values))
-    if value_col == "mean":
-        # diverging: center at 0
-        vabs = max(abs(vmin), abs(vmax))
-        cmap = "RdBu_r"
-        im = ax.imshow(pivot.values, cmap=cmap, vmin=-vabs, vmax=vabs, aspect="auto")
-    else:
-        cmap = "viridis"
-        im = ax.imshow(pivot.values, cmap=cmap, vmin=vmin, vmax=vmax, aspect="auto")
-    ax.set_xticks(range(len(ERISKII_AXES)))
-    ax.set_xticklabels(ERISKII_AXES, rotation=45, ha="right")
-    ax.set_yticks(range(len(pivot)))
-    ax.set_yticklabels(pivot.index)
-    ax.set_title(title)
-    fig.colorbar(im, ax=ax, shrink=0.8)
-    # annotate cells
-    for i in range(pivot.shape[0]):
-        for j in range(pivot.shape[1]):
-            ax.text(j, i, f"{pivot.values[i, j]:+.2f}", ha="center", va="center",
-                    fontsize=7, color="black")
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    print(f"wrote {out_path}")
-
-
-def section_per_model(rows: pd.DataFrame, axes_df: pd.DataFrame) -> pd.DataFrame:
-    from llmoji_study.config import ERISKII_PER_MODEL_TSV
-    from llmoji_study.eriskii import weighted_group_axis_stats
-    # Claude-side sources only (exclude codex-hook). Schema post-2026-04-27
-    # unified-journal refactor: source ∈ {claude-hook, claude-ai-export,
-    # codex-hook}. Pre-refactor this filter was source == "claude-code".
-    cc = rows[rows["source"].isin(["claude-hook", "claude-ai-export"])].copy()
-    cc["model"] = cc["model"].fillna("(unknown)")
-    df = weighted_group_axis_stats(
-        cc, axes_df,
-        group_col="model", axis_names=ERISKII_AXES, min_emissions=10,
-    )
-    df.to_csv(ERISKII_PER_MODEL_TSV, sep="\t", index=False)
-    print(f"wrote {ERISKII_PER_MODEL_TSV}")
-    if not df.empty:
-        _heatmap(df, group_col="model", value_col="mean",
-                 out_path=FIGURES_DIR / "eriskii_per_model_axes_mean.png",
-                 title="per-model axis mean (claude-code only, n≥10 emissions)")
-        _heatmap(df, group_col="model", value_col="std",
-                 out_path=FIGURES_DIR / "eriskii_per_model_axes_std.png",
-                 title="per-model axis std (range)")
-    return df
-
-
-def section_per_project(rows: pd.DataFrame, axes_df: pd.DataFrame) -> pd.DataFrame:
-    from llmoji_study.config import ERISKII_PER_PROJECT_TSV
-    from llmoji_study.eriskii import weighted_group_axis_stats
-    # Same Claude-side filter as section_per_model — see note there.
-    cc = rows[rows["source"].isin(["claude-hook", "claude-ai-export"])].copy()
-    df = weighted_group_axis_stats(
-        cc, axes_df,
-        group_col="project_slug", axis_names=ERISKII_AXES,
-        min_emissions=10,
-    )
-    df.to_csv(ERISKII_PER_PROJECT_TSV, sep="\t", index=False)
-    print(f"wrote {ERISKII_PER_PROJECT_TSV}")
-    if not df.empty:
-        _heatmap(df, group_col="project_slug", value_col="mean",
-                 out_path=FIGURES_DIR / "eriskii_per_project_axes_mean.png",
-                 title="per-project axis mean (n≥10 emissions)")
-        _heatmap(df, group_col="project_slug", value_col="std",
-                 out_path=FIGURES_DIR / "eriskii_per_project_axes_std.png",
-                 title="per-project axis std (range)")
-    return df
-
-
-def section_bridge(rows: pd.DataFrame, axes_df: pd.DataFrame) -> pd.DataFrame:
-    import matplotlib.pyplot as plt
-    from sentence_transformers import SentenceTransformer
-
-    from llmoji_study.config import ERISKII_USER_KAOMOJI_CORR_TSV
-    from llmoji_study.eriskii import user_kaomoji_axis_correlation
-
-    embedder = SentenceTransformer(EMBED_MODEL)
-    df = user_kaomoji_axis_correlation(
-        rows, axes_df,
-        embedder=embedder, axis_anchors=AXIS_ANCHORS, axis_order=ERISKII_AXES,
-    )
-    df.to_csv(ERISKII_USER_KAOMOJI_CORR_TSV, sep="\t", index=False)
-    print(f"wrote {ERISKII_USER_KAOMOJI_CORR_TSV}")
-
-    if df.empty:
-        print("  no rows with surrounding_user; skipping figure")
-        return df
-
-    fig, ax = plt.subplots(figsize=(8, 6))
-    df_sorted = df.sort_values("r", ascending=True)
-    ax.barh(df_sorted["axis"], df_sorted["r"],
-            color=["#444" if pb < 0.05 else "#bbb"
-                   for pb in df_sorted["p_bonf"]])
-    ax.axvline(0, color="black", linewidth=0.5)
-    ax.set_xlabel("Pearson r (user-text axis projection × kaomoji axis projection)")
-    n_used = int(df["n"].iloc[0]) if len(df) else 0
-    ax.set_title(f"surrounding_user → kaomoji axis correlation\n"
-                 f"n={n_used}; dark bars: p_bonf < 0.05 (Bonferroni across 21 axes)")
-    fig.tight_layout()
-    out = FIGURES_DIR / "eriskii_user_kaomoji_axis_corr.png"
-    fig.savefig(out, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    print(f"wrote {out}")
-    return df
-
-
 def section_writeup(
     df_axes: pd.DataFrame,
     df_clusters: pd.DataFrame,
-    df_per_model: pd.DataFrame,
-    df_per_project: pd.DataFrame,
-    df_bridge: pd.DataFrame,
+    corpus_rows: list[dict],
 ) -> None:
-    from llmoji_study.config import ERISKII_COMPARISON_MD
-
-    # Top-N kaomoji from our data (by emission count).
+    """Narrative comparison vs eriskii's published page."""
     top_us = df_axes.nlargest(20, "n")[["first_word", "n"]].copy()
     top_us["pct"] = (top_us["n"] / df_axes["n"].sum() * 100).round(1)
 
-    # Eriskii's published top-20 kaomoji + frequencies (from the page text).
     eriskii_top20 = [
-        ("(´・ω・`)", 248, "7.4"),
-        ("(・ω・)",   213, "6.3"),
-        ("(・∀・)",   194, "5.8"),
-        ("(◕‿◕)",    145, "4.3"),
-        ("(´-ω-`)",  120, "3.6"),
-        ("(￣▽￣)",   84,  "2.5"),
-        ("(｀・ω・´)", 74,  "2.2"),
-        ("(⊙_⊙)",    63,  "1.9"),
-        ("(・ω・)ノ", 60,  "1.8"),
-        ("(°△°)",    57,  "1.7"),
-        ("(╯°□°)╯︵ ┻━┻", 56, "1.7"),
-        ("(・_・)",   52,  "1.5"),
-        ("(・_・;)",  51,  "1.5"),
-        ("(￣ω￣)",   51,  "1.5"),
-        ("(☆▽☆)",    50,  "1.5"),
-        ("(；・∀・)", 39,  "1.2"),
-        ("(・_・ )",  38,  "1.1"),
-        ("(・_・?)",  36,  "1.1"),
-        ("(◕‿◕✿)",   36,  "1.1"),
-        ("(・・?)",   31,  "0.9"),
+        ("(´・ω・`)", 248, "7.4"), ("(・ω・)", 213, "6.3"),
+        ("(・∀・)",   194, "5.8"), ("(◕‿◕)",  145, "4.3"),
+        ("(´-ω-`)",  120, "3.6"), ("(￣▽￣)",  84,  "2.5"),
+        ("(｀・ω・´)", 74, "2.2"), ("(⊙_⊙)",   63,  "1.9"),
+        ("(・ω・)ノ", 60, "1.8"), ("(°△°)",    57,  "1.7"),
+        ("(╯°□°)╯︵ ┻━┻", 56, "1.7"), ("(・_・)", 52, "1.5"),
+        ("(・_・;)",  51, "1.5"), ("(￣ω￣)",   51,  "1.5"),
+        ("(☆▽☆)",    50, "1.5"), ("(；・∀・)", 39,  "1.2"),
+        ("(・_・ )",  38, "1.1"), ("(・_・?)",  36,  "1.1"),
+        ("(◕‿◕✿)",   36, "1.1"), ("(・・?)",   31,  "0.9"),
     ]
-
-    # Eriskii's full 15 cluster labels (visible on the page).
     eriskii_clusters = [
         "Warm reassuring support (50 faces)",
         "Warm supportive affirmation (37 faces)",
@@ -472,21 +335,33 @@ def section_writeup(
             overlap.append((fw, en, ept, 0, 0.0, 0.0, False))
     overlap_count = sum(1 for *_, present in overlap if present)
 
+    n_contributors = len({d["contributor"]
+                          for r in corpus_rows for d in r["descriptions"]})
+
     lines: list[str] = []
     lines.append("# Eriskii-replication: narrative comparison")
     lines.append("")
-    lines.append("Generated by `scripts/16_eriskii_replication.py`. Pre-registration record: `docs/superpowers/specs/2026-04-24-eriskii-replication-design.md`.")
+    lines.append(
+        "Generated by `scripts/16_eriskii_replication.py` from the "
+        "`a9lim/llmoji` HuggingFace dataset (contributor-submitted "
+        "kaomoji corpus, Haiku-synthesized per-face meanings)."
+    )
+    lines.append("")
+    lines.append(
+        f"Corpus snapshot: {len(corpus_rows)} canonical kaomoji from "
+        f"{n_contributors} contributor(s)."
+    )
     lines.append("")
     lines.append("## Methodology recap")
     lines.append("")
     lines.append("Replicates eriskii.net/projects/claude-faces' two-stage pipeline:")
-    lines.append("1. Stage A: per kaomoji, sample up to 4 instances; mask the leading kaomoji with `[FACE]`; ask Haiku to describe what the masked face conveys.")
-    lines.append("2. Stage B: per kaomoji, synthesize the per-instance descriptions into one canonical one-sentence meaning.")
-    lines.append("3. Embed each synthesis with sentence-transformers/all-MiniLM-L6-v2.")
+    lines.append("1. Stage A (contributor-side, in the `llmoji` package): per kaomoji, sample up to 4 instances; mask the leading kaomoji with `[FACE]`; ask Haiku to describe what the masked face conveys.")
+    lines.append("2. Stage B (contributor-side): per kaomoji, synthesize the per-instance descriptions into one canonical one-sentence meaning. The synthesis is what ships to the HF dataset.")
+    lines.append("3. (Here) embed each per-bundle synthesis with sentence-transformers/all-MiniLM-L6-v2; weighted-mean by per-bundle count across contributors; L2-normalize.")
     lines.append("4. Project onto eriskii's 21 semantic axes (Warmth, Energy, …, Exhaustion).")
     lines.append("5. t-SNE + KMeans(k=15); Haiku per-cluster labels.")
     lines.append("")
-    lines.append("Beyond eriskii: per-model axis breakdowns (eriskii's data lacked model info) + per-project axis breakdowns + mechanistic surrounding-user → kaomoji axis-correlation bridge.")
+    lines.append("Pre-2026-04-27 we also ran per-model and per-project axis breakdowns plus a `surrounding_user → kaomoji` axis-correlation bridge from a local Claude.ai-export + journal scrape. The HF corpus pools per-machine before upload, so per-row model / project / user-text isn't available and those breakdowns are gone.")
     lines.append("")
     lines.append(f"## Top-20 frequency overlap with eriskii: {overlap_count}/20")
     lines.append("")
@@ -527,47 +402,13 @@ def section_writeup(
                      f"{r['label']} | {members} |")
     lines.append("")
 
-    lines.append("## Per-model axis means (claude-code only, n≥10 emissions)")
-    lines.append("")
-    if not df_per_model.empty:
-        pivot = df_per_model.pivot(index="model", columns="axis", values="mean")
-        pivot = pivot[ERISKII_AXES]
-        lines.append("| model | " + " | ".join(ERISKII_AXES) + " |")
-        lines.append("|" + "---|" * (len(ERISKII_AXES) + 1))
-        for m in pivot.index:
-            cells = [f"{pivot.loc[m, a]:+.2f}" for a in ERISKII_AXES]
-            lines.append(f"| {m} | " + " | ".join(cells) + " |")
-        lines.append("")
-        # per-model std summary
-        std_pivot = df_per_model.pivot(index="model", columns="axis", values="std")
-        avg_std = std_pivot.mean(axis=1).sort_values(ascending=False)
-        lines.append("**Per-model average std across all 21 axes** (operationalizes eriskii's qualitative \"opus-4-6 had wider range\" claim):")
-        lines.append("")
-        lines.append("| model | mean axis std |")
-        lines.append("|---|---|")
-        for m, s in avg_std.items():
-            lines.append(f"| {m} | {s:.4f} |")
-        lines.append("")
-
-    lines.append("## Mechanistic bridge: surrounding_user → kaomoji axis correlation")
-    lines.append("")
-    if not df_bridge.empty:
-        lines.append("| axis | Pearson r | p | p_bonf | n |")
-        lines.append("|---|---|---|---|---|")
-        for _, r in df_bridge.sort_values("r", ascending=False).iterrows():
-            sig = "**" if r["p_bonf"] < 0.05 else ""
-            lines.append(f"| {r['axis']} | {sig}{r['r']:+.3f}{sig} | "
-                         f"{r['p']:.3g} | {r['p_bonf']:.3g} | {int(r['n'])} |")
-        lines.append("")
-        lines.append("Bold = passes Bonferroni correction across 21 axes (p_bonf < 0.05). Reading: significant positive r on (e.g.) Warmth would mean warmer user messages elicit warmer kaomoji. Caveat: user-text and kaomoji-description embeddings live in the same MiniLM space, so correlation is at-best evidence of register-tracking, not direct evidence of internal state.")
-        lines.append("")
-
     lines.append("## Caveats and known limitations")
     lines.append("")
     lines.append("- **Wetness anchor is a9lim's enrichment, not eriskii's**. Eriskii explicitly used the bare strings `wetness ↔ dryness` ('three seashells' joke; intentionally undefined). Our anchor reads 'waxing poetic about emotions, lyrical and self-expressive ↔ helpful assistant tone, task-focused, businesslike'. Wetness rankings are accordingly more meaningful than eriskii's but not directly comparable.")
     lines.append("- **Eriskii's per-kaomoji cluster assignments are not public** — comparison is theme-level only.")
     lines.append("- **The mask token `[FACE]` is sometimes referenced literally** in Haiku descriptions. Stage-B synthesis usually corrects for this but a few descriptions retain artifacts.")
-    lines.append("- **Cross-pipeline embedding methodology**: eriskii embeds Haiku-synthesized meaning; we follow the same pipeline. The response-based embedding (`data/claude_faces_embed.parquet`) is preserved for future ad-hoc comparison.")
+    lines.append("- **Per-machine pooling already happened on the contributor side.** Counts here are sums of per-bundle counts; a single heavy contributor can swing a face's rank. The corpus is small (n<1K canonical kaomoji as of writing) so this is worth watching.")
+    lines.append("- **Per-model and per-project axis breakdowns are gone.** They needed per-row metadata that the HF dataset doesn't carry. If we want them back, the right move is a separate research-side scrape of a single contributor's local journal — not adding fields to the public dataset.")
     lines.append("")
 
     ERISKII_COMPARISON_MD.write_text("\n".join(lines) + "\n")
@@ -576,15 +417,34 @@ def section_writeup(
 
 def main() -> None:
     if not CLAUDE_FACES_EMBED_DESCRIPTION_PATH.exists():
-        print(f"no embeddings at {CLAUDE_FACES_EMBED_DESCRIPTION_PATH}; "
-              "run scripts/15 first")
+        print(
+            f"no embeddings at {CLAUDE_FACES_EMBED_DESCRIPTION_PATH}; "
+            "run scripts/15 first"
+        )
         sys.exit(1)
+    if not CLAUDE_DESCRIPTIONS_PATH.exists():
+        print(
+            f"no corpus at {CLAUDE_DESCRIPTIONS_PATH}; "
+            "run scripts/06_claude_hf_pull.py first"
+        )
+        sys.exit(1)
+
     _use_cjk_font()
 
-    print("loading description embeddings (canonicalized)...")
-    from llmoji_study.claude_faces import load_embeddings_canonical
-    fw, n, E = load_embeddings_canonical(CLAUDE_FACES_EMBED_DESCRIPTION_PATH)
+    print("loading description embeddings...")
+    fw, n, E = load_embeddings(CLAUDE_FACES_EMBED_DESCRIPTION_PATH)
     print(f"  {len(fw)} canonical kaomoji, {E.shape[1]}-dim")
+
+    print("loading raw corpus (for cluster-label descriptions)...")
+    corpus_rows: list[dict] = []
+    with CLAUDE_DESCRIPTIONS_PATH.open() as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            corpus_rows.append(json.loads(line))
+    descriptions_by_fw = _representative_descriptions(corpus_rows)
+    print(f"  {len(descriptions_by_fw)} representative descriptions")
 
     print("computing axis vectors...")
     from sentence_transformers import SentenceTransformer
@@ -598,53 +458,10 @@ def main() -> None:
     df_axes = section_axes(fw, n, P)
 
     print("\n=== Section: clusters ===")
-    # synthesized descriptions: one canonical string per kaomoji
-    import json
-    from llmoji_study.config import CLAUDE_HAIKU_SYNTHESIZED_PATH
-    # Canonicalize the synthesized-description keys; on collision keep
-    # the description from the variant with the most contributing
-    # instances (n_descriptions). Mirrors the n-weighted merge that
-    # load_embeddings_canonical does for the embedding side.
-    from llmoji.taxonomy import canonicalize_kaomoji
-    desc_candidates: dict[str, list[tuple[int, str]]] = {}
-    with open(CLAUDE_HAIKU_SYNTHESIZED_PATH) as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            r = json.loads(line)
-            if "error" in r:
-                continue
-            canon = canonicalize_kaomoji(r["first_word"])
-            desc_candidates.setdefault(canon, []).append(
-                (int(r.get("n_descriptions", 1)), str(r["synthesized"])),
-            )
-    descriptions_by_fw: dict[str, str] = {
-        canon: max(cands, key=lambda c: c[0])[1]
-        for canon, cands in desc_candidates.items()
-    }
     df_clusters = section_clusters(fw, n, E, descriptions_by_fw)
 
-    print("\n=== Section: per-model ===")
-    rows = pd.read_json(CLAUDE_KAOMOJI_PATH, lines=True)
-    # Canonicalize first_word so per-model / per-project / bridge joins
-    # against df_axes (which is canonical) work correctly. Original
-    # first_word preserved as first_word_raw for audit.
-    rows = rows.assign(
-        first_word_raw=rows["first_word"],
-        first_word=rows["first_word"].map(
-            lambda s: canonicalize_kaomoji(s) if isinstance(s, str) else s,
-        ),
-    )
-    df_per_model = section_per_model(rows, df_axes)
-    print("\n=== Section: per-project ===")
-    df_per_project = section_per_project(rows, df_axes)
-
-    print("\n=== Section: mechanistic bridge ===")
-    df_bridge = section_bridge(rows, df_axes)
-
     print("\n=== Section: writeup ===")
-    section_writeup(df_axes, df_clusters, df_per_model, df_per_project, df_bridge)
+    section_writeup(df_axes, df_clusters, corpus_rows)
 
 
 if __name__ == "__main__":

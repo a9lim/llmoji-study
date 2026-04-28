@@ -1,51 +1,46 @@
 """Eriskii-style PCA chart of Claude's kaomoji vocabulary.
 
-Counterpart to scripts/09_claude_faces_plot.py (t-SNE) and
-scripts/16_eriskii_replication.py (axis projections). Reads the
-description-based per-kaomoji embeddings (claude_faces_embed_description
-.parquet — eriskii's pipeline: each kaomoji embedded by its haiku-
-synthesized meaning), canonicalizes near-duplicate forms via
-``llmoji.taxonomy.canonicalize_kaomoji`` (NFKC + arm-modifier strip),
-fits PCA on the merged per-canonical embeddings, and plots a 2D
-scatter with HDBSCAN clusters and frequency-sized markers.
+Counterpart to ``scripts/16_eriskii_replication.py`` (axis projection +
+t-SNE). Reads the description-based per-canonical-kaomoji embeddings
+from script 15, fits PCA on those embeddings, and plots a 2D scatter
+with HDBSCAN clusters and frequency-sized markers.
 
 Two panels:
   1. PC1 vs PC2 with HDBSCAN clusters (auto-k) — main figure.
   2. PC1 vs PC2 with KMeans(k=15) — parity with eriskii's published
      panel.
 
-Output: figures/claude_faces_pca.png
+Output: ``figures/claude_faces_pca.png``
+
+Pre-2026-04-27 this script also pulled per-canonical raw emission
+counts from ``data/claude_kaomoji.jsonl``. Post-refactor that file is
+gone — counts come from the parquet's ``n`` column, which is already
+``count_total`` from the HF corpus pull.
 """
 
 from __future__ import annotations
 
 import sys
-from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 
-from llmoji_study.claude_faces import load_embeddings_canonical
+from llmoji_study.claude_faces import load_embeddings
 from llmoji_study.config import (
     CLAUDE_FACES_EMBED_DESCRIPTION_PATH,
-    CLAUDE_KAOMOJI_PATH,
     FIGURES_DIR,
 )
-from llmoji.taxonomy import canonicalize_kaomoji
 
 
 def _use_cjk_font() -> None:
-    """Synced with llmoji/analysis.py, llmoji/emotional_analysis.py,
-    scripts/09_claude_faces_plot.py, scripts/16_eriskii_replication.py
-    — keep these five chains in sync."""
+    """Synced with llmoji_study/analysis.py, llmoji_study/emotional_analysis.py,
+    scripts/16_eriskii_replication.py — keep these chains in sync."""
     import matplotlib.font_manager as fm
-    from pathlib import Path
     repo_root = Path(__file__).resolve().parent.parent
     emoji_font = repo_root / "data" / "fonts" / "NotoEmoji-Regular.ttf"
     if emoji_font.exists() and "Noto Emoji" not in {f.name for f in fm.fontManager.ttflist}:
@@ -58,16 +53,6 @@ def _use_cjk_font() -> None:
         "DejaVu Serif", "Tahoma", "Noto Sans Canadian Aboriginal",
         "Heiti TC", "Noto Emoji", "Helvetica Neue",
     ]
-
-
-def emission_frequencies(claude_kaomoji_path: Path) -> Counter[str]:
-    """Per-canonical-kaomoji emission count from the raw scrape."""
-    counter: Counter[str] = Counter()
-    rows = pd.read_json(claude_kaomoji_path, lines=True)
-    for fw in rows["first_word"]:
-        if isinstance(fw, str) and fw:
-            counter[canonicalize_kaomoji(fw)] += 1
-    return counter
 
 
 def _hdbscan_labels(E: np.ndarray, min_cluster_size: int = 5) -> np.ndarray:
@@ -92,8 +77,8 @@ def _scatter_panel(
     palette: list[str] | None = None,
     annotate_top: int = 30,
 ) -> None:
-    """Draw a single PCA panel: dots sized by log frequency, coloured
-    by cluster label (-1 = noise = light gray), top-N labelled."""
+    """Single PCA panel: dots sized by log frequency, colored by
+    cluster label (-1 = noise = light gray), top-N annotated."""
     unique = sorted(set(labels.tolist()))
     if palette is None:
         cmap = plt.get_cmap("tab20")
@@ -135,21 +120,10 @@ def main() -> None:
         sys.exit(1)
     _use_cjk_font()
 
-    print("loading description embeddings (canonicalized)...")
-    fw, n_desc, E = load_embeddings_canonical(CLAUDE_FACES_EMBED_DESCRIPTION_PATH)
+    print("loading description embeddings...")
+    fw, n, E = load_embeddings(CLAUDE_FACES_EMBED_DESCRIPTION_PATH)
     print(f"  {len(fw)} canonical kaomoji")
-
-    # n in claude_faces_embed_description.parquet is "n_descriptions" — how
-    # many per-instance haiku passes contributed to the synthesis. For
-    # marker sizing we want emission frequency from the raw scrape.
-    print("loading raw emission frequencies...")
-    freq = emission_frequencies(CLAUDE_KAOMOJI_PATH)
-    n_emit = np.array([freq.get(f, 0) for f in fw], dtype=int)
-    if (n_emit == 0).any():
-        # Fall back to n_descriptions if some canonical forms aren't in
-        # the raw scrape (shouldn't happen, but defensive).
-        n_emit = np.where(n_emit > 0, n_emit, n_desc)
-    print(f"  total emissions across {len(fw)} canonical kaomoji: {int(n_emit.sum())}")
+    print(f"  total emissions across canonical kaomoji: {int(n.sum())}")
 
     print("fitting PCA...")
     pca = PCA(n_components=2)
@@ -175,7 +149,7 @@ def main() -> None:
     fig, axes = plt.subplots(1, 2, figsize=(20, 9))
 
     _scatter_panel(
-        axes[0], coords, fw, n_emit, hdb_labels,
+        axes[0], coords, fw, n, hdb_labels,
         title=(
             f"Claude faces — description-PCA, HDBSCAN\n"
             f"{len(fw)} canonical kaomoji, {n_hdb} clusters + "
@@ -183,7 +157,7 @@ def main() -> None:
         ),
     )
     _scatter_panel(
-        axes[1], coords, fw, n_emit, km_labels,
+        axes[1], coords, fw, n, km_labels,
         title=(
             f"Claude faces — description-PCA, KMeans (k=15)\n"
             f"parity with eriskii's published panel"

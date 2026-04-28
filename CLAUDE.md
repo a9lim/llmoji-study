@@ -54,18 +54,32 @@ multi-model parameterization via `LLMOJI_MODEL=qwen|ministral|gemma`.
 v1/v2 re-run not yet done — pre-registered as gated on v3 hidden-
 state findings, which now justify it but no urgent need.
 
-Claude-faces corpus mechanic refactored 2026-04-27: cooperating Stop
-hooks at `~/.claude/hooks/kaomoji-log.sh` and
-`~/.codex/hooks/kaomoji-log.sh` append a unified-schema row to a
-per-agent journal on every kaomoji-bearing assistant turn. A one-shot
-backfill (`scripts/21_backfill_journals.py`) replays history into the
-same journals, so they're the **single source of truth** for every
-agent assistant turn — Claude *and* Codex. Drops the legacy
-transcript-walking adapter (`claude_code_source.py` deleted). Scrape
-splits into per-source files (`claude_kaomoji_{export,hook}.jsonl`)
-+ merged view; only what changed re-runs. 647 merged rows post-refactor
-(was 436 pre-refactor) — most of the bump is codex history finally
-captured.
+Claude-faces pipeline migrated to the HF dataset 2026-04-27: the
+research side now pulls from
+[`a9lim/llmoji`](https://huggingface.co/datasets/a9lim/llmoji)
+instead of scraping local Claude.ai exports + ~/.claude / ~/.codex
+journals. The local-scrape pipeline (cooperating Stop hooks,
+backfill, two-stage Haiku) now lives entirely contributor-side in
+the `llmoji` PyPI package, which writes Haiku-synthesized bundles to
+the HF dataset. `scripts/06_claude_hf_pull.py` snapshot-downloads,
+pools by canonical kaomoji form across contributors, and emits
+`data/claude_descriptions.jsonl` for the rest of the pipeline.
+
+What this means in practice:
+- Deleted: `scripts/{05_claude_vocab_sample,06_claude_scrape,
+  08_claude_faces_embed,09_claude_faces_plot,14_claude_haiku_describe,
+  21_backfill_journals,22_resync_haiku_canonical}.py`. Their
+  responsibilities are either gone (response-based embedding,
+  per-instance Haiku) or moved to the package (backfill, scrape,
+  Haiku synthesis).
+- Pre-refactor `claude_kaomoji_{export,hook}.jsonl` and
+  `claude_haiku_{descriptions,synthesized}.jsonl` are gone from
+  `data/`. The HF corpus is the single source of truth.
+- Eriskii pipeline drops `per-model`, `per-project`, and
+  `surrounding_user → kaomoji` bridge sections. The HF dataset
+  pools per-machine before upload; per-row model / project / user-
+  text isn't there. Top-20 frequency overlap, KMeans clusters with
+  Haiku labels, axis projection: kept.
 
 v1.0 package split landed 2026-04-27: `llmoji` (the PyPI package) now
 owns taxonomy / canonicalization / hook templates / scrape sources /
@@ -278,47 +292,48 @@ only.
   bracket-start compliance is 100% — but worth flagging in
   Gotchas if a v3 Ministral run is greenlit.
 
-### Claude-faces — journal-driven scrape (non-gemma, non-steering)
+### Claude-faces — HF-corpus-driven (non-gemma, non-steering)
 
-Two cooperating Stop hooks (`~/.claude/hooks/kaomoji-log.sh`,
-`~/.codex/hooks/kaomoji-log.sh`) append a unified-schema JSONL row
-per kaomoji-bearing assistant turn to a per-agent journal
-(`~/.claude/kaomoji-journal.jsonl`, `~/.codex/kaomoji-journal.jsonl`).
-History gets replayed into the same journals via
-`scripts/21_backfill_journals.py` (one-shot; pause active sessions
-during the run). 
+Pulled from `a9lim/llmoji` on HuggingFace. Layout:
+`contributors/<32-hex>/bundle-<UTC>/{manifest.json,descriptions.jsonl}`,
+one bundle per `llmoji upload --target hf` from the contributor
+side. Each `descriptions.jsonl` row carries
+`(kaomoji, count, haiku_synthesis_description, llmoji_version)`,
+already pre-aggregated per-machine to one row per canonical face.
 
-Unified row schema (6 fields, source inferred from journal path):
-`ts, model, cwd, kaomoji, user_text, assistant_text`. `kaomoji` is
-the leading non-letter prefix, ≥2 bytes, first char ∈
-`KAOMOJI_START_CHARS` (rows that fail the check aren't written).
-`assistant_text` has the leading kaomoji + surrounding whitespace
-stripped. `user_text` is the latest *real* human-typed prompt:
-sidechain (subagent) turns are dropped at write time on the Claude
-side via `isSidechain`; system-injected user-role payloads are
-filtered (Claude: `"Base directory for this skill:"`; Codex:
-`# AGENTS.md`, `<environment_context>`, `<INSTRUCTIONS>`).
+Pipeline:
 
-Scrape (`scripts/06_claude_scrape.py`) splits into per-source files
-— `data/claude_kaomoji_{export,hook}.jsonl` — and rewrites the
-merged `data/claude_kaomoji.jsonl` (export + hook) at the end.
-Default re-runs both cheap sources; pass `export` or `hook` to
-limit. **647 merged rows / 156 canonical kaomoji** post-refactor
-(587 claude-hook + 14 codex-hook + 46 export). Codex turns enter
-the corpus for the first time at this refactor.
+1. `scripts/06_claude_hf_pull.py`: `huggingface_hub.snapshot_download`
+   into `data/hf_dataset/` (gitignored), walk every bundle,
+   canonicalize each kaomoji form, pool by canonical form across
+   contributors. Output: `data/claude_descriptions.jsonl`, one row
+   per canonical form with `count_total`, `n_contributors`,
+   `n_bundles`, `providers`, and a sorted list of per-bundle
+   descriptions.
+2. `scripts/07_claude_kaomoji_basics.py`: descriptive stats
+   (top-25, contributor and bundle counts, provider mix,
+   coverage histogram).
+3. `scripts/15_claude_faces_embed_description.py`: embed every
+   per-bundle description with `all-MiniLM-L6-v2`, weighted-mean
+   by per-bundle count, L2-normalize. Output:
+   `data/claude_faces_embed_description.parquet`.
+4. `scripts/16_eriskii_replication.py`: project onto 21 axes,
+   t-SNE plus KMeans(k=15), Haiku per-cluster labels,
+   `data/eriskii_comparison.md`.
+5. `scripts/18_claude_faces_pca.py`: PCA panel.
 
-Eriskii-replication adds two-stage haiku description (per-instance
-descriptions → per-kaomoji synthesis → MiniLM embedding) projected
-onto 21 anchored axes (warmth, energy, …).
-
-**Highlights:** top-20 frequency overlap with eriskii's published
-top-20 is 16/20. Per-model axis breakouts confirm eriskii's
-qualitative "opus-4-6 had wider range" claim numerically (mean axis
-std opus-4-6 0.067 > opus-4-7 0.066 > sonnet-4-6 0.063). Mechanistic
-bridge (surrounding_user → kaomoji axis correlation): 2/21 axes
-survive Bonferroni at α=0.05/21 — surprise (r=+0.20) and curiosity
-(r=+0.18). Affective axes are null — MiniLM on user text picks up
-novelty/unexpectedness, not valence-tracking.
+Pre-refactor highlights (single-machine local scrape, 647
+emissions, 156 canonical kaomoji): top-20 frequency overlap with
+eriskii's published top-20 was 16/20, and the 15 KMeans cluster
+themes lined up with eriskii's 15 at the register level.
+Per-model axis breakdowns and the
+`surrounding_user → kaomoji axis correlation` bridge analysis
+needed per-row `model` / `project_slug` / `surrounding_user`
+fields that the HF dataset doesn't carry (everything is pooled
+per-machine before upload), so those analyses are gone.
+Multi-contributor numbers will land once the dataset has more
+bundles. `docs/harness-side.md` has the full methodology and the
+historical pre-refactor numbers.
 
 ## Hidden-state pipeline
 
@@ -388,26 +403,16 @@ Effect (post-aggressive-canonicalization, 2026-04-25):
   Pearson r = -0.117 (was -0.136) — still near zero, near-
   orthogonal probes preserved.
 - Ministral pilot: 9 → 9 (no merges available at this N).
-- Claude-faces: 160 → **144** raw rows (16 merge groups under
-  the new rules — middle-dot folds, `ᴗ`/`‿` belatedly applied
-  to claude-faces, internal-whitespace strips). The
-  `claude_faces_embed.parquet` is unaffected because
-  `load_embeddings_canonical` merges at load time. **However:**
-  `data/claude_haiku_synthesized.jsonl` has 16 collision groups
-  where multiple per-face Haiku-synthesized descriptions key to
-  the same canonical form. As of 2026-04-25 the eriskii outputs
-  (`eriskii_axes.tsv`, `eriskii_clusters.tsv`,
-  `eriskii_per_*.tsv`, `eriskii_user_kaomoji_axis_corr.tsv`,
-  `figures/eriskii_*`, `figures/claude_faces_interactive.html`)
-  are **stale w.r.t. the new canonicalization** — they reflect
-  pre-aggressive-canonicalization grouping. A separate plan
-  (re-synthesizing the 16 merge groups via Haiku and
-  regenerating the eriskii pipeline end-to-end) is the proper
-  fix; until then, treat eriskii numbers as historical baseline.
+- Claude-faces: contributor-side canonicalization happens in
+  `llmoji analyze` before upload, and `06_claude_hf_pull.py`
+  re-canonicalizes again on the way in (in case contributor
+  bundles were produced under different package versions). The
+  pre-refactor 160 → 144 row collapse is no longer relevant
+  here — the HF corpus arrives canonical.
 
 JSONL keeps raw `first_word`; `first_word_raw` column exists for
-audit. Regenerate the per-kaomoji parquets / figures if the
-canonicalization rule changes.
+audit on v1/v2/v3 pilot data. Regenerate per-kaomoji parquets and
+figures if the canonicalization rule changes.
 
 ## Gotchas
 
@@ -495,15 +500,6 @@ extra entry. `read_after_generate` trims to
 generated-token state, and round-trip through saklas's scorer
 missed by 0.2–0.5 per probe.
 
-### Claude.ai export drops content for ~half the conversations
-
-Anthropic's newer "export your data" returns
-`chat_messages[*].text = ""` for ~49% of conversations the older
-export populated fully. Metadata is preserved; text is gone.
-`llmoji.sources.claude_export.iter_claude_export` reads every
-configured export dir and keeps whichever copy of a given
-conversation has more non-empty messages. Keep old exports.
-
 ### Matplotlib font fallback needs a list, not a string
 
 Kaomoji span 90+ non-ASCII non-CJK characters plus, on Qwen,
@@ -513,10 +509,9 @@ them all. matplotlib 3.6+ supports per-glyph fallback via
 `rcParams["font.family"] = [...]`. `_use_cjk_font` helpers
 (in `llmoji_study/analysis.py`, `llmoji_study/emotional_analysis.py`,
 `llmoji_study/cross_pilot_analysis.py`,
-`scripts/09_claude_faces_plot.py`,
 `scripts/16_eriskii_replication.py`,
 `scripts/17_v3_face_scatters.py`,
-`scripts/18_claude_faces_pca.py` — seven copies, **keep in sync**)
+`scripts/18_claude_faces_pca.py` — six copies, **keep in sync**)
 register a project-local monochrome emoji font
 (`data/fonts/NotoEmoji-Regular.ttf`, Google Noto Emoji variable
 font, 1.9MB, committed to the repo) and configure the chain
@@ -549,27 +544,14 @@ Real compliance (bracket-start, the v3 loader's actual filter) is
 ~100% on every model so far. Real check: `awk` for first-char in
 `([{（｛`, not the runner's log line.
 
-### Codex puts the kaomoji on the LAST agent message, Claude on the FIRST
+### Codex / Claude provider quirks live in the package now
 
-Opposite conventions. Claude's assistant message is one event with
-interleaved `text + tool_use + text` content blocks; the kaomoji-
-prefixed response is always the FIRST text block (later text is
-post-tool-call continuation, irrelevant to kaomoji analysis). Codex
-emits each agent message as a separate `event_msg.agent_message`
-event; progress messages go first during tool calls, the kaomoji-
-bearing summary lands last as `task_complete.last_agent_message`.
-The Codex hook + backfill key on `last_agent_message`, NOT on the
-first agent_message — flipping that would miss every kaomoji on
-multi-step Codex turns.
-
-### Sidechain filter is Claude-only
-
-`isSidechain: true` events in `~/.claude/projects/**/*.jsonl` mark
-subagent (Task-tool-spawned) sessions; both the live Claude hook
-and the backfill drop them at write time. Codex has no analog —
-the `collaboration_mode` field is `"default"` for every observed
-turn_context, no subagent equivalent. So the codex hook + backfill
-have no sidechain check.
+Pre-refactor we documented here that Codex puts the kaomoji on the
+LAST agent message while Claude puts it on the FIRST, and that
+Claude has an `isSidechain` filter that Codex doesn't need. Both
+quirks moved to the `llmoji.providers.*Provider` adapters in the
+v1.0 package split; this repo doesn't read raw transcripts anymore.
+See `../llmoji/CLAUDE.md` for the live documentation.
 
 ### KAOMOJI_START_CHARS sync — RESOLVED via the v1.0 package split
 
@@ -587,34 +569,8 @@ the v1.0 package split:
 Three places that still hand-coordinate (matplotlib font helpers,
 which are research-side and unrelated): `llmoji_study/analysis.py`,
 `llmoji_study/emotional_analysis.py`, `llmoji_study/cross_pilot_analysis.py`,
-plus inline copies in scripts/09, 16, 17, 18. Keep those in sync
+plus inline copies in scripts/16, 17, 18. Keep those in sync
 with each other; that gotcha is independent of the kaomoji-set sync.
-
-### System-injection prefixes — managed by the package
-
-`user_text` skips system-injected user-role payloads. Both prefix
-lists live on the `llmoji.providers.*Provider` classes
-(`system_injected_prefixes`):
-
-- Claude Code: `"Base directory for this skill:"`
-- Codex: `"# AGENTS.md"`, `"<environment_context>"`, `"<INSTRUCTIONS>"`
-- Hermes: `[]` (hermes delivers `extra.user_message` pre-injection,
-  per the documented contract; pending live-traffic verification)
-
-The bash hook templates interpolate the lists at install time; the
-backfill module (`llmoji.backfill`) mirrors the same lists in its
-`CLAUDE_CODE_INJECTED_PREFIXES` / `CODEX_INJECTED_PREFIXES`
-constants. Single source per provider.
-
-### Don't re-run the transcript scrape — the journal is canonical
-
-Pre-refactor the `code` source walked `~/.claude/projects/**/*.jsonl`
-on every invocation; that adapter is gone. History is replayed into
-the journal once via `21_backfill_journals.py`; live hooks append
-from there. Re-running the backfill OVERWRITES the journals — only
-do it (a) after a schema change, or (b) with active sessions paused
-(an in-flight turn would otherwise land in both the backfill via
-transcript and the live hook within the same second).
 
 ### Python stdout buffering hides long-run progress in tee'd logs
 
@@ -664,17 +620,12 @@ python scripts/10_cross_pilot_clustering.py
 python scripts/11_emotional_probe_correlations.py
 python scripts/12_emotional_prompt_matrix.py
 
-# Claude-faces + eriskii-replication (needs ANTHROPIC_API_KEY for 14 + 16)
-python scripts/21_backfill_journals.py        # one-shot; replay claude+codex history
-python scripts/05_claude_vocab_sample.py
-python scripts/06_claude_scrape.py            # default: export + hook; --no-merge to skip merged view
-python scripts/07_claude_kaomoji_basics.py
-python scripts/08_claude_faces_embed.py
-python scripts/09_claude_faces_plot.py              # response-based t-SNE PNG
-python scripts/14_claude_haiku_describe.py
+# Claude-faces + eriskii-replication (needs ANTHROPIC_API_KEY for 16)
+python scripts/06_claude_hf_pull.py            # snapshot a9lim/llmoji into data/hf_dataset/
+python scripts/07_claude_kaomoji_basics.py     # printout: top kaomoji, contributors, providers
 python scripts/15_claude_faces_embed_description.py
-python scripts/16_eriskii_replication.py            # axes + clusters + interactive HTML
-python scripts/18_claude_faces_pca.py               # PCA chart, eriskii-style
+python scripts/16_eriskii_replication.py       # axes + clusters + interactive HTML
+python scripts/18_claude_faces_pca.py          # PCA chart, eriskii-style
 ```
 
 ## Layout
@@ -699,21 +650,24 @@ llmoji-study/
     emotional_analysis.py      # v3 hidden-state figures + summary; loaders
                                # apply canonicalize_kaomoji at load time
     cross_pilot_analysis.py    # pooled v1v2 + v3 hidden-state clustering
-    claude_faces.py            # response-based per-kaomoji embeddings;
-                               # load_embeddings_canonical() merges variants
+    claude_faces.py            # HF-corpus loader + per-canonical
+                               # description embeddings (post-refactor;
+                               # response-based code dropped)
     eriskii_anchors.py         # 21-axis AXIS_ANCHORS + CLUSTER_LABEL_PROMPT
                                # (research-side analysis primitives;
                                # not in the v1.0 frozen public surface)
-    eriskii.py                 # axis projection + masking + haiku primitives
+    eriskii.py                 # axis projection + cluster labeling primitives
     taxonomy_labels.py         # gemma-tuned TAXONOMY + ANGRY_CALM_TAXONOMY
                                # + label_on + extract_with_label
                                # (these were in llmoji.taxonomy pre-v1.0;
                                # moved here because they're pilot-specific
                                # and don't belong in a provider-agnostic
                                # public package)
-  scripts/                     # 00–22 + 99; each is directly executable
-  docs/                        # design+plan docs per experiment
+  scripts/                     # 00–04, 06, 07, 10–13, 15–20, 99
+  docs/                        # design+plan docs per experiment +
+                               # local-side.md, harness-side.md
   data/                        # *.jsonl, *.tsv, *.parquet, *.html (tracked)
+  data/hf_dataset/             # snapshot of a9lim/llmoji (gitignored)
   data/hidden/                 # per-row .npz sidecars (gitignored)
   figures/                     # tracked
   logs/                        # tee'd run output (gitignored)
