@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from llmoji_study.config import DATA_DIR, EMOTIONAL_DATA_PATH, FIGURES_DIR
+from llmoji_study.config import DATA_DIR, current_model
 from llmoji_study.emotional_analysis import (
     load_rows,
     plot_prompt_kaomoji_matrix,
@@ -19,12 +19,14 @@ from llmoji_study.emotional_analysis import (
 
 
 def main() -> None:
-    if not EMOTIONAL_DATA_PATH.exists():
-        print(f"no data at {EMOTIONAL_DATA_PATH}; run scripts/03_emotional_run.py first")
+    M = current_model()
+    if not M.emotional_data_path.exists():
+        print(f"no data at {M.emotional_data_path}; "
+              f"run LLMOJI_MODEL={M.short_name} scripts/03_emotional_run.py first")
         return
 
-    df = load_rows(str(EMOTIONAL_DATA_PATH))
-    print(f"loaded {len(df)} v3 rows")
+    df = load_rows(str(M.emotional_data_path))
+    print(f"loaded {len(df)} v3 rows ({M.short_name})")
 
     mat, meta = prompt_kaomoji_matrix(df, top_k=12)
     print(f"built {len(mat)} prompts × {len(mat.columns)} kaomoji matrix")
@@ -34,10 +36,10 @@ def main() -> None:
         q_mat = mat.loc[q_meta["prompt_id"]]
         print(f"  {q}: prompts={len(q_meta)}  sum={int(q_mat.to_numpy().sum())}")
 
-    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+    M.figures_dir.mkdir(parents=True, exist_ok=True)
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    fig_path = FIGURES_DIR / "fig_v3_prompt_kaomoji.png"
+    fig_path = M.figures_dir / "fig_v3_prompt_kaomoji.png"
     plot_prompt_kaomoji_matrix(df, str(fig_path), top_k=12)
     print(f"\nwrote {fig_path}")
 

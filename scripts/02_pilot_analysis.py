@@ -1,7 +1,8 @@
 """Analyze the pilot output.
 
 Reads data/pilot_raw.jsonl, evaluates the three pre-registered decision
-rules + the k-means ARI summary, and writes figures to figures/.
+rules + the k-means ARI summary, and writes figures to
+figures/local/gemma/ (v1/v2 are gemma-only).
 
 Usage:
     python scripts/02_pilot_analysis.py
@@ -22,6 +23,8 @@ from llmoji_study.config import (
     PILOT_RAW_PATH,
     STEERED_AXES,
 )
+
+PILOT_FIGURES_DIR = FIGURES_DIR / "local" / "gemma"
 from llmoji_study.hidden_state_analysis import load_hidden_features
 
 
@@ -73,9 +76,9 @@ def main() -> None:
     df = df.iloc[[k for k, i in enumerate(aligned_idx) if i >= 0]].reset_index(drop=True)
     X = X[keep]
 
-    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-    all_figures(df, X, str(FIGURES_DIR))
-    print(f"figures written to {FIGURES_DIR}")
+    PILOT_FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+    all_figures(df, X, str(PILOT_FIGURES_DIR))
+    print(f"figures written to {PILOT_FIGURES_DIR}")
 
     # --- go / no-go call (per axis) ---
     print("\n=== verdict ===")

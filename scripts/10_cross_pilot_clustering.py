@@ -49,18 +49,19 @@ def main() -> None:
     print("rows per source:")
     print(df["source"].value_counts().to_string())
 
-    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+    out_dir = FIGURES_DIR / "local" / "gemma"
+    out_dir.mkdir(parents=True, exist_ok=True)
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    fig_path = FIGURES_DIR / "fig_pool_cosine.png"
+    fig_path = out_dir / "fig_pool_cosine.png"
     plot_pooled_cosine_heatmap(df, X, str(fig_path), center=True)
     print(f"\nwrote {fig_path}  (grand-mean centered)")
 
-    fig_uncentered = FIGURES_DIR / "fig_pool_cosine_uncentered.png"
+    fig_uncentered = out_dir / "fig_pool_cosine_uncentered.png"
     plot_pooled_cosine_heatmap(df, X, str(fig_uncentered), center=False)
     print(f"wrote {fig_uncentered}  (uncentered; comparison)")
 
-    fig_pca = FIGURES_DIR / "fig_pool_pca.png"
+    fig_pca = out_dir / "fig_pool_pca.png"
     pca_stats = plot_pooled_pca_scatter(df, X, str(fig_pca))
     print(f"wrote {fig_pca}")
     if pca_stats:

@@ -197,7 +197,7 @@ MODEL_REGISTRY: dict[str, ModelPaths] = {
         emotional_data_path=DATA_DIR / "emotional_raw.jsonl",
         emotional_summary_path=DATA_DIR / "emotional_summary.tsv",
         experiment="v3",
-        figures_dir=FIGURES_DIR,
+        figures_dir=FIGURES_DIR / "local" / "gemma",
         vocab_sample_path=VOCAB_SAMPLE_PATH,
     ),
     "qwen": ModelPaths(
@@ -206,7 +206,7 @@ MODEL_REGISTRY: dict[str, ModelPaths] = {
         emotional_data_path=DATA_DIR / "qwen_emotional_raw.jsonl",
         emotional_summary_path=DATA_DIR / "qwen_emotional_summary.tsv",
         experiment="v3_qwen",
-        figures_dir=FIGURES_DIR / "qwen",
+        figures_dir=FIGURES_DIR / "local" / "qwen",
         vocab_sample_path=DATA_DIR / "qwen_vocab_sample.jsonl",
     ),
     "ministral": ModelPaths(
@@ -215,7 +215,7 @@ MODEL_REGISTRY: dict[str, ModelPaths] = {
         emotional_data_path=DATA_DIR / "ministral_emotional_raw.jsonl",
         emotional_summary_path=DATA_DIR / "ministral_emotional_summary.tsv",
         experiment="v3_ministral",
-        figures_dir=FIGURES_DIR / "ministral",
+        figures_dir=FIGURES_DIR / "local" / "ministral",
         vocab_sample_path=DATA_DIR / "ministral_vocab_sample.jsonl",
     ),
 }

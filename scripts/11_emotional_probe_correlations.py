@@ -16,7 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from llmoji_study.config import DATA_DIR, EMOTIONAL_DATA_PATH, FIGURES_DIR, PROBES
+from llmoji_study.config import DATA_DIR, PROBES, current_model
 from llmoji_study.emotional_analysis import (
     compute_probe_correlations,
     load_rows,
@@ -25,12 +25,14 @@ from llmoji_study.emotional_analysis import (
 
 
 def main() -> None:
-    if not EMOTIONAL_DATA_PATH.exists():
-        print(f"no data at {EMOTIONAL_DATA_PATH}; run scripts/03_emotional_run.py first")
+    M = current_model()
+    if not M.emotional_data_path.exists():
+        print(f"no data at {M.emotional_data_path}; "
+              f"run LLMOJI_MODEL={M.short_name} scripts/03_emotional_run.py first")
         return
 
-    df = load_rows(str(EMOTIONAL_DATA_PATH))
-    print(f"loaded {len(df)} v3 rows")
+    df = load_rows(str(M.emotional_data_path))
+    print(f"loaded {len(df)} v3 rows ({M.short_name})")
 
     stats = compute_probe_correlations(df, timestep="t0")
     i_hs = PROBES.index("happy.sad")
@@ -47,11 +49,11 @@ def main() -> None:
         rho = sub["spearman"][i_hs][i_ac]
         print(f"  {key}: n={n}  pearson r = {r:+.3f}  spearman rho = {rho:+.3f}")
 
-    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+    M.figures_dir.mkdir(parents=True, exist_ok=True)
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    fig_p = FIGURES_DIR / "fig_v3_corr_pearson.png"
-    fig_s = FIGURES_DIR / "fig_v3_corr_spearman.png"
+    fig_p = M.figures_dir / "fig_v3_corr_pearson.png"
+    fig_s = M.figures_dir / "fig_v3_corr_spearman.png"
     plot_probe_correlation_matrix(df, str(fig_p), method="pearson")
     print(f"\nwrote {fig_p}")
     plot_probe_correlation_matrix(df, str(fig_s), method="spearman")

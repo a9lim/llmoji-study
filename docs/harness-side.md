@@ -111,8 +111,12 @@ emissions, 174 canonical kaomoji):
   88 noise points at `min_cluster_size=5`; the dense KMeans
   panel is the eriskii-parity reference.
 - See `data/eriskii_comparison.md` for the full per-axis writeup
-  on the live corpus, and `figures/eriskii_clusters_tsne.png` /
-  `figures/claude_faces_pca.png` for the visualizations.
+  on the live corpus, and `figures/harness/eriskii_clusters_tsne.png`
+  and `figures/harness/claude_faces_pca.png` for the visualizations.
+
+![harness clusters](../figures/harness/eriskii_clusters_tsne.png)
+
+![harness PCA](../figures/harness/claude_faces_pca.png)
 
 ### Pre-refactor headline numbers (single-machine local scrape)
 
@@ -147,7 +151,141 @@ fields aren't in the bundle:
 
 If we want either of these analyses back, the right move is a
 separate research-side scrape of a single contributor's local
-journal, not adding fields to the public dataset.
+journal, not adding fields to the public dataset. That's what
+`scripts/local_per_project_axes.py` does for the per-project axis
+breakdown — see the next section.
+
+### Per-provider per-project axes (single-contributor side script)
+
+`scripts/local_per_project_axes.py` reads `~/.claude/kaomoji-journal.jsonl`
+and `~/.codex/kaomoji-journal.jsonl` directly via the
+`llmoji.sources.journal` adapter, embeds each emission's
+`assistant_text` with MiniLM, projects onto the same 21 eriskii
+axes the harness pipeline uses, and groups by `project_slug`
+with `min_emissions = 10`. Output goes to
+`figures/harness/{claude,codex}/per_project_axes_{mean,std}.png`
+and `data/harness/{claude,codex}/per_project_axes.tsv`.
+
+This is local-only and single-contributor: nothing here ships to
+HF, and the numbers are specific to one machine's journal. The
+public dataset and the headline numbers above are unaffected.
+
+Sample sizes on the current snapshot:
+
+| provider | usable emissions | projects with n≥10 |
+| --- | ---: | ---: |
+| claude (Claude Code) | 644 | 14 |
+| codex | 62 | 3 |
+
+#### Claude side
+
+`figures/harness/claude/per_project_axes_mean.png`. Top and
+bottom axis per project, by signed mean projection:
+
+| project | n | top axis | bottom axis |
+| --- | ---: | --- | --- |
+| saklas | 164 | curiosity (+0.058) | exhaustion (−0.047) |
+| llmoji | 147 | curiosity (+0.065) | exhaustion (−0.053) |
+| a9lim.github.io | 64 | curiosity (+0.060) | exhaustion (−0.046) |
+| kenoma | 45 | curiosity (+0.060) | exhaustion (−0.063) |
+| Work | 43 | curiosity (+0.061) | surprise (−0.059) |
+| faithful | 37 | curiosity (+0.059) | exhaustion (−0.065) |
+| rlaif | 29 | curiosity (+0.068) | exhaustion (−0.063) |
+| llmoji-study | 26 | curiosity (+0.044) | exhaustion (−0.052) |
+| shoals | 23 | approval (+0.052) | surprise (−0.100) |
+| hylic | 20 | curiosity (+0.075) | aggression (−0.066) |
+| claudedriven | 13 | curiosity (+0.068) | warmth (−0.083) |
+| brie | 12 | positivity (+0.068) | technicality (−0.090) |
+| geon | 11 | curiosity (+0.057) | exhaustion (−0.077) |
+| a9lim | 10 | anger (+0.051) | surprise (−0.051) |
+
+Aggregate reads:
+
+- **Curiosity dominates.** Top axis on 12 of 14 claude projects;
+  the two exceptions are `shoals` (worldbuilding, top=approval)
+  and `brie` (top=positivity). On this contributor's machine,
+  Claude reads as overwhelmingly inquiry-mode in response.
+- **Exhaustion is the floor on the load-bearing repos.** saklas,
+  llmoji, kenoma, faithful, rlaif, llmoji-study, geon, and
+  a9lim.github.io all have exhaustion as the most-negative axis.
+  Low exhaustion in the response embedding corresponds to
+  energetic engagement — bigger and more open-ended projects pull
+  this signal harder.
+- **Outliers worth zooming on.**
+  - `brie` (n=12): hardest negative cell on the whole heatmap,
+    technicality −0.090, with positivity as the top. Small
+    project, low-tech, friendly tone.
+  - `shoals` (n=23): surprise floor at −0.100. Worldbuilding
+    work where claude responses settle into expected texture
+    rather than registering surprise — consistent with
+    canon-maintenance work.
+  - `claudedriven` (n=13): warmth floor at −0.083. Clinical
+    register, fitting a project that's literally about driving
+    Claude rather than collaborating.
+  - `llmoji-study` (n=26): bottom = confidence (−0.052) [versus
+    most other projects, where confidence is mid-pack and
+    exhaustion is the floor]. The research repo where pre-
+    registration and the don't-bluff anchor enforce hedging
+    shows up as low-confidence in the response embedding too.
+
+The values are all small in absolute terms (±0.1 cosine
+projection on a normalized embedding); think shoulder-of-curiosity
+differences rather than strong contrasts.
+
+#### Codex side
+
+`figures/harness/codex/per_project_axes_mean.png`. Sample is
+much smaller (62 emissions across 3 projects clearing n=10):
+
+| project | n | top axis | bottom axis |
+| --- | ---: | --- | --- |
+| saklas | 35 | curiosity (+0.040) | technicality (−0.063) |
+| website | 14 | curiosity (+0.080) | approval (−0.047) |
+| kenoma | 13 | curiosity (+0.046) | exhaustion (−0.067) |
+
+Curiosity is still the top axis on all three. Exhaustion only
+shows up as the floor on `kenoma`; the other two land
+elsewhere.
+
+#### Cross-provider divergence
+
+The two providers overlap on `saklas` and `kenoma` with
+sufficient N for a soft compare:
+
+- `saklas`: claude bot = exhaustion (−0.047, n=164), codex bot
+  = technicality (−0.063, n=35). Same project, two different
+  model families, two different bottom-axis reads. The numbers
+  are close enough in magnitude that this could partly be
+  ranking noise (codex's exhaustion projection on saklas is also
+  negative, just less so than its technicality projection).
+- `kenoma`: claude bot = exhaustion (−0.063), codex bot =
+  exhaustion (−0.067). Agreement at the floor.
+
+[TBD] more careful cross-provider read. Codex N is 62 emissions
+across 3 projects, all of which I'm familiar with; claude N is
+644 across 14, also all familiar. The "saklas reads as more
+technical-floor on codex than on claude" signal could mean Codex
+spends its responses on saklas in more code/data-heavy register
+than Claude does, or it could be a 35-row sampling artifact.
+I haven't done a side-by-side read of the actual response text
+on saklas split by provider yet; that would settle whether the
+divergence is real. Worth flagging when codex sample size grows.
+
+#### Caveats
+
+- Response-based embedding, not user-prompt or kaomoji-glyph.
+  This measures the texture of Claude's and Codex's *responses*
+  on each project, projected onto eriskii axes. It is not a
+  measure of the work itself or of the user's framing.
+- `MIN_TEXT_LEN = 20` drops emissions where `assistant_text` is
+  empty or kaomoji-only (~11% of total). Those rows would have
+  no semantic content for MiniLM to embed.
+- Per-project axis means are small in absolute terms (cosine
+  projections of L2-normalized 384-d embeddings onto unit-norm
+  axis vectors; typical magnitude ±0.1). Within-figure contrasts
+  are real, but don't read these as full-scale eriskii rankings.
+- The eriskii anchor pairs were locked for the harness pipeline.
+  Same axes here, no anchor changes for this side script.
 
 ### Multi-contributor numbers
 

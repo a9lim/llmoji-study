@@ -62,7 +62,7 @@ All 150 samples from the happy-steer arm emit happy-labeled
 kaomoji; all 150 from the sad-steer arm emit sad-labeled kaomoji.
 No crossover, and the shift is monotonic across conditions.
 
-![condition bars](../figures/fig2_condition_bars.png)
+![condition bars](../figures/local/gemma/fig2_condition_bars.png)
 
 #### Steering is selective to the targeted axis
 
@@ -104,7 +104,7 @@ natural prompting is thin.
 Pooling kaomoji across all six arms and clustering on cosine
 distance between per-kaomoji mean probe vectors:
 
-![kaomoji cluster heatmap](../figures/fig3_kaomoji_heatmap.png)
+![kaomoji cluster heatmap](../figures/local/gemma/fig3_kaomoji_heatmap.png)
 
 Four clusters fall out of the hierarchical cut. The two big ones
 are what matter:
@@ -242,14 +242,26 @@ dimension survives, so the v1 and v2 valence-collapse is a
 probe-extraction artifact, not a property of the underlying
 representation.
 
-![v3 PCA](../figures/fig_v3_pca_valence_arousal.png)
+![v3 PCA, gemma](../figures/local/gemma/fig_v3_pca_valence_arousal.png)
+
+The supporting v3 figures, all on `figures/local/gemma/`, are
+`fig_emo_a_kaomoji_sim.png` (kaomoji similarity heatmap),
+`fig_emo_b_kaomoji_consistency.png` (within-kaomoji consistency to
+mean), `fig_emo_c_kaomoji_quadrant.png` (per-kaomoji emission
+counts by Russell quadrant), and the per-face panels
+`fig_v3_face_pca_by_quadrant.png`,
+`fig_v3_face_cosine_heatmap.png`, and
+`fig_v3_face_probe_scatter.png`. The face-level figures are
+recoloured by the 2026-04-25 RGB-blend palette so cross-quadrant
+emitters render as mixes rather than dominant-quadrant winner-
+take-all.
 
 ## Pilot v3: Qwen3.6-27B replication
 
 Same prompts, same seeds, same instruction, swapped model.
 Multi-model wiring via `LLMOJI_MODEL=qwen` selects a registry entry
 that reroutes outputs to `data/qwen_emotional_*` and
-`figures/qwen/*`. Qwen3.6-27B is a reasoning model so
+`figures/local/qwen/*`. Qwen3.6-27B is a reasoning model so
 `thinking=False` is set; gemma-4-31b-it is not. This is the
 closest-to-equivalent comparison.
 
@@ -303,7 +315,156 @@ LN 75 + HN 5 + HP 2), analogous to gemma's `(｡•́︿•̀｡)`. The one
 HN-coded form shared between gemma's and Qwen's vocabulary is
 `(╯°□°)`, the table-flip glyph.
 
-![v3 Qwen PCA](../figures/qwen/fig_v3_pca_valence_arousal.png)
+![v3 PCA, qwen](../figures/local/qwen/fig_v3_pca_valence_arousal.png)
+
+Supporting figures live under `figures/local/qwen/` with the same
+filenames as the gemma side. The cross-quadrant emitters
+`(;ω;)` (n=82, LN-dominant), `(;´д｀)` (n=70, HN/LN mix), and
+`(｡•́︿•̀｡)` (n=22, LN-dominant) all show up as visibly mixed
+under the RGB-blend palette in
+`fig_v3_face_pca_by_quadrant.png`.
+
+## Cross-model comparison: gemma vs qwen on v3
+
+Same 100 Russell-quadrant-balanced prompts, same 8 seeds per
+prompt, same `kaomoji_prompted` instruction, same hidden-state
+capture pipeline. Two open-weight LMs, two readings.
+
+### Headline numbers
+
+| metric | gemma-4-31b-it | qwen3.6-27b |
+| --- | ---: | ---: |
+| canonical kaomoji forms (post-canonicalization) | 32 | 65 |
+| hidden-state PCA, PC1 explained variance | 12.98% | 14.87% |
+| hidden-state PCA, PC2 explained variance |  7.49% |  8.29% |
+| Russell-quadrant separation ratio, PC1 | 2.03 | 2.20 |
+| Russell-quadrant separation ratio, PC2 | 2.74 | 1.89 |
+| Pearson r, mean(happy.sad) × mean(angry.calm) across faces | -0.94 | -0.12 |
+| TAXONOMY-match rate (gemma-tuned dict) | ~85% | ~13% |
+| bracket-start instruction compliance | 100% | 100% |
+
+### Geometric structure
+
+Side-by-side PCA panels:
+`figures/local/gemma/fig_v3_pca_valence_arousal.png` against
+`figures/local/qwen/fig_v3_pca_valence_arousal.png`.
+
+In the gemma panel, the four affect quadrant centroids fall
+roughly on a single line. HP sits at (-5, -6), LP at (-3, +4),
+NB at (-2, +6); HN and LN both sit near (+7, -2), nearly
+overlapping on PC2. The shared sad-face vocabulary `(｡•́︿•̀｡)`
+(n=171, 102 LN + 52 HN) shows up as a single large blue circle
+next to the red HN cluster, visually flattening the negative-side
+arousal axis.
+
+In the qwen panel, the four affect quadrants land in four
+distinct regions. HP at (-22, -30), LP at (-15, -2), NB at
+(-23, +29), HN at (+30, +22), LN at (+30, -4). The plot range
+is roughly 4x wider on each axis (PC1 spans about -45 to +60 on
+qwen vs -15 to +10 on gemma), reflecting both the larger
+vocabulary and the wider hidden-state spread.
+
+The geometric difference: in gemma, PC2 is essentially a single
+arousal-like axis shared across quadrants, with HP at one end and
+NB/LP at the other and HN/LN clustered near zero. In qwen, the
+positive-valence cluster (HP, LP) and the negative-valence
+cluster (HN, LN) each carry their own arousal-like spread on
+PC2, but those spreads point in opposite directions:
+HP → LP travels (+7, +28), HN → LN travels (+0.5, -27). Two
+arousal axes, anti-parallel, instead of one shared one.
+
+Practical reading: gemma's affect representation in v3 is closer
+to one-dimensional with an arousal modifier; qwen's is closer to
+a two-dimensional Russell circumplex with arousal expressed
+independently within each valence half.
+
+### Probe-space divergence
+
+`figures/local/gemma/fig_v3_face_probe_scatter.png` and
+`figures/local/qwen/fig_v3_face_probe_scatter.png` plot per-face
+mean `happy.sad` against mean `angry.calm`.
+
+Gemma: r = -0.94 (p < 1e-15) across n=32 faces. The two probes
+read nearly the same direction with opposite sign. This is the
+v1/v2 valence-collapse claim restated on naturalistic v3 data.
+
+Qwen: r = -0.12 (p = 0.36) across n=65 faces. The valence
+collapse does not appear. Saklas's contrastive-PCA recovers
+near-orthogonal `happy.sad` and `angry.calm` directions on this
+model. v1/v2-style probe-space analysis would carry substantially
+more affect-relevant variance on qwen than on gemma.
+
+This is a model-architecture-and-training difference, not a
+saklas issue. Same probe-extraction code, same prompts, same
+α settings; the recovered directions just have different
+geometry in the underlying representation.
+
+### Vocabulary and dialect
+
+The TAXONOMY dict was tuned to gemma's emissions, so qwen's
+TAXONOMY-match rate is mechanically low (around 13%). The
+runner's per-quadrant "emission rate" log line counts TAXONOMY
+matches and reads as instruction-following collapse on qwen when
+it isn't; bracket-start compliance is 100% on both.
+
+Qualitative dialect notes from inspecting the per-quadrant
+top-emission tables:
+
+- Qwen has a dedicated HN shocked/distress register (`(;´д｀)`
+  37, `(>_<)` 34, `(╥_╥)` 25, `(;'⌒\`)` 22, `(╯°□°)` 21) that's
+  partly absent on gemma; the only HN-coded form shared between
+  the two vocabularies is the table-flip glyph `(╯°□°)`.
+- Qwen's default cross-context form is `(≧◡≦)` (n=106, HP 39 +
+  LP 38 + NB 28). Gemma's analog is `(｡◕‿◕｡)`, but gemma's
+  default lands HP/NB-heavy without the LP weight that qwen's
+  carries.
+- Cross-quadrant emitters on qwen analogous to gemma's
+  `(｡•́︿•̀｡)`: `(;ω;)` (n=82; LN 75 + HN 5 + HP 2) and `(;´д｀)`
+  (n=70; HN 37 + LN 31 + NB 2). The same `(｡•́︿•̀｡)` form
+  appears on qwen too at n=22.
+
+### Within-kaomoji consistency
+
+`figures/local/{gemma,qwen}/fig_emo_b_kaomoji_consistency.png`
+plot per-face cosine to the per-face mean hidden-state vector.
+
+Gemma: 0.92-0.99 across the 32 forms with n≥3. The lowest-
+consistency faces are exactly the cross-quadrant emitters
+(`(｡•́︿•̀｡)` 0.94, `(╯°□°)` 0.95, `(⊙_⊙)` 0.94).
+
+Qwen: 0.89-0.99 across the 33 forms with n≥3. Same shape; the
+floor is slightly lower because qwen's longer vocabulary tail
+includes faces with broader contextual range.
+
+[TBD] qualitative read of the consistency-figure shape difference
+across models. Numerically the ranges overlap heavily; visually
+the two figures show similar structure but I haven't done a
+careful side-by-side yet.
+
+### Cosine-heatmap structure
+
+`figures/local/{gemma,qwen}/fig_v3_face_cosine_heatmap.png` show
+centered cosine between per-face mean hidden states.
+
+[TBD] cross-model qualitative comparison. The headline number
+(faces within a Russell quadrant cluster cleanly, cross-quadrant
+emitters bridge two clusters) holds in both, but the visual
+texture of the heatmaps differs and a careful read on whether
+qwen shows a tighter or looser within-cluster cosine band hasn't
+been done.
+
+### Per-face PCA panel
+
+`figures/local/{gemma,qwen}/fig_v3_face_pca_by_quadrant.png`.
+Both use the same 2026-04-25 RGB-blend palette, with cross-
+quadrant emitters rendering as visible mixes.
+
+[TBD] qualitative read on whether the qwen panel's wider plot
+range (corresponding to the PC1/PC2 spread numbers above)
+visually distinguishes the per-face structure from gemma's, or
+whether it just rescales an otherwise-similar arrangement. The
+Russell-quadrant centroids panel above answers this at the
+quadrant level; the per-face panel may add detail beyond that.
 
 ## Vocab pilot: Ministral-3-14B-Instruct-2512
 
@@ -385,7 +546,7 @@ LLMOJI_MODEL=qwen python scripts/03_emotional_run.py
 LLMOJI_MODEL=qwen python scripts/04_emotional_analysis.py
 LLMOJI_MODEL=qwen python scripts/13_emotional_pca_valence_arousal.py
 LLMOJI_MODEL=qwen python scripts/17_v3_face_scatters.py
-# outputs land at data/{short_name}_emotional_*, figures/{short_name}/*
+# outputs land at data/{short_name}_emotional_*, figures/local/{short_name}/*
 
 # Cross-pilot + v3-extension analyses
 python scripts/10_cross_pilot_clustering.py
@@ -401,8 +562,8 @@ each plus model load). Both runs are resumable via a
 errored cells are retried on the next invocation rather than
 re-running the whole pipeline. Outputs are keyed by model: setting
 `LLMOJI_MODEL=qwen` reroutes everything to `data/qwen_emotional_*`
-and `figures/qwen/*` so gemma and Qwen runs don't clobber each
-other.
+and `figures/local/qwen/*` so gemma and Qwen runs don't clobber
+each other.
 
 ## Gotchas
 

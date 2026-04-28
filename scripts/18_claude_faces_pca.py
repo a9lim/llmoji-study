@@ -10,7 +10,7 @@ Two panels:
   2. PC1 vs PC2 with KMeans(k=15) — parity with eriskii's published
      panel.
 
-Output: ``figures/claude_faces_pca.png``
+Output: ``figures/harness/claude_faces_pca.png``
 
 Pre-2026-04-27 this script also pulled per-canonical raw emission
 counts from ``data/claude_kaomoji.jsonl``. Post-refactor that file is
@@ -145,7 +145,8 @@ def main() -> None:
     print("  KMeans: k=15 fit complete")
 
     print("plotting...")
-    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+    harness_dir = FIGURES_DIR / "harness"
+    harness_dir.mkdir(parents=True, exist_ok=True)
     fig, axes = plt.subplots(1, 2, figsize=(20, 9))
 
     _scatter_panel(
@@ -168,7 +169,7 @@ def main() -> None:
         ax.set_ylabel(f"PC2 ({var[1]*100:.1f}% var)")
 
     fig.tight_layout()
-    out = FIGURES_DIR / "claude_faces_pca.png"
+    out = harness_dir / "claude_faces_pca.png"
     fig.savefig(out, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"wrote {out}")

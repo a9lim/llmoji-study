@@ -613,19 +613,24 @@ LLMOJI_MODEL=qwen python scripts/03_emotional_run.py
 LLMOJI_MODEL=qwen python scripts/04_emotional_analysis.py
 LLMOJI_MODEL=qwen python scripts/13_emotional_pca_valence_arousal.py
 LLMOJI_MODEL=qwen python scripts/17_v3_face_scatters.py
-# outputs land at data/{short_name}_emotional_*, figures/{short_name}/*
+# outputs land at data/{short_name}_emotional_*, figures/local/{short_name}/*
 
 # Cross-pilot + v3-extension analyses
-python scripts/10_cross_pilot_clustering.py
-python scripts/11_emotional_probe_correlations.py
-python scripts/12_emotional_prompt_matrix.py
+python scripts/10_cross_pilot_clustering.py    # → figures/local/gemma/
+python scripts/11_emotional_probe_correlations.py  # respects LLMOJI_MODEL
+python scripts/12_emotional_prompt_matrix.py       # respects LLMOJI_MODEL
 
 # Claude-faces + eriskii-replication (needs ANTHROPIC_API_KEY for 16)
 python scripts/06_claude_hf_pull.py            # snapshot a9lim/llmoji into data/hf_dataset/
 python scripts/07_claude_kaomoji_basics.py     # printout: top kaomoji, contributors, providers
 python scripts/15_claude_faces_embed_description.py
-python scripts/16_eriskii_replication.py       # axes + clusters + interactive HTML
-python scripts/18_claude_faces_pca.py          # PCA chart, eriskii-style
+python scripts/16_eriskii_replication.py       # → figures/harness/eriskii_*, claude_faces_interactive.html
+python scripts/18_claude_faces_pca.py          # → figures/harness/claude_faces_pca.png
+
+# Single-contributor per-provider per-project axes (research-side
+# side script; reads ~/.claude + ~/.codex journals locally, splits
+# by provider, → figures/harness/{claude,codex}/per_project_axes_*.png)
+python scripts/local_per_project_axes.py
 ```
 
 ## Layout
@@ -669,7 +674,20 @@ llmoji-study/
   data/                        # *.jsonl, *.tsv, *.parquet, *.html (tracked)
   data/hf_dataset/             # snapshot of a9lim/llmoji (gitignored)
   data/hidden/                 # per-row .npz sidecars (gitignored)
-  figures/                     # tracked
+  data/harness/{claude,codex}/ # per-provider per-project TSVs from
+                               # local_per_project_axes.py (single-
+                               # contributor side script; tracked)
+  figures/
+    harness/                   # contributor-corpus figures (eriskii
+                               # clusters, claude_faces PCA, plus
+                               # per-provider per-project axes from
+                               # the side script)
+      claude/                  # per_project_axes_{mean,std}.png
+      codex/                   # per_project_axes_{mean,std}.png
+    local/                     # local-LM v1/v2/v3 figures
+      gemma/                   # fig_emo_*, fig_v3_*, fig_pool_*
+      qwen/                    # fig_emo_*, fig_v3_*
+      ministral/               # ready when v3 lands on Ministral
   logs/                        # tee'd run output (gitignored)
 ```
 

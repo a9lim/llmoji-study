@@ -4,8 +4,8 @@
 Sections in build order:
   - axis projection: ``data/eriskii_axes.tsv`` (per-kaomoji × 21 axes)
   - clusters: ``data/eriskii_clusters.tsv`` +
-    ``figures/eriskii_clusters_tsne.png`` + interactive plotly HTML at
-    ``figures/claude_faces_interactive.html``
+    ``figures/harness/eriskii_clusters_tsne.png`` + interactive plotly
+    HTML at ``figures/harness/claude_faces_interactive.html``
   - narrative writeup: ``data/eriskii_comparison.md``
 
 Pre-2026-04-27, this script also produced
@@ -194,14 +194,16 @@ def section_clusters(
     ax.set_xticks([])
     ax.set_yticks([])
     fig.tight_layout()
-    out = FIGURES_DIR / "eriskii_clusters_tsne.png"
+    harness_dir = FIGURES_DIR / "harness"
+    harness_dir.mkdir(parents=True, exist_ok=True)
+    out = harness_dir / "eriskii_clusters_tsne.png"
     fig.savefig(out, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"wrote {out}")
 
     _write_interactive_clusters_html(
         xy, fw, n, clusters, cluster_labels, descriptions_by_fw,
-        out_path=FIGURES_DIR / "claude_faces_interactive.html",
+        out_path=harness_dir / "claude_faces_interactive.html",
     )
     return df_clusters
 
