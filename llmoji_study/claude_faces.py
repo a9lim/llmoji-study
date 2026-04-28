@@ -4,10 +4,10 @@
 Pre-refactor this module also did response-based embeddings on raw
 ``data/claude_kaomoji.jsonl`` rows (whole assistant_text minus the
 leading kaomoji). Post-refactor that path is gone — the corpus is
-now the HF dataset ``a9lim/llmoji``, where every row is already
-pre-aggregated per-machine to ``(kaomoji, count, haiku_synthesis_description)``,
-so the only thing left to embed on the research side is the
-synthesized description string.
+the HF dataset ``a9lim/llmoji``, where every row is already
+pre-aggregated per-machine and (in 1.1) per-source-model to
+``(kaomoji, count, synthesis_description)``, so the only thing left
+to embed on the research side is the synthesized description string.
 
 Public surface:
 
@@ -18,8 +18,12 @@ Public surface:
     ``data/claude_descriptions.jsonl`` (the flat per-canonical output
     of ``scripts/06_claude_hf_pull.py``).
   - :func:`embed_descriptions` — for each kaomoji, embed every
-    per-bundle description, then weighted-mean by per-bundle count
-    and L2-renormalize. Returns ``(canonical_kaomoji, count_total, E)``.
+    per-bundle / per-source-model description, then weighted-mean by
+    per-bundle count and L2-renormalize. Returns
+    ``(canonical_kaomoji, count_total, E)``. The same canonical face
+    written by N source models contributes N description rows to the
+    weighted mean — that's the cross-model pooling the dataset's 1.1
+    per-source-model split makes possible.
   - :func:`save_embeddings` / :func:`load_embeddings` — parquet round-trip.
 """
 
@@ -41,9 +45,12 @@ def load_descriptions(path: Path) -> list[dict]:
     ``scripts/06_claude_hf_pull.py``.
 
     Each row carries ``kaomoji`` (canonical), ``count_total``,
-    ``n_contributors``, ``n_bundles``, ``providers`` (list), and
-    ``descriptions`` (list of per-bundle dicts with
-    ``description``, ``count``, ``contributor``, ``providers``,
+    ``n_contributors``, ``n_bundles``, ``n_source_models``,
+    ``providers`` (list), ``source_models`` (list),
+    ``synthesis_backends`` (list), and ``descriptions`` (list of
+    per-bundle / per-source-model dicts with ``description``,
+    ``count``, ``contributor``, ``bundle``, ``source_model``,
+    ``synthesis_model_id``, ``synthesis_backend``, ``providers``,
     ``llmoji_version``).
     """
     rows: list[dict] = []

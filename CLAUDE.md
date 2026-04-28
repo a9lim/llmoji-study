@@ -59,11 +59,30 @@ research side now pulls from
 [`a9lim/llmoji`](https://huggingface.co/datasets/a9lim/llmoji)
 instead of scraping local Claude.ai exports + ~/.claude / ~/.codex
 journals. The local-scrape pipeline (cooperating Stop hooks,
-backfill, two-stage Haiku) now lives entirely contributor-side in
-the `llmoji` PyPI package, which writes Haiku-synthesized bundles to
-the HF dataset. `scripts/06_claude_hf_pull.py` snapshot-downloads,
-pools by canonical kaomoji form across contributors, and emits
+backfill, contributor-side synthesis) now lives entirely
+contributor-side in the `llmoji` PyPI package, which writes
+synthesizer-generated bundles to the HF dataset.
+`scripts/06_claude_hf_pull.py` snapshot-downloads, pools by canonical
+kaomoji form across contributors and source models, and emits
 `data/claude_descriptions.jsonl` for the rest of the pipeline.
+
+HF dataset format moved to 1.1 on 2026-04-28: bundles are now
+`bundle-<UTC>/{manifest.json, <sanitized-source-model>.jsonl, ...}` —
+one `.jsonl` per source model the contributor's harness saw, where
+the filename stem is `llmoji._util.sanitize_model_id_for_path`
+(lowercase, `/` → `__`, `:` → `-`). Per-row fields renamed
+`haiku_synthesis_description` → `synthesis_description`;
+`llmoji_version` left the row and is now manifest-only. The manifest
+gained `synthesis_model_id`, `synthesis_backend`
+(`anthropic|openai|local`), `model_counts`, and
+`total_synthesized_rows`. Legacy 1.0 `descriptions.jsonl` bundles
+still load via the same `*.jsonl` glob and get tagged with
+`source_model = "_pre_1_1"` so we can opt them in/out downstream.
+The companion package's `llmoji.haiku_prompts` module was
+correspondingly renamed `llmoji.synth_prompts` and `HAIKU_MODEL_ID`
+became `DEFAULT_ANTHROPIC_MODEL_ID`; we re-export it as
+`HAIKU_MODEL_ID` from `llmoji_study.config` for the per-cluster
+labeling call site in script 16.
 
 What this means in practice:
 - Deleted: `scripts/{05_claude_vocab_sample,06_claude_scrape,
@@ -75,11 +94,15 @@ What this means in practice:
 - Pre-refactor `claude_kaomoji_{export,hook}.jsonl` and
   `claude_haiku_{descriptions,synthesized}.jsonl` are gone from
   `data/`. The HF corpus is the single source of truth.
-- Eriskii pipeline drops `per-model`, `per-project`, and
+- Eriskii pipeline drops `per-project` and
   `surrounding_user → kaomoji` bridge sections. The HF dataset
-  pools per-machine before upload; per-row model / project / user-
-  text isn't there. Top-20 frequency overlap, KMeans clusters with
-  Haiku labels, axis projection: kept.
+  pools per-machine before upload; per-row project / user-text
+  isn't there. `per-model` (i.e. per-source-model) is back as of
+  the 1.1 layout — `06_claude_hf_pull.py` preserves source-model
+  metadata per description; a per-source-model axis breakdown
+  script is a planned follow-up. Top-20 frequency overlap, KMeans
+  clusters with Haiku labels, axis projection: kept (still pooled
+  across source models for the headline figures in script 16).
 
 v1.0 package split landed 2026-04-27: `llmoji` (the PyPI package) now
 owns taxonomy / canonicalization / hook templates / scrape sources /
@@ -294,46 +317,66 @@ only.
 
 ### Claude-faces — HF-corpus-driven (non-gemma, non-steering)
 
-Pulled from `a9lim/llmoji` on HuggingFace. Layout:
-`contributors/<32-hex>/bundle-<UTC>/{manifest.json,descriptions.jsonl}`,
-one bundle per `llmoji upload --target hf` from the contributor
-side. Each `descriptions.jsonl` row carries
-`(kaomoji, count, haiku_synthesis_description, llmoji_version)`,
-already pre-aggregated per-machine to one row per canonical face.
+Pulled from `a9lim/llmoji` on HuggingFace. 1.1 layout:
+`contributors/<32-hex>/bundle-<UTC>/{manifest.json,
+<sanitized-source-model>.jsonl, ...}`, one bundle per
+`llmoji upload --target hf` from the contributor side. Filename
+stem is `llmoji._util.sanitize_model_id_for_path` of the source
+model id (lowercase, `/` → `__`, `:` → `-`); each row carries
+`(kaomoji, count, synthesis_description)`, already pre-aggregated
+per-machine and per-source-model to one row per
+`(source_model, canonical_face)` cell. The manifest carries
+`synthesis_model_id` / `synthesis_backend` (`anthropic|openai|local`)
+/ `model_counts` / `total_synthesized_rows` plus the older
+`llmoji_version` / `submitter_id` / `generated_at` /
+`providers_seen`. Legacy 1.0 bundles (single
+`descriptions.jsonl`, field `haiku_synthesis_description`) coexist
+in the same dataset and are read transparently — they get tagged
+`source_model = "_pre_1_1"` in our flat output so downstream can
+filter them out if needed.
 
 Pipeline:
 
 1. `scripts/06_claude_hf_pull.py`: `huggingface_hub.snapshot_download`
-   into `data/hf_dataset/` (gitignored), walk every bundle,
-   canonicalize each kaomoji form, pool by canonical form across
-   contributors. Output: `data/claude_descriptions.jsonl`, one row
-   per canonical form with `count_total`, `n_contributors`,
-   `n_bundles`, `providers`, and a sorted list of per-bundle
-   descriptions.
+   into `data/hf_dataset/` (gitignored), walk every bundle's
+   `*.jsonl`, canonicalize each kaomoji form, pool by canonical
+   form across contributors and source models. Output:
+   `data/claude_descriptions.jsonl`, one row per canonical form
+   with `count_total`, `n_contributors`, `n_bundles`,
+   `n_source_models`, `providers`, `source_models`,
+   `synthesis_backends`, and a sorted list of per-bundle /
+   per-source-model descriptions (each with `source_model`,
+   `synthesis_model_id`, `synthesis_backend`, `bundle`,
+   `contributor`, `providers`, `llmoji_version`).
 2. `scripts/07_claude_kaomoji_basics.py`: descriptive stats
    (top-25, contributor and bundle counts, provider mix,
-   coverage histogram).
+   per-source-model emissions/faces, synthesis-backend mix,
+   coverage and cross-model histograms).
 3. `scripts/15_claude_faces_embed_description.py`: embed every
-   per-bundle description with `all-MiniLM-L6-v2`, weighted-mean
-   by per-bundle count, L2-normalize. Output:
+   per-bundle / per-source-model description with `all-MiniLM-L6-v2`,
+   weighted-mean by per-bundle count, L2-normalize. Output:
    `data/claude_faces_embed_description.parquet`.
 4. `scripts/16_eriskii_replication.py`: project onto 21 axes,
    t-SNE plus KMeans(k=15), Haiku per-cluster labels,
-   `data/eriskii_comparison.md`.
+   `data/eriskii_comparison.md`. Headline figures still pool
+   across source models; per-source-model splits are a planned
+   follow-up script.
 5. `scripts/18_claude_faces_pca.py`: PCA panel.
 
 Pre-refactor highlights (single-machine local scrape, 647
 emissions, 156 canonical kaomoji): top-20 frequency overlap with
 eriskii's published top-20 was 16/20, and the 15 KMeans cluster
 themes lined up with eriskii's 15 at the register level.
-Per-model axis breakdowns and the
+Per-project axis breakdowns and the
 `surrounding_user → kaomoji axis correlation` bridge analysis
-needed per-row `model` / `project_slug` / `surrounding_user`
-fields that the HF dataset doesn't carry (everything is pooled
-per-machine before upload), so those analyses are gone.
-Multi-contributor numbers will land once the dataset has more
-bundles. `docs/harness-side.md` has the full methodology and the
-historical pre-refactor numbers.
+needed per-row `project_slug` / `surrounding_user` fields that
+the HF dataset doesn't carry (everything is pooled per-machine
+before upload), so those analyses are gone. Per-(source_model)
+axis breakdowns, by contrast, are recoverable now that the 1.1
+layout splits each bundle by source model — just not implemented
+yet here. Multi-contributor numbers will land once the dataset
+has more bundles. `docs/harness-side.md` has the full methodology
+and the historical pre-refactor numbers.
 
 ## Hidden-state pipeline
 
@@ -544,6 +587,22 @@ Real compliance (bracket-start, the v3 loader's actual filter) is
 ~100% on every model so far. Real check: `awk` for first-char in
 `([{（｛`, not the runner's log line.
 
+### `06_claude_hf_pull.py` doesn't garbage-collect remote-deleted bundles
+
+`huggingface_hub.snapshot_download(local_dir=...)` only adds and
+updates files; it never removes files that were deleted on the
+remote since the last pull. So a bundle the dataset owner deleted
+on HF lingers in `data/hf_dataset/` indefinitely and shows up in
+every subsequent pull as if it were still part of the corpus —
+including in the `06` flat output and every figure built from it.
+Symptom: an unfamiliar `submitter_id` or `_pre_1_1`-tagged source
+model that doesn't appear in `HfApi.list_repo_files`. Fix:
+`rm -rf data/hf_dataset && python scripts/06_claude_hf_pull.py`.
+The cache is gitignored and regenerable, so a clean re-pull is
+always safe. Hit on 2026-04-28 when the legacy 1.0 bundle had
+already been dropped from HF but kept reappearing in `07` output
+from the stale cache.
+
 ### Codex / Claude provider quirks live in the package now
 
 Pre-refactor we documented here that Codex puts the kaomoji on the
@@ -642,8 +701,10 @@ llmoji-study/
                                # the PyPI package owns that namespace
     config.py                  # MODEL_ID, PROBE_CATEGORIES, PROBES,
                                # paths; re-exports HAIKU_MODEL_ID
-                               # from llmoji.haiku_prompts so the
-                               # locked corpus value is single-source
+                               # from llmoji.synth_prompts (renamed
+                               # from haiku_prompts in the 1.1 split)
+                               # as DEFAULT_ANTHROPIC_MODEL_ID, so the
+                               # locked Haiku version stays single-source
     prompts.py                 # 30 v1/v2 prompts
     emotional_prompts.py       # 100 v3 prompts (5 quadrants × 20)
     capture.py                 # run_sample() → SampleRow + sidecar
@@ -706,8 +767,11 @@ Modules that USED to live here and now live in the `llmoji` package
   - `llmoji.sources.journal` — generic kaomoji-journal reader.
   - `llmoji.sources.claude_export` — Claude.ai export reader.
   - `llmoji.backfill` — `backfill_claude_code`, `backfill_codex`.
-  - `llmoji.haiku_prompts` — `DESCRIBE_PROMPT_*`,
-    `SYNTHESIZE_PROMPT`, `HAIKU_MODEL_ID`.
+  - `llmoji.synth_prompts` (renamed from `llmoji.haiku_prompts` in
+    the 1.1 split when contributor-side synthesis went
+    backend-agnostic) — `DESCRIBE_PROMPT_*`, `SYNTHESIZE_PROMPT`,
+    `DEFAULT_ANTHROPIC_MODEL_ID` (was `HAIKU_MODEL_ID`),
+    `DEFAULT_OPENAI_MODEL_ID`.
 
 The CLI (`llmoji {install,uninstall,status,parse,analyze,upload}`)
 is exposed via `[project.scripts]` on `pip install llmoji`. Not
@@ -727,7 +791,7 @@ adapters. See `../llmoji/CLAUDE.md` for the package side.
 - Pre-registered decisions go in `pyproject.toml` /
   `llmoji_study/config.py` / `llmoji_study/prompts.py` /
   `llmoji_study/emotional_prompts.py`, plus the package's frozen
-  v1.0 surface (`llmoji.taxonomy`, `llmoji.haiku_prompts`). Changes
+  v1.0 surface (`llmoji.taxonomy`, `llmoji.synth_prompts`). Changes
   to the package side are major-version events; changes here are
   research-side and only invalidate cross-run comparisons within
   this repo.

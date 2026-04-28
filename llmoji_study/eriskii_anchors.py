@@ -10,11 +10,12 @@ Multi-word anchor phrases by design — the embedding catches the
 concept rather than a single-word idiosyncrasy. All 21 axes from
 eriskii.net (note: ``"wryness"`` is the eriskii spelling, single n).
 
-This module stays research-side. The Haiku description / synthesis
-prompts that produce the text projected onto these axes moved to
-``llmoji.haiku_prompts`` in the v1.0 package split — they're public
-API and locked, whereas the axes are research-side analysis
-primitives free to evolve.
+This module stays research-side. The description / synthesis prompts
+that produce the text projected onto these axes moved to
+``llmoji.synth_prompts`` in the v1.0 package split (renamed from
+``llmoji.haiku_prompts`` in the 1.1 split when the contributor-side
+synthesizer went backend-agnostic) — they're public API and locked,
+whereas the axes are research-side analysis primitives free to evolve.
 """
 
 from __future__ import annotations

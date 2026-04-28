@@ -101,30 +101,41 @@ EMOTIONAL_EXPERIMENT = "v3"
 # (per-instance describe → per-kaomoji synthesize) to get one
 # meaning string per face. That whole pipeline now lives on the
 # contributor side via the `llmoji` PyPI package (which writes its
-# Haiku-synthesized output to a public HF dataset). This repo
-# pulls the aggregated corpus instead of running it locally.
+# synthesizer output to a public HF dataset). This repo pulls the
+# aggregated corpus instead of running it locally.
 #
 # Single source of truth for the harness side:
-#   ``a9lim/llmoji`` on HuggingFace, layout
-#   ``contributors/<32-hex>/bundle-<UTC>/{manifest,descriptions}.jsonl``.
+#   ``a9lim/llmoji`` on HuggingFace, 1.1 layout
+#   ``contributors/<32-hex>/bundle-<UTC>/{manifest.json,
+#       <sanitized-source-model>.jsonl, ...}``,
+# with backwards-compat for 1.0 bundles whose synthesizer output is in
+# a single ``descriptions.jsonl`` per bundle.
 #
 # `scripts/06_claude_hf_pull.py` snapshot-downloads to
-# ``CLAUDE_DATASET_DIR``, then flattens by canonical kaomoji form
-# into ``CLAUDE_DESCRIPTIONS_PATH`` for the rest of the pipeline.
+# ``CLAUDE_DATASET_DIR``, walks every bundle's ``*.jsonl``, then
+# flattens by canonical kaomoji form (pooling across contributors and
+# source models) into ``CLAUDE_DESCRIPTIONS_PATH`` for the rest of
+# the pipeline. Per-source-model metadata is preserved in each
+# per-description record so downstream can group / filter by it.
 CLAUDE_HF_REPO = "a9lim/llmoji"
 CLAUDE_DATASET_DIR = DATA_DIR / "hf_dataset"
 CLAUDE_DESCRIPTIONS_PATH = DATA_DIR / "claude_descriptions.jsonl"
 CLAUDE_FACES_EMBED_DESCRIPTION_PATH = DATA_DIR / "claude_faces_embed_description.parquet"
 
 # --- eriskii-replication experiment (description-based embeddings + axes) ---
-# Locked Haiku version. Re-exported from the `llmoji` PyPI package so
-# the canonical-corpus value lives in one place — the v1.0 split
-# froze this string in `llmoji.haiku_prompts`. Imported here for the
-# (now sole) call site: per-cluster Haiku labeling in
-# `scripts/16_eriskii_replication.py`. Per-instance / per-kaomoji
-# description and synthesis happens contributor-side and ships
-# pre-baked in the HF bundles.
-from llmoji.haiku_prompts import HAIKU_MODEL_ID  # noqa: E402, F401
+# Locked Haiku version, used as the model id for per-cluster labeling
+# in `scripts/16_eriskii_replication.py` (research-side decision —
+# unrelated to whichever synthesizer the corpus contributors used).
+# Re-exported from the `llmoji` PyPI package's `synth_prompts` module
+# (renamed from `haiku_prompts` in the v1.1 split that made the
+# contributor-side synthesizer backend-agnostic). The package now
+# exposes per-backend defaults; we pin to the anthropic one because
+# Haiku is what the eriskii pipeline was originally validated with.
+# Per-instance / per-kaomoji description and synthesis itself happens
+# contributor-side and ships pre-baked in the HF bundles.
+from llmoji.synth_prompts import (  # noqa: E402, F401
+    DEFAULT_ANTHROPIC_MODEL_ID as HAIKU_MODEL_ID,
+)
 
 # Order matters: this is the column order in eriskii_axes.tsv. Must
 # stay in sync with `llmoji_study.eriskii_anchors.AXIS_ANCHORS`

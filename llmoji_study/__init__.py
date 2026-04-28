@@ -37,8 +37,9 @@ package): ``taxonomy`` (the canonicalization rules + KAOMOJI_START_CHARS
 + is_kaomoji_candidate + slim ``extract``), ``claude_scrape``,
 ``claude_hook_source``, ``claude_export_source``,
 ``backfill_journals`` (now ``llmoji.scrape`` / ``llmoji.sources.*`` /
-``llmoji.backfill``), and the Haiku prompt strings (now
-``llmoji.haiku_prompts``).
+``llmoji.backfill``), and the description / synthesis prompt
+strings (now ``llmoji.synth_prompts``; renamed from
+``llmoji.haiku_prompts`` in the 1.1 split).
 """
 
 __version__ = "0.1.0"
