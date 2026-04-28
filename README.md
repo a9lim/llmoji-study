@@ -164,8 +164,8 @@ python scripts/18_claude_faces_pca.py          # PCA panel
 
 ## License
 
-AGPL-3.0-or-later for this repo. See [LICENSE](LICENSE). The
-companion package
+CC-BY-SA-4.0 for this repo (writeups, figures, analysis code).
+See [LICENSE](LICENSE). The companion package
 [`llmoji`](https://github.com/a9lim/llmoji) is GPL-3.0-or-later.
 The shared corpus on
 [HuggingFace](https://huggingface.co/datasets/a9lim/llmoji) is
