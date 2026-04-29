@@ -24,7 +24,15 @@ logs/
 .DS_Store
 .idea/
 .vscode/
+.claude/
 
 # Snapshot of the contributor-submitted HF dataset
 # (a9lim/llmoji); regenerable via scripts/06_claude_hf_pull.py.
 data/hf_dataset/
+
+# Multi-layer h_mean tensors for the v3 follow-on analyses
+# (scripts 21, 23). ~800 MB per model (npz compression doesn't help
+# with dense float32 hidden states); one-shot rebuild from the
+# data/hidden/<experiment>/*.npz sidecars via the loader's
+# cache_path arg.
+data/cache/

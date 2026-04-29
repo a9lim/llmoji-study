@@ -274,11 +274,13 @@ def main() -> None:
         sys.exit(1)
     _use_cjk_font()
 
+    layer_label = "max" if M.preferred_layer is None else f"L{M.preferred_layer}"
     print(f"model: {M.short_name}")
-    print("loading v3 hidden-state features (which=h_mean)...")
+    print(f"loading v3 hidden-state features (which=h_mean, layer={layer_label})...")
     df, X = load_emotional_features(
         str(M.emotional_data_path), DATA_DIR,
         experiment=M.experiment, which="h_mean",
+        layer=M.preferred_layer,
     )
     df = df[df["first_word"].notna() & (df["first_word"] != "")].reset_index(drop=True)
     print(f"  {len(df)} kaomoji-bearing rows; "

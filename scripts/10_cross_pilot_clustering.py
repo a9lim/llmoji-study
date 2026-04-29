@@ -15,6 +15,7 @@ from llmoji_study.config import (
     EMOTIONAL_DATA_PATH,
     EMOTIONAL_EXPERIMENT,
     FIGURES_DIR,
+    MODEL_REGISTRY,
     PILOT_EXPERIMENT,
     PILOT_RAW_PATH,
 )
@@ -25,6 +26,13 @@ from llmoji_study.cross_pilot_analysis import (
     pooled_summary_table,
 )
 
+# Pooled v1/v2 + v3 are both gemma — read at gemma's preferred layer so
+# the cosine/PCA figures see the same affect snapshot the v3 follow-on
+# analyses do. v1/v2 sidecars don't exist yet (gated on v3 findings),
+# so the v1/v2 portion of the pool is empty for now; this is the
+# correct setting for when they land.
+GEMMA_LAYER = MODEL_REGISTRY["gemma"].preferred_layer
+
 
 def main() -> None:
     if not PILOT_RAW_PATH.exists():
@@ -34,12 +42,15 @@ def main() -> None:
         print(f"no data at {EMOTIONAL_DATA_PATH}; run scripts/03_emotional_run.py first")
         return
 
-    print("loading pooled hidden-state features (which=h_last, layer=max)...")
+    layer_label = "max" if GEMMA_LAYER is None else f"L{GEMMA_LAYER}"
+    print(f"loading pooled hidden-state features "
+          f"(which=h_last, layer={layer_label})...")
     df, X = load_pooled_features(
         str(PILOT_RAW_PATH), str(EMOTIONAL_DATA_PATH), DATA_DIR,
         v1_v2_experiment=PILOT_EXPERIMENT,
         v3_experiment=EMOTIONAL_EXPERIMENT,
         which="h_last",
+        layer=GEMMA_LAYER,
     )
     print(f"pooled {len(df)} kaomoji-bearing rows; X shape {X.shape}")
     if len(df) == 0:

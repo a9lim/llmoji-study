@@ -59,11 +59,13 @@ def main() -> None:
     print(f"re-labeling kaomoji in {M.emotional_data_path}")
     _relabel_in_place(M.emotional_data_path)
 
-    print("loading hidden-state features (which=h_mean, layer=max)...")
+    layer_label = "max" if M.preferred_layer is None else f"L{M.preferred_layer}"
+    print(f"loading hidden-state features (which=h_mean, layer={layer_label})...")
     df, X = load_emotional_features(
         str(M.emotional_data_path), DATA_DIR,
         experiment=M.experiment,
         which="h_mean",
+        layer=M.preferred_layer,
     )
     print(f"loaded {len(df)} kaomoji-bearing rows; X shape {X.shape}")
     if len(df) == 0:

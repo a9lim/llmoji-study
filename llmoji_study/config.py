@@ -191,6 +191,14 @@ class ModelPaths:
     so sidecars don't collide.
     `vocab_sample_path` is where `scripts/00_vocab_sample.py` writes
     its 30-row leading-token histogram for this model.
+    `preferred_layer` is the probe layer at which v3 affect
+    representation is best — i.e. where Russell-quadrant silhouette
+    peaks in `scripts/21_v3_layerwise_emergence.py`. ``None`` means
+    "use the deepest captured probe layer" (the loader default).
+    Gemma's affect representation peaks at L31 of 56 and degrades by
+    36% to the deepest L57; Qwen's peaks essentially at the deepest
+    L59-61. Set per-model so v3 figures pick the right slice without
+    every script having to special-case it.
     """
     model_id: str
     short_name: str
@@ -199,6 +207,7 @@ class ModelPaths:
     experiment: str
     figures_dir: Path
     vocab_sample_path: Path
+    preferred_layer: int | None = None
 
 
 MODEL_REGISTRY: dict[str, ModelPaths] = {
@@ -210,6 +219,9 @@ MODEL_REGISTRY: dict[str, ModelPaths] = {
         experiment="v3",
         figures_dir=FIGURES_DIR / "local" / "gemma",
         vocab_sample_path=VOCAB_SAMPLE_PATH,
+        # Silhouette peaks at L31 (0.184) and degrades to 0.117 at the
+        # deepest L57 — v3 figures default here per scripts/21.
+        preferred_layer=31,
     ),
     "qwen": ModelPaths(
         model_id="Qwen/Qwen3.6-27B",
@@ -219,6 +231,9 @@ MODEL_REGISTRY: dict[str, ModelPaths] = {
         experiment="v3_qwen",
         figures_dir=FIGURES_DIR / "local" / "qwen",
         vocab_sample_path=DATA_DIR / "qwen_vocab_sample.jsonl",
+        # Silhouette peaks at L59 (0.313); deepest L61 is essentially
+        # tied at 0.304. Leave None → deepest.
+        preferred_layer=None,
     ),
     "ministral": ModelPaths(
         model_id="mistralai/Ministral-3-14B-Instruct-2512",
@@ -228,6 +243,8 @@ MODEL_REGISTRY: dict[str, ModelPaths] = {
         experiment="v3_ministral",
         figures_dir=FIGURES_DIR / "local" / "ministral",
         vocab_sample_path=DATA_DIR / "ministral_vocab_sample.jsonl",
+        # No v3 run yet; preferred layer will be set after running 21.
+        preferred_layer=None,
     ),
 }
 

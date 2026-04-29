@@ -33,11 +33,13 @@ def main() -> None:
               f"run LLMOJI_MODEL={M.short_name} python scripts/03_emotional_run.py first")
         return
 
+    layer_label = "max" if M.preferred_layer is None else f"L{M.preferred_layer}"
     print(f"model: {M.short_name}")
-    print("loading v3 hidden-state features...")
+    print(f"loading v3 hidden-state features (layer={layer_label})...")
     df, X = load_emotional_features(
         str(M.emotional_data_path), DATA_DIR,
         experiment=M.experiment, which="h_mean",
+        layer=M.preferred_layer,
     )
     print(f"loaded {len(df)} v3 kaomoji-bearing rows; X shape {X.shape}")
     if len(df) == 0:
@@ -47,12 +49,14 @@ def main() -> None:
     # v1/v2 baseline overlay only applies to the gemma run (PILOT_RAW_PATH
     # is gemma-only — no Qwen/Ministral steering data exists). Quietly skip
     # the overlay for non-gemma models even if a stray PILOT_RAW_PATH file
-    # exists.
+    # exists. Use the same preferred_layer so PCA fit is on a homogeneous
+    # snapshot.
     baseline_df = baseline_X = None
     if M.short_name == "gemma" and PILOT_RAW_PATH.exists():
         baseline_df, baseline_X = load_v1v2_neutral_baseline_features(
             str(PILOT_RAW_PATH), DATA_DIR,
             experiment=PILOT_EXPERIMENT, which="h_mean",
+            layer=M.preferred_layer,
         )
         print(f"loaded {len(baseline_df)} v1/v2 neutral-valence baseline rows")
 

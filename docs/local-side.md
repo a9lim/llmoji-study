@@ -215,21 +215,31 @@ Setup: 100 prompts balanced across the five Russell quadrants
 (HP high-valence-high-arousal, LP high-valence-low-arousal, HN, LN,
 plus a neutral-baseline NB), 8 seeds per prompt, single
 `kaomoji_prompted` arm. 800 generations. Per-row hidden-state
-sidecars at the deepest probe layer, written alongside the JSONL.
+sidecars at every probe layer (the v1.0 sidecar refactor stores
+all of them, not just the deepest), written alongside the JSONL.
 
 ### Findings
 
-Hidden-state PCA on 800 row-level vectors gives PC1 13.0% and PC2
-7.5%. Russell quadrants separate cleanly. PC1 reads as valence
-(HN and LN on the right at +7, HP and LP and NB on the left at -2
-to -5), PC2 reads as activation (NB and LP at +4 to +6, HP at -6).
-Separation ratios are PC1 2.02 and PC2 2.73.
+Hidden-state PCA on 800 row-level vectors at L31 (gemma's
+preferred-affect layer per `scripts/21_v3_layerwise_emergence.py`;
+the per-model peak silhouette layer identified in the 2026-04-28
+v3 follow-on analyses below) gives PC1 19.8% and PC2 7.0%. Russell
+quadrants separate cleanly on both axes. PC1 reads as valence
+(HN/LN on the right at +9 to +13, HP/LP/NB on the left at -3 to
+-9), PC2 carries arousal (HN +3.7 vs LN -6.2; HP -6.8 vs LP +2.1;
+NB +7.3). Separation ratios are PC1 2.10 and PC2 2.12.
 
-HP and LP discriminate cleanly. HN and LN overlap on PC1, because
-they share the sad-face vocabulary `(｡•́︿•̀｡)` (n=171, 102 LN +
-52 HN); a single cross-quadrant face flattens the negative-side
-arousal information. HN gets a dedicated shocked or angry register
-(`(╯°□°)`, `(⊙_⊙)`, `(⊙﹏⊙)`) that doesn't appear elsewhere.
+At L31 HN and LN separate on both axes — the PC2 gap is 9.7 units
+even though they still share the sad-face vocabulary `(｡•́︿•̀｡)`
+(n=171, 102 LN + 52 HN). The model's hidden state distinguishes
+the two negative quadrants; the kaomoji vocabulary collapses them
+to one face at the output. (At the prior L57 default both
+quadrants sat near +7 on PC1 with PC2 close to zero, and the
+"HN/LN overlap" reading became part of the gemma-vs-qwen "1D vs
+2D" framing — that framing dissolved once gemma was read at the
+right layer; see v3 follow-on analyses.) HN still gets a dedicated
+shocked or angry register (`(╯°□°)`, `(⊙_⊙)`, `(⊙﹏⊙)`) that
+doesn't appear elsewhere.
 
 Within-kaomoji consistency to mean is 0.92 to 0.99 across the 32
 forms with n≥3 after canonicalization (33 pre-canonicalization).
@@ -240,7 +250,10 @@ Probe-space PCA on the same 800 rows would give PC1 ≈ 89% (the
 v1 and v2 collapse). In hidden-state space the second emotional
 dimension survives, so the v1 and v2 valence-collapse is a
 probe-extraction artifact, not a property of the underlying
-representation.
+representation. Pearson r between mean `happy.sad` and mean
+`angry.calm` across faces is -0.94 — that number is a property of
+saklas's probe geometry, computed at saklas's own internal layer,
+and doesn't change with which layer we PCA on.
 
 ![v3 PCA, gemma](../figures/local/gemma/fig_v3_pca_valence_arousal.png)
 
@@ -332,16 +345,21 @@ capture pipeline. Two open-weight LMs, two readings.
 
 ### Headline numbers
 
-| metric | gemma-4-31b-it | qwen3.6-27b |
+| metric | gemma-4-31b-it (L31) | qwen3.6-27b (L61) |
 | --- | ---: | ---: |
 | canonical kaomoji forms (post-canonicalization) | 32 | 65 |
-| hidden-state PCA, PC1 explained variance | 12.98% | 14.87% |
-| hidden-state PCA, PC2 explained variance |  7.49% |  8.29% |
-| Russell-quadrant separation ratio, PC1 | 2.03 | 2.20 |
-| Russell-quadrant separation ratio, PC2 | 2.74 | 1.89 |
+| hidden-state PCA, PC1 explained variance | 19.83% | 14.87% |
+| hidden-state PCA, PC2 explained variance |  7.04% |  8.29% |
+| Russell-quadrant separation ratio, PC1 | 2.10 | 2.20 |
+| Russell-quadrant separation ratio, PC2 | 2.12 | 1.89 |
 | Pearson r, mean(happy.sad) × mean(angry.calm) across faces | -0.94 | -0.12 |
 | TAXONOMY-match rate (gemma-tuned dict) | ~85% | ~13% |
 | bracket-start instruction compliance | 100% | 100% |
+
+(Gemma read at L31, its peak-affect probe layer per `scripts/21`,
+not L57 as in earlier writeups. The L57 numbers — PC1 13.0%, PC2
+7.5%, "HN/LN-collapse-on-PC1" — are superseded; see v3 follow-on
+analyses below.)
 
 ### Geometric structure
 
@@ -349,34 +367,38 @@ Side-by-side PCA panels:
 `figures/local/gemma/fig_v3_pca_valence_arousal.png` against
 `figures/local/qwen/fig_v3_pca_valence_arousal.png`.
 
-In the gemma panel, the four affect quadrant centroids fall
-roughly on a single line. HP sits at (-5, -6), LP at (-3, +4),
-NB at (-2, +6); HN and LN both sit near (+7, -2), nearly
-overlapping on PC2. The shared sad-face vocabulary `(｡•́︿•̀｡)`
-(n=171, 102 LN + 52 HN) shows up as a single large blue circle
-next to the red HN cluster, visually flattening the negative-side
-arousal axis.
+In the gemma panel (read at L31), the four affect quadrants land
+in distinct regions: HP at (-5.9, -6.8), LP at (-3.6, +2.1), NB
+at (-7.3, +7.3), HN at (+12.8, +3.7), LN at (+9.0, -6.2). HN and
+LN are now separated on both axes — PC1 gap of 3.8 units, PC2
+gap of 9.9 units — even though `(｡•́︿•̀｡)` (n=171, 102 LN + 52
+HN) is still the shared face. Internal state distinguishes the
+two negative quadrants; the vocabulary doesn't.
 
 In the qwen panel, the four affect quadrants land in four
 distinct regions. HP at (-22, -30), LP at (-15, -2), NB at
 (-23, +29), HN at (+30, +22), LN at (+30, -4). The plot range
-is roughly 4x wider on each axis (PC1 spans about -45 to +60 on
-qwen vs -15 to +10 on gemma), reflecting both the larger
-vocabulary and the wider hidden-state spread.
+is roughly 3-4x wider on each axis than gemma's (PC1 spans about
+-45 to +60 on qwen vs -10 to +13 on gemma), reflecting both the
+larger vocabulary and the longer absolute scale of qwen's
+internal affect axis.
 
-The geometric difference: in gemma, PC2 is essentially a single
-arousal-like axis shared across quadrants, with HP at one end and
-NB/LP at the other and HN/LN clustered near zero. In qwen, the
+The geometric difference (post-2026-04-28): in qwen, the
 positive-valence cluster (HP, LP) and the negative-valence
-cluster (HN, LN) each carry their own arousal-like spread on
-PC2, but those spreads point in opposite directions:
-HP → LP travels (+7, +28), HN → LN travels (+0.5, -27). Two
-arousal axes, anti-parallel, instead of one shared one.
-
-Practical reading: gemma's affect representation in v3 is closer
-to one-dimensional with an arousal modifier; qwen's is closer to
-a two-dimensional Russell circumplex with arousal expressed
-independently within each valence half.
+cluster (HN, LN) each carry their own arousal spread on PC2, but
+those spreads point in opposite directions: HP → LP travels
+(+7, +28), HN → LN travels (+0.5, -27). In gemma at L31 the same
+shape holds — HP → LP is (+2.3, +8.9) and HN → LN is
+(-3.8, -9.9), both axes pointing oppositely. Two arousal axes,
+anti-parallel, in both models. The earlier "gemma 1D, qwen 2D"
+framing was a layer-choice artifact: at L57 gemma's HN and LN
+collapsed on PC1 with PC2 ~ 0, and the negative-cluster arousal
+axis was invisible. At L31 both models recover the same
+two-dimensional Russell circumplex shape; qwen's is just longer
+in absolute scale and tighter in silhouette (0.31 vs 0.18). See
+v3 follow-on analyses below for the formal cross-model alignment
+(CKA 0.84 deepest-deepest, Procrustes rotation +7.8° at preferred
+layers).
 
 ### Probe-space divergence
 
@@ -466,6 +488,158 @@ whether it just rescales an otherwise-similar arrangement. The
 Russell-quadrant centroids panel above answers this at the
 quadrant level; the per-face panel may add detail beyond that.
 
+## v3 follow-on analyses (2026-04-28)
+
+Five scripts run on the existing v3 sidecars — no new model time.
+The headline driver is `scripts/21`, the layer-wise emergence
+trajectory; everything else flows from the discovery that gemma's
+affect representation peaks at L31 of 56 rather than at the deepest
+L57 the v3 figures previously defaulted to. Adding `preferred_layer`
+to `ModelPaths` (gemma=31, qwen=None → deepest L61) made the rest of
+the v3 pipeline read at the right layer per model.
+
+### Layer-wise emergence (`scripts/21_v3_layerwise_emergence.py`)
+
+Per probe layer, fit PCA(2) on h_mean and measure quadrant
+separation via silhouette score, between-centroid std on PC1/PC2,
+and PC1/PC2 explained variance.
+
+- Gemma (56 layers): silhouette peaks at **L31 (0.184)** and
+  degrades 36% to **0.117 at the deepest L57**. Half-peak
+  silhouette reached by L7.
+- Qwen (60 layers): silhouette peaks at **L59 (0.313)** and stays
+  at **0.304 at L61**. Half-peak by L16. Monotonic refinement to
+  the output.
+- Cross-model: qwen's peak silhouette is 70% higher than gemma's
+  (0.31 vs 0.18). At the right layer for each, qwen's affect
+  representation is genuinely cleaner by absolute discriminability,
+  but the structural difference is much smaller than the L57
+  numbers suggested.
+
+Outputs: `figures/local/{gemma,qwen}/fig_v3_layerwise_emergence.png`,
+`fig_v3_layerwise_pca_quartiles.png`, `v3_layerwise_emergence.tsv`,
+plus `figures/local/cross_model/fig_v3_layerwise_emergence_compare.png`.
+
+### Same-face-cross-quadrant (`scripts/22_v3_same_face_cross_quadrant.py`)
+
+For each face emitted in two or more quadrants with at least three
+rows in each, train a PCA(20) → l2-logistic classifier on h_mean
+to predict which quadrant prompted each instance, using only that
+face's rows. 5-fold stratified CV vs 30-shuffle label-permutation
+null at q95.
+
+- Gemma at L31: **6/10** cross-quadrant emitters separate.
+  `(｡•́︿•̀｡)` (n=171, the LN+HN dual-emitter) accuracy 0.95 vs
+  null 0.59. `(｡◕‿◕｡)` (n=75) and `(╯°□°)` (n=54) accuracy 1.00.
+  The four that don't separate are all low-n (n ≤ 19) borderline
+  cases.
+- Qwen at L61: **7/16** separate. `(≧‿≦)` (n=105, HP+LP+NB)
+  accuracy 0.96 vs null 0.44; `(;ω;)` (n=80) accuracy 0.95.
+
+For the faces that separate, internal hidden state carries the
+affect signal but the model collapses it to a shared face. The
+kaomoji is a partial readout, not the state itself; the dominant
+pattern is "internal state finer than vocabulary."
+
+### Cross-model alignment (`scripts/23_v3_cross_model_alignment.py`)
+
+Pair v3 rows by `(prompt_id, seed)` — both runs used the same 100
+prompts × 8 seeds, so 800 perfect cross-model pairs. Linear CKA via
+centered Gram matrices over the full 56×60 layer grid (kernel form,
+~5s; the naive d×d covariance form takes ~25 min). Cross-validated
+CCA on PCA(20) features with a 70/30 paired-prompt split.
+
+- CKA: at the **deepest-layer pair** (gemma L57 ↔ qwen L61) =
+  **0.844**, **maximum** at gemma L52 ↔ qwen L58 = **0.858**, at
+  the **preferred-layer pair** (gemma L31 ↔ qwen L61) = **0.798**.
+  The deepest-deepest CKA is higher than the preferred-pair CKA
+  even though the affect signal is degraded mid-network on gemma —
+  representations converge geometrically near the output.
+- CCA top-10 canonical correlations on held-out prompts (gemma L31
+  ↔ qwen L61): 0.98, 0.98, 0.97, 0.94, 0.94, 0.94, 0.93, 0.94,
+  0.91, 0.90. Train and test essentially match — no overfit. Ten
+  distinct shared affect/register directions.
+- Procrustes alignment of per-quadrant PCA(2) centroids: **+7.8°
+  rotation** at preferred-layer pair (down from +14.0° at
+  deepest-deepest), residual 5.7. Russell circumplex shape is more
+  aligned across models when each model is read at its affect peak.
+
+### PC3+ × probes (`scripts/24_v3_pca3plus.py`)
+
+Fit PCA(8) on v3 h_mean per model, cross-reference each PC against
+all 5 saklas probe scores at t0 (whole-generation aggregate).
+
+- Gemma (L31): PC1 absorbs valence (`happy.sad` r=-0.69,
+  `angry.calm` r=+0.46 — valence-collapse persists; this is
+  structural to gemma's probe geometry). PC2 absorbs a humor +
+  warmth + arousal mix.
+- Qwen (L61): PC1 absorbs valence + humor jointly (`happy.sad`
+  r=-0.86, `humorous.serious` r=-0.69). PC2 absorbs certainty
+  (`confident.uncertain` r=-0.48). PC3 absorbs arousal + warmth
+  (`angry.calm` r=-0.61, `warm.clinical` r=+0.48).
+
+The cross-face Pearson r=-0.94 vs r=-0.12 between mean
+`happy.sad` and `angry.calm` reduces to a clean PCA explanation:
+gemma loads both probes onto PC1+PC2 together so they anti-align;
+qwen loads them onto PC1 vs PC3, which are nearly orthogonal in
+face-space. Different decompositions of the same affect space.
+
+### Kaomoji predictiveness (`scripts/25_v3_kaomoji_predictiveness.py`)
+
+Per-model fidelity in two directions, h_mean at preferred layer,
+faces filtered to n ≥ 5.
+
+- **Hidden → face** (multi-class logistic on PCA(50)-reduced
+  h_mean, 5-fold CV): gemma top-1 accuracy 0.71 across 19 face
+  classes (uniform 0.05, majority 0.23, macro-F1 0.52); qwen
+  0.495 across 28 classes (uniform 0.04, majority 0.14, macro-F1
+  0.30). Both 13–14× uniform.
+- **Hidden → quadrant** (5-class, same pipeline): both models
+  1.000 accuracy — caveat: 5-fold CV is by row not by prompt;
+  with 8 seeds × 100 prompts the same prompt appears in train
+  and test folds with different seeds, so this number is inflated
+  by prompt-level leakage. Need a `GroupKFold` keyed on
+  `prompt_id` for the rigorous version.
+- **Face → hidden** (η² of face identity per PC, summed weighted
+  by explained variance): face identity recovers **49%** of the
+  top-5 PC subspace on gemma, **60%** on qwen.
+- **Concrete reconstruction**: predict h_mean = face_centroid in
+  full hidden space gives R² = **0.260** (gemma) / **0.287**
+  (qwen); mean centered cosine 0.49 / 0.52; ‖error‖/‖row deviation‖
+  0.86 / 0.84. Quadrant-centroid baseline gets R² 0.254 / 0.264
+  — face buys only +0.6 / +2.3 percentage points over quadrant
+  alone in full hidden space. Reconciles with the η² above:
+  kaomoji choice tracks the affect direction tightly and is roughly
+  independent of the bulk of hidden state, which is content-
+  related. The marginal information beyond quadrant is
+  concentrated where affect lives.
+
+### Open follow-ons
+
+- v1/v2 hidden-state analyses still default to the deepest probe
+  layer (no v1/v2 sidecars exist yet anyway, but the loaders are
+  wired for L31 when they land).
+- L31 was found via h_mean silhouette. v1/v2 + cross-pilot scripts
+  use h_last at L31 — assumes "best layer for affect" is
+  snapshot-independent. Worth re-running script 21 with
+  `which="h_last"` to verify.
+- Script 25's quadrant accuracy of 1.000 is real but inflated by
+  prompt-level leakage in the 5-fold CV; needs `GroupKFold` for the
+  honest number. Expected to drop to ~0.7–0.8 under leave-prompts-
+  out CV.
+- Qwen has 16 cross-quadrant emitters; gemma has 10. Wider net for
+  natural-experiment work on qwen as the dataset grows.
+- The remaining 7.8° Procrustes rotation between gemma L31 and
+  qwen L61 is non-trivial. Asks whether the two models' quadrant
+  axes are shifted by a consistent affine map.
+
+The full version of these findings — including all methodological
+caveats, the kernel-form CKA implementation note, per-face TSV
+columns, and the exact figure file paths — lives in
+[`CLAUDE.md`](../CLAUDE.md) under "v3 follow-on analyses". The
+README's "Findings summary" section gives the same five points in
+public-facing prose.
+
 ## Vocab pilot: Ministral-3-14B-Instruct-2512
 
 Same 30 v1 and v2 prompts, same seed, same instruction as the
@@ -520,6 +694,25 @@ Defaults: `which="h_mean"` (whole-generation aggregate; smoother
 and more probative than `h_last`), `layer=None` (deepest probe
 layer). All v3 figures use `h_mean`.
 
+Per-model layer override: `ModelPaths.preferred_layer` (in
+`llmoji_study.config`) carries the peak-affect probe layer per
+model — gemma = 31, qwen = None (uses deepest L61), ministral =
+None (no v3 data yet). v3 scripts (04, 13, 17, 22, 23, 24, 25)
+all pass `layer=M.preferred_layer` so figures get the right
+snapshot per model. v1/v2 + cross-pilot scripts (02, 10) follow
+the same convention; both currently bail because
+`pilot_raw.jsonl` doesn't exist (v1/v2 hidden-state pipeline
+gated on v3 findings). The 2026-04-28 layer-wise emergence
+analysis is the source of L31; see v3 follow-on analyses above.
+
+Multi-layer cache: `load_hidden_features_all_layers(...)` opens
+each sidecar once and returns a `(n_rows, n_layers, hidden_dim)`
+tensor with optional disk cache at
+`data/cache/v3_<short>_h_mean_all_layers.npz` (gitignored,
+~800 MB compressed per model — npz compression doesn't help much
+with dense float32 hidden states). Used by `scripts/21` (layer
+trajectory) and `scripts/23` (per-layer CKA grid).
+
 ## Reproducing
 
 ```bash
@@ -552,6 +745,13 @@ LLMOJI_MODEL=qwen python scripts/17_v3_face_scatters.py
 python scripts/10_cross_pilot_clustering.py
 python scripts/11_emotional_probe_correlations.py
 python scripts/12_emotional_prompt_matrix.py
+
+# v3 follow-on analyses (2026-04-28; uses existing sidecars, no model time)
+python scripts/21_v3_layerwise_emergence.py        # multi-layer, both models
+python scripts/22_v3_same_face_cross_quadrant.py   # respects LLMOJI_MODEL
+python scripts/23_v3_cross_model_alignment.py      # gemma↔qwen, both required
+python scripts/24_v3_pca3plus.py                   # respects LLMOJI_MODEL
+python scripts/25_v3_kaomoji_predictiveness.py     # both models in one run
 ```
 
 The v1 and v2 run is approximately thirty minutes end-to-end on

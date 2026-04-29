@@ -19,12 +19,17 @@ from llmoji_study.analysis import all_figures, evaluate_axis, load_rows
 from llmoji_study.config import (
     DATA_DIR,
     FIGURES_DIR,
+    MODEL_REGISTRY,
     PILOT_EXPERIMENT,
     PILOT_RAW_PATH,
     STEERED_AXES,
 )
 
 PILOT_FIGURES_DIR = FIGURES_DIR / "local" / "gemma"
+# v1/v2 is gemma-only by design (no steering vectors calibrated for
+# qwen3_5 / Ministral). Read at gemma's preferred layer so the
+# hidden-state figures here match the v3 figures' affect snapshot.
+GEMMA_LAYER = MODEL_REGISTRY["gemma"].preferred_layer
 from llmoji_study.hidden_state_analysis import load_hidden_features
 
 
@@ -62,10 +67,13 @@ def main() -> None:
     # reads the JSONL independently and returns its own metadata df
     # aligned with X; we discard that df and use the probe-column df
     # from load_rows for probe-based figures, passing only X forward.
-    print("\nloading hidden-state features for Fig 1b + Fig 3...")
+    layer_label = "max" if GEMMA_LAYER is None else f"L{GEMMA_LAYER}"
+    print(f"\nloading hidden-state features for Fig 1b + Fig 3 "
+          f"(which=h_last, layer={layer_label})...")
     df_hidden, X = load_hidden_features(
         str(PILOT_RAW_PATH), DATA_DIR,
         experiment=PILOT_EXPERIMENT, which="h_last",
+        layer=GEMMA_LAYER,
     )
     # Align X to df via row_uuid (drops rows without sidecars).
     uuid_to_idx = {u: i for i, u in enumerate(df_hidden["row_uuid"])}

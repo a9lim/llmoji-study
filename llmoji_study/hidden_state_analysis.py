@@ -285,3 +285,105 @@ def stack_snapshot(
             )
         out.append(getattr(cap.layers[layer], which))
     return np.asarray(out, dtype=np.float32)
+
+
+# ---------------------------------------------------------------------------
+# Multi-layer loading (for layer-wise emergence + per-layer CKA scripts)
+# ---------------------------------------------------------------------------
+
+
+def load_hidden_features_all_layers(
+    jsonl_path: str | Path,
+    data_dir: Path,
+    experiment: str,
+    *,
+    which: str = "h_mean",
+    layers: list[int] | None = None,
+    drop_errors: bool = True,
+    cache_path: Path | None = None,
+) -> tuple[pd.DataFrame, np.ndarray, list[int]]:
+    """Load JSONL + sidecars and stack one snapshot per layer into a
+    3D feature tensor. Returns ``(df, X3, layer_idxs)`` where
+    ``X3.shape == (n_rows, n_layers, hidden_dim)``.
+
+    The slow path is one ``np.load`` per row (44k for an 800-row run
+    × 56 layers if we used ``load_hidden_features`` once per layer);
+    this helper opens each sidecar exactly once. Optionally writes the
+    result to ``cache_path`` (an .npz of the X3 tensor + a JSONL of
+    row metadata) and reads it back on subsequent calls.
+
+    ``layers=None`` uses every layer present in the first sidecar.
+    Pass an explicit list to subset (e.g. every 4th layer).
+    """
+    if which not in WHICH_SNAPSHOTS:
+        raise ValueError(f"which must be one of {WHICH_SNAPSHOTS}")
+
+    if cache_path is not None and cache_path.exists():
+        cached = np.load(cache_path)
+        meta_path = cache_path.with_suffix(".meta.jsonl")
+        df = pd.read_json(meta_path, lines=True) if meta_path.exists() else pd.DataFrame()
+        layer_idxs = [int(x) for x in cached["layer_idxs"]]
+        X3 = cached["X3"]
+        return df, X3, layer_idxs
+
+    jsonl_path = Path(jsonl_path)
+    rows: list[dict[str, Any]] = []
+    with jsonl_path.open() as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            r = json.loads(line)
+            if drop_errors and "error" in r:
+                continue
+            rows.append(r)
+
+    chosen_layers: list[int] | None = layers
+    per_row: list[np.ndarray] = []
+    kept: list[dict[str, Any]] = []
+    missing = 0
+    for r in rows:
+        uuid = r.get("row_uuid", "")
+        if not uuid:
+            missing += 1
+            continue
+        sidecar = hidden_state_path(data_dir, experiment, uuid)
+        if not sidecar.exists():
+            missing += 1
+            continue
+        cap = load_hidden_states(sidecar, full_trace=False)
+        if chosen_layers is None:
+            chosen_layers = sorted(cap.layers.keys())
+        try:
+            stack = np.stack([
+                getattr(cap.layers[L], which).astype(np.float32)
+                for L in chosen_layers
+            ])
+        except KeyError:
+            missing += 1
+            continue
+        per_row.append(stack)
+        kept.append(r)
+
+    if missing:
+        print(f"  [load_hidden_features_all_layers] dropped {missing} rows "
+              f"with no sidecar / missing layer")
+
+    if not kept:
+        return pd.DataFrame(), np.zeros((0, 0, 0), dtype=np.float32), []
+
+    df = pd.DataFrame(kept).reset_index(drop=True)
+    X3 = np.asarray(per_row, dtype=np.float32)
+    layer_idxs = list(chosen_layers or [])
+
+    if cache_path is not None:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(
+            cache_path,
+            X3=X3,
+            layer_idxs=np.array(layer_idxs, dtype=np.int64),
+        )
+        df.to_json(cache_path.with_suffix(".meta.jsonl"),
+                   orient="records", lines=True)
+
+    return df, X3, layer_idxs
