@@ -14,13 +14,20 @@ MODEL_ID = "google/gemma-4-31b-it"
 # Saklas probe categories to bootstrap. The `probes=` kwarg on
 # `SaklasSession.from_pretrained` takes CATEGORY names, not individual
 # concept names; the library expands a category into its member concepts
-# via the bundled defaults. The union of these three categories covers
-# the five concepts we actually read (see PROBES below).
+# via the bundled defaults. The `affect` category covers happy.sad and
+# angry.calm out of the box, plus the three extension probes registered
+# via `llmoji_study.probe_extensions` (`powerful.powerless`,
+# `surprised.unsurprised`, `disgusted.accepting`) — those are all
+# tagged `affect` so they auto-pick-up once `register_extension_probes()`
+# has materialized them into `~/.saklas/vectors/default/`.
 PROBE_CATEGORIES = ["affect", "epistemic", "register"]
 
-# Concept names we read probe scores for. Subset of the categories
-# above. Only the first of these is steered in the pilot; the others
-# serve as a steering-selectivity check and features for clustering.
+# Baseline concept set — kept stable across v1/v2/v3 because
+# `SampleRow.probe_scores_t0` / `_tlast` are LISTS indexed by this
+# order. Adding entries here would silently misalign every JSONL row
+# already on disk. Extension probes go in PROBES_EXTENSION below and
+# are written to dict-keyed fields, so existing analysis scripts that
+# slice probe_scores_t0[i] keep working unchanged.
 PROBES = [
     "happy.sad",
     "angry.calm",
@@ -28,6 +35,33 @@ PROBES = [
     "warm.clinical",
     "humorous.serious",
 ]
+
+# v3 follow-on probe extensions (2026-04-29) — addresses two known
+# limitations of the V-A circumplex:
+#
+#   - **Anger / fear collapse on PC2.** Both sit at HN (high-arousal,
+#     negative-valence) so 2D Russell can't separate them. PAD's third
+#     axis (dominance) splits them: anger = HN + high dominance,
+#     fear = HN + low dominance. `powerful.powerless` targets the
+#     felt-agency framing (distinct from saklas's bundled
+#     `authoritative.submissive`, which is register-flavored).
+#   - **Plutchik axes missing from V-A.** Surprise (novelty
+#     appraisal) and disgust (revulsion) are first-rank emotions in
+#     Plutchik's wheel and Ekman's basic six but have no clean
+#     projection onto V-A. Added to fill the gap.
+#
+# Stored as dict-keyed fields (`extension_probe_means`,
+# `extension_probe_scores_t0`, `extension_probe_scores_tlast`) by
+# `scripts/27_v3_extension_probe_rescore.py` so the change is
+# strictly additive — no existing schema breaks.
+PROBES_EXTENSION = [
+    "powerful.powerless",      # PAD dominance / felt agency / coping potential
+    "surprised.unsurprised",   # Plutchik surprise / novelty appraisal
+    "disgusted.accepting",     # Plutchik disgust / revulsion
+]
+
+# Convenience union for analysis scripts that want every probe.
+PROBES_ALL = PROBES + PROBES_EXTENSION
 
 # Axes whose steering produces causal-intervention arms. v1 tested
 # happy.sad only; v2 adds angry.calm to test the unmarked/marked-affect

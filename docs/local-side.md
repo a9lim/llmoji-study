@@ -255,17 +255,22 @@ representation. Pearson r between mean `happy.sad` and mean
 saklas's probe geometry, computed at saklas's own internal layer,
 and doesn't change with which layer we PCA on.
 
-![v3 PCA, gemma](../figures/local/gemma/fig_v3_pca_valence_arousal.png)
+The Russell-quadrant PCA scatter is interactive in
+`figures/local/cross_model/fig_v3_extension_3d_pca.html` (PC1 ×
+PC2 × PC3 with hover-on-point); the static 2D version
+(`fig_v3_pca_valence_arousal.png`) was retired 2026-04-29.
 
 The supporting v3 figures, all on `figures/local/gemma/`, are
 `fig_emo_a_kaomoji_sim.png` (kaomoji similarity heatmap),
 `fig_emo_b_kaomoji_consistency.png` (within-kaomoji consistency to
 mean), `fig_emo_c_kaomoji_quadrant.png` (per-kaomoji emission
-counts by Russell quadrant), and the per-face panels
-`fig_v3_face_pca_by_quadrant.png`,
-`fig_v3_face_cosine_heatmap.png`, and
-`fig_v3_face_probe_scatter.png`. The face-level figures are
-recoloured by the 2026-04-25 RGB-blend palette so cross-quadrant
+counts by Russell quadrant), and `fig_v3_face_cosine_heatmap.png`
+(per-face × per-face cosine of mean h_mean, ordered by quadrant).
+The 2D per-face PCA / probe-scatter panels were retired
+2026-04-29; `figures/local/cross_model/fig_v3_extension_3d_pca_per_face.html`
+and `fig_v3_extension_3d_probes_per_face.html` cover the same
+ground with hover, rotation, and PC3 surfaced. All face-level
+figures use the 2026-04-25 RGB-blend palette so cross-quadrant
 emitters render as mixes rather than dominant-quadrant winner-
 take-all.
 
@@ -328,14 +333,16 @@ LN 75 + HN 5 + HP 2), analogous to gemma's `(｡•́︿•̀｡)`. The one
 HN-coded form shared between gemma's and Qwen's vocabulary is
 `(╯°□°)`, the table-flip glyph.
 
-![v3 PCA, qwen](../figures/local/qwen/fig_v3_pca_valence_arousal.png)
+The qwen panel of `figures/local/cross_model/fig_v3_extension_3d_pca.html`
+is the rotatable counterpart of the v3 PCA scatter (the static
+`fig_v3_pca_valence_arousal.png` was retired 2026-04-29).
 
 Supporting figures live under `figures/local/qwen/` with the same
 filenames as the gemma side. The cross-quadrant emitters
 `(;ω;)` (n=82, LN-dominant), `(;´д｀)` (n=70, HN/LN mix), and
 `(｡•́︿•̀｡)` (n=22, LN-dominant) all show up as visibly mixed
-under the RGB-blend palette in
-`fig_v3_face_pca_by_quadrant.png`.
+under the RGB-blend palette in the qwen panel of
+`figures/local/cross_model/fig_v3_extension_3d_pca_per_face.html`.
 
 ## Cross-model comparison: gemma vs qwen on v3
 
@@ -363,9 +370,9 @@ analyses below.)
 
 ### Geometric structure
 
-Side-by-side PCA panels:
-`figures/local/gemma/fig_v3_pca_valence_arousal.png` against
-`figures/local/qwen/fig_v3_pca_valence_arousal.png`.
+Side-by-side PCA panels live as the two scenes in
+`figures/local/cross_model/fig_v3_extension_3d_pca.html` (the
+former 2D-per-model files were retired 2026-04-29).
 
 In the gemma panel (read at L31), the four affect quadrants land
 in distinct regions: HP at (-5.9, -6.8), LP at (-3.6, +2.1), NB
@@ -402,19 +409,29 @@ layers).
 
 ### Probe-space divergence
 
-`figures/local/gemma/fig_v3_face_probe_scatter.png` and
-`figures/local/qwen/fig_v3_face_probe_scatter.png` plot per-face
-mean `happy.sad` against mean `angry.calm`.
+The two scenes of
+`figures/local/cross_model/fig_v3_extension_3d_probes_per_face.html`
+plot per-face mean `happy.sad` against mean `angry.calm` against
+mean `fearful.unflinching` at h_last (the trio basis added 2026-04-29
+in place of the retired 2D `fig_v3_face_probe_scatter.png`).
 
-Gemma: r = -0.94 (p < 1e-15) across n=32 faces. The two probes
-read nearly the same direction with opposite sign. This is the
-v1/v2 valence-collapse claim restated on naturalistic v3 data.
+Gemma: r(happy.sad, angry.calm) = -0.94 (p < 1e-15) across n=32
+faces. The two probes read nearly the same direction with opposite
+sign. This is the v1/v2 valence-collapse claim restated on
+naturalistic v3 data. The new fearful axis tracks gemma's affect
+direction tightly too — r(happy.sad, fearful.unflinching) = +0.81
+and r(fearful.unflinching, angry.calm) = -0.92 at the face level.
 
-Qwen: r = -0.12 (p = 0.36) across n=65 faces. The valence
-collapse does not appear. Saklas's contrastive-PCA recovers
-near-orthogonal `happy.sad` and `angry.calm` directions on this
-model. v1/v2-style probe-space analysis would carry substantially
-more affect-relevant variance on qwen than on gemma.
+Qwen: r(happy.sad, angry.calm) = -0.12 (p = 0.36) across n=64
+faces. The valence collapse does not appear. Saklas's
+contrastive-PCA recovers near-orthogonal `happy.sad` and
+`angry.calm` directions on this model. The fearful axis is
+substantially more independent than gemma's:
+r(happy.sad, fearful.unflinching) = -0.87 (qwen reads happy and
+fearful as antiparallel, gemma reads them as roughly aligned),
+r(fearful.unflinching, angry.calm) = +0.27. v1/v2-style
+probe-space analysis would carry substantially more
+affect-relevant variance on qwen than on gemma.
 
 This is a model-architecture-and-training difference, not a
 saklas issue. Same probe-extraction code, same prompts, same
@@ -477,16 +494,20 @@ been done.
 
 ### Per-face PCA panel
 
-`figures/local/{gemma,qwen}/fig_v3_face_pca_by_quadrant.png`.
-Both use the same 2026-04-25 RGB-blend palette, with cross-
-quadrant emitters rendering as visible mixes.
+`figures/local/cross_model/fig_v3_extension_3d_pca_per_face.html`
+(both models, side-by-side scenes). Same 2026-04-25 RGB-blend
+palette, marker size log-scaled to per-face emission count, hover
+shows face + total + per-quadrant breakdown. Replaces the
+retired 2D `fig_v3_face_pca_by_quadrant.png` (2026-04-29) — the
+3D version surfaces PC3 and lets you orbit-rotate to compare
+PC1×PC2 against PC1×PC3 directly.
 
-[TBD] qualitative read on whether the qwen panel's wider plot
+[TBD] qualitative read on whether the qwen scene's wider plot
 range (corresponding to the PC1/PC2 spread numbers above)
 visually distinguishes the per-face structure from gemma's, or
 whether it just rescales an otherwise-similar arrangement. The
 Russell-quadrant centroids panel above answers this at the
-quadrant level; the per-face panel may add detail beyond that.
+quadrant level; the per-face HTML may add detail beyond that.
 
 ## v3 follow-on analyses (2026-04-28)
 
@@ -731,27 +752,32 @@ python scripts/02_pilot_analysis.py
 # v3 (naturalistic, 800 generations); gemma default
 python scripts/03_emotional_run.py
 python scripts/04_emotional_analysis.py             # Fig A/B/C + summary TSV
-python scripts/13_emotional_pca_valence_arousal.py  # Russell-quadrant PCA
-python scripts/17_v3_face_scatters.py               # per-face PCA, cosine, probe scatter
+python scripts/17_v3_face_scatters.py               # per-face cosine heatmap
 
 # v3 on a non-gemma model (registry: gemma | qwen | ministral)
 LLMOJI_MODEL=qwen python scripts/03_emotional_run.py
 LLMOJI_MODEL=qwen python scripts/04_emotional_analysis.py
-LLMOJI_MODEL=qwen python scripts/13_emotional_pca_valence_arousal.py
 LLMOJI_MODEL=qwen python scripts/17_v3_face_scatters.py
 # outputs land at data/{short_name}_emotional_*, figures/local/{short_name}/*
 
 # Cross-pilot + v3-extension analyses
 python scripts/10_cross_pilot_clustering.py
-python scripts/11_emotional_probe_correlations.py
+python scripts/11_emotional_probe_correlations.py   # trio + PROBES_ALL
 python scripts/12_emotional_prompt_matrix.py
 
 # v3 follow-on analyses (2026-04-28; uses existing sidecars, no model time)
 python scripts/21_v3_layerwise_emergence.py        # multi-layer, both models
 python scripts/22_v3_same_face_cross_quadrant.py   # respects LLMOJI_MODEL
 python scripts/23_v3_cross_model_alignment.py      # gemma↔qwen, both required
-python scripts/24_v3_pca3plus.py                   # respects LLMOJI_MODEL
+python scripts/24_v3_pca3plus.py                   # PC × PROBES_ALL correlation
 python scripts/25_v3_kaomoji_predictiveness.py     # both models in one run
+
+# Probe extension (2026-04-29; PAD dominance + Plutchik surprise + disgust;
+# also auto-picks-up fearful.unflinching et al). All gradient-free.
+python scripts/26_register_extension_probes.py     # one-time per-model bootstrap
+python scripts/27_v3_extension_probe_rescore.py    # rescores existing v3 sidecars
+python scripts/28_v3_extension_probe_figures.py    # 4 PNG cross-model figures
+python scripts/29_v3_extension_probe_3d.py         # 4 interactive HTMLs
 ```
 
 The v1 and v2 run is approximately thirty minutes end-to-end on
@@ -767,7 +793,7 @@ each other.
 
 ## Gotchas
 
-A few of the worst gotchas (the full list is in [`CLAUDE.md`](../CLAUDE.md)):
+A few of the worst gotchas (the full list is in [`docs/gotchas.md`](gotchas.md)):
 
 - saklas's `probes=` kwarg takes category names (`affect`,
   `epistemic`, `register`), not concept names (`happy.sad`).

@@ -1,21 +1,25 @@
 # pyright: reportPossiblyUnboundVariable=false, reportArgumentType=false
-"""v3 PC3+ structure + saklas-probe cross-reference.
+"""v3 PC × probe correlation cross-reference (probes ALL).
 
-PC1+PC2 of v3 h_mean absorb valence and arousal (~20% of variance on
-gemma, ~23% on qwen). What's in PC3-PC8? This script:
+PC1+PC2 of v3 h_mean absorb valence and arousal (~20% on gemma,
+~23% on qwen). What's in PC3-PC8?
 
 * Fits PCA(8) on v3 h_mean per model.
-* Plots PC3 vs PC4 and PC5 vs PC6 colored by quadrant — should NOT
-  show clean quadrant separation if PC1+PC2 already absorbed the
-  affect signal.
-* Computes Pearson correlation of each PC{1..8} with each of the
-  five saklas probe scores (happy.sad, angry.calm, confident.uncertain,
-  warm.clinical, humorous.serious), at both t0 (whole-generation
-  aggregate) and tlast (last-token). Heatmap PC × probe.
+* Computes Pearson correlation of each PC{1..8} with each loaded
+  probe (PROBES_ALL = 5 core + 3 explicit extension + any
+  auto-discovered probes living in `extension_probe_scores_*`),
+  at both t0 (state at first generated token) and tlast (final
+  generated token). Heatmap PC × probe, side-by-side panels.
 * Identifies which PCs carry non-affect signal — large correlations
-  with confident.uncertain, warm.clinical, or humorous.serious on PCs
-  beyond the first two would surface a hidden non-affect axis the
-  model uses for kaomoji choice.
+  with confident.uncertain, warm.clinical, humorous.serious, or
+  hallucinating.grounded on PCs beyond the first two surface a
+  hidden non-affect axis the model uses for kaomoji choice.
+
+The previous companion figure `fig_v3_pca3plus_quadrants.png`
+(per-quadrant PCx scatters at PC1×PC2 / PC1×PC3 / PC2×PC3) was
+deleted 2026-04-29; the interactive 3D version
+``figures/local/cross_model/fig_v3_extension_3d_pca.html`` covers
+the same ground via rotation, and adds a PC3 readout directly.
 
 Outputs to figures/local/<short>/.
 """
@@ -35,26 +39,27 @@ from sklearn.decomposition import PCA
 
 from llmoji_study.config import DATA_DIR, PROBES, current_model
 from llmoji_study.emotional_analysis import (
-    QUADRANT_COLORS,
-    QUADRANT_ORDER,
     _use_cjk_font,
     load_emotional_features,
 )
 
 
-def _attach_probe_columns(df: pd.DataFrame, jsonl_path: Path) -> pd.DataFrame:
-    """Re-load JSONL probe-score arrays and merge into df by row_uuid.
-    ``load_emotional_features`` strips probe columns by default; we
-    pull them back for the cross-reference."""
+def _attach_probe_columns(df: pd.DataFrame, jsonl_path: Path) -> tuple[pd.DataFrame, list[str]]:
+    """Re-load JSONL probe scores and merge into df by row_uuid.
+
+    Returns (merged df, probes_in_order). Probes_in_order is
+    PROBES + sorted extension probes that actually appear on the
+    JSONL — this is the column set both heatmap panels use.
+    """
     raw = pd.read_json(jsonl_path, lines=True)
-    # raw has probe_scores_t0 / probe_scores_tlast as length-5 lists,
-    # in PROBES order.
     cols = ["row_uuid"]
-    if "probe_scores_t0" in raw.columns:
-        cols.append("probe_scores_t0")
-    if "probe_scores_tlast" in raw.columns:
-        cols.append("probe_scores_tlast")
+    for c in ("probe_scores_t0", "probe_scores_tlast",
+              "extension_probe_scores_t0", "extension_probe_scores_tlast"):
+        if c in raw.columns:
+            cols.append(c)
     raw = raw[cols].copy()
+
+    # Core probes — list-indexed by PROBES order.
     if "probe_scores_t0" in raw.columns:
         t0 = np.asarray(raw["probe_scores_t0"].tolist(), dtype=float)
         for i, p in enumerate(PROBES):
@@ -65,93 +70,73 @@ def _attach_probe_columns(df: pd.DataFrame, jsonl_path: Path) -> pd.DataFrame:
         for i, p in enumerate(PROBES):
             raw[f"tlast_{p}"] = tl[:, i]
         raw = raw.drop(columns=["probe_scores_tlast"])
+
+    # Extension probes — dict-keyed; column union over all rows.
+    ext_keys: list[str] = []
+    for src_col, prefix in (("extension_probe_scores_t0", "t0"),
+                             ("extension_probe_scores_tlast", "tlast")):
+        if src_col not in raw.columns:
+            continue
+        keys: set[str] = set()
+        for d in raw[src_col]:
+            if isinstance(d, dict):
+                keys.update(d.keys())
+        for k in sorted(keys):
+            raw[f"{prefix}_{k}"] = [
+                (d.get(k) if isinstance(d, dict) else None)
+                for d in raw[src_col]
+            ]
+        ext_keys = sorted(set(ext_keys) | keys)
+        raw = raw.drop(columns=[src_col])
+
     out = df.merge(raw, on="row_uuid", how="left")
-    return out
-
-
-def _plot_pca_higher_components(
-    coords: np.ndarray,
-    var_ratio: np.ndarray,
-    quadrants: np.ndarray,
-    out_path: Path,
-    short_name: str,
-) -> None:
-    """Three panels: PC1 vs PC2 (reference), PC3 vs PC4, PC5 vs PC6.
-    All colored by quadrant. PC1-PC2 should show the Russell
-    circumplex; PC3-PC6 should NOT, if affect is fully absorbed up
-    front."""
-    _use_cjk_font()
-    fig, axes = plt.subplots(1, 3, figsize=(16, 5.2))
-    pairs = [(0, 1), (2, 3), (4, 5)]
-    for ax, (i, j) in zip(axes, pairs):
-        for q in QUADRANT_ORDER:
-            mask = quadrants == q
-            if not mask.any():
-                continue
-            ax.scatter(
-                coords[mask, i], coords[mask, j],
-                c=QUADRANT_COLORS[q], s=14, alpha=0.7,
-                edgecolor="none", label=q,
-            )
-        for q in QUADRANT_ORDER:
-            mask = quadrants == q
-            if not mask.any():
-                continue
-            cent = coords[mask][:, [i, j]].mean(axis=0)
-            ax.plot(cent[0], cent[1], marker="*", markersize=18,
-                    color=QUADRANT_COLORS[q],
-                    markeredgecolor="black", markeredgewidth=0.9, zorder=5)
-        ax.axhline(0, color="#ccc", linewidth=0.4, zorder=0)
-        ax.axvline(0, color="#ccc", linewidth=0.4, zorder=0)
-        ax.set_xlabel(f"PC{i+1} ({var_ratio[i]*100:.1f}%)")
-        ax.set_ylabel(f"PC{j+1} ({var_ratio[j]*100:.1f}%)")
-        ax.set_title(f"PC{i+1} vs PC{j+1}")
-
-    axes[-1].legend(loc="best", fontsize=8, frameon=False, title="quadrant")
-    fig.suptitle(
-        f"v3 PCA higher-order components — {short_name}\n"
-        "(PC1-PC2 = affect; PC3+ should NOT show quadrant structure)",
-    )
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=150, bbox_inches="tight")
-    plt.close(fig)
+    probes_all = list(PROBES) + ext_keys
+    return out, probes_all
 
 
 def _plot_pc_probe_correlations(
     pc_probe_t0: np.ndarray,
     pc_probe_tlast: np.ndarray,
     n_components: int,
+    probes_all: list[str],
     out_path: Path,
     short_name: str,
 ) -> None:
-    """PC × probe Pearson correlation heatmap, side-by-side t0 / tlast.
-    Strong off-diagonal entries on PC3+ identify non-affect axes the
-    model uses (e.g. PC3 lit up on humorous.serious would mean the
-    model's third-most-variable internal axis tracks register)."""
+    """PC × probe Pearson correlation heatmap, side-by-side t0 / tlast."""
     _use_cjk_font()
-    fig, axes = plt.subplots(1, 2, figsize=(13, 4.5),
+    n_probes = len(probes_all)
+    # Width scales with probe count so labels stay readable.
+    panel_w = max(6.5, 0.55 * n_probes)
+    fig, axes = plt.subplots(1, 2, figsize=(2 * panel_w, 4.8 + 0.18 * n_components),
                              sharey=True)
 
+    im = None
     for ax, mat, title in zip(axes,
                               [pc_probe_t0, pc_probe_tlast],
-                              ["t0 (whole-gen mean)", "tlast (final token)"]):
+                              ["t0 (h_first)", "tlast (h_last)"]):
         im = ax.imshow(mat, cmap="RdBu_r", vmin=-1, vmax=1, aspect="auto")
-        ax.set_xticks(range(len(PROBES)))
-        ax.set_xticklabels(PROBES, rotation=45, ha="right", fontsize=8)
+        ax.set_xticks(range(n_probes))
+        ax.set_xticklabels(probes_all, rotation=55, ha="right", fontsize=7.5)
         ax.set_yticks(range(n_components))
         ax.set_yticklabels([f"PC{k+1}" for k in range(n_components)], fontsize=8)
+        # Mark the boundary between core PROBES and extension probes.
+        sep = len(PROBES) - 0.5
+        ax.axvline(sep, color="black", linewidth=0.6)
         ax.set_title(title)
         for i in range(n_components):
-            for j in range(len(PROBES)):
+            for j in range(n_probes):
                 v = mat[i, j]
-                ax.text(j, i, f"{v:+.2f}", ha="center", va="center",
-                        fontsize=7,
-                        color="white" if abs(v) > 0.5 else "#222")
-    cb = fig.colorbar(im, ax=axes, shrink=0.7, label="Pearson r")
-    cb.ax.tick_params(labelsize=8)
+                if not np.isnan(v):
+                    ax.text(j, i, f"{v:+.2f}", ha="center", va="center",
+                            fontsize=6.5,
+                            color="white" if abs(v) > 0.5 else "#222")
+    if im is not None:
+        cb = fig.colorbar(im, ax=axes, shrink=0.7, label="Pearson r")
+        cb.ax.tick_params(labelsize=8)
     fig.suptitle(
-        f"v3 PCA component × saklas probe correlation — {short_name}\n"
-        "(which PCs absorb which probe direction?)"
+        f"v3 PCA component × probe correlation — {short_name}\n"
+        "(left of black line = core PROBES; right = extension; "
+        "t0 / tlast scoring at h_first / h_last)"
     )
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
@@ -172,8 +157,10 @@ def main() -> None:
         layer=M.preferred_layer,
     )
     print(f"  {len(df)} rows, X {X.shape}")
-    df = _attach_probe_columns(df, M.emotional_data_path)
+    df, probes_all = _attach_probe_columns(df, M.emotional_data_path)
     print(f"  attached probe columns; {len(df)} rows after merge")
+    print(f"  probes considered: {len(probes_all)} "
+          f"({len(PROBES)} core + {len(probes_all) - len(PROBES)} extension)")
 
     n_components = 8
     print(f"\nfitting PCA(n_components={n_components})...")
@@ -186,56 +173,48 @@ def main() -> None:
 
     M.figures_dir.mkdir(parents=True, exist_ok=True)
 
-    # Higher-component scatters.
-    pca_path = M.figures_dir / "fig_v3_pca3plus_quadrants.png"
-    _plot_pca_higher_components(
-        coords, var, df["quadrant"].to_numpy(),
-        pca_path, M.short_name,
-    )
-    print(f"wrote {pca_path}")
-
-    # PC × probe correlation.
-    pc_probe_t0 = np.zeros((n_components, len(PROBES)))
-    pc_probe_tlast = np.zeros((n_components, len(PROBES)))
+    pc_probe_t0 = np.full((n_components, len(probes_all)), np.nan)
+    pc_probe_tlast = np.full((n_components, len(probes_all)), np.nan)
     for k in range(n_components):
-        for j, probe in enumerate(PROBES):
-            t0_col = f"t0_{probe}"
-            tl_col = f"tlast_{probe}"
-            if t0_col in df.columns:
-                t0 = df[t0_col].to_numpy()
-                mask = ~np.isnan(t0)
+        for j, probe in enumerate(probes_all):
+            for src, mat in (("t0", pc_probe_t0), ("tlast", pc_probe_tlast)):
+                col = f"{src}_{probe}"
+                if col not in df.columns:
+                    continue
+                vals = df[col].to_numpy(dtype=float)
+                mask = ~np.isnan(vals)
                 if mask.sum() >= 3:
-                    pc_probe_t0[k, j] = float(pearsonr(coords[mask, k], t0[mask])[0])
-            if tl_col in df.columns:
-                tl = df[tl_col].to_numpy()
-                mask = ~np.isnan(tl)
-                if mask.sum() >= 3:
-                    pc_probe_tlast[k, j] = float(pearsonr(coords[mask, k], tl[mask])[0])
+                    mat[k, j] = float(pearsonr(coords[mask, k], vals[mask])[0])
 
-    print("\nPC × probe Pearson correlation (t0):")
-    print(f"  {'':4} " + " ".join(f"{p[:10]:>10}" for p in PROBES))
+    print("\nPC × probe Pearson correlation (t0 / h_first):")
+    print(f"  {'':4} " + " ".join(f"{p[:10]:>10}" for p in probes_all))
     for k in range(n_components):
-        row = " ".join(f"{pc_probe_t0[k, j]:+.2f}".rjust(10) for j in range(len(PROBES)))
+        row = " ".join(
+            (f"{pc_probe_t0[k, j]:+.2f}" if not np.isnan(pc_probe_t0[k, j]) else "  nan").rjust(10)
+            for j in range(len(probes_all))
+        )
         print(f"  PC{k+1}: {row}")
 
-    print("\nPC × probe Pearson correlation (tlast):")
-    print(f"  {'':4} " + " ".join(f"{p[:10]:>10}" for p in PROBES))
+    print("\nPC × probe Pearson correlation (tlast / h_last):")
+    print(f"  {'':4} " + " ".join(f"{p[:10]:>10}" for p in probes_all))
     for k in range(n_components):
-        row = " ".join(f"{pc_probe_tlast[k, j]:+.2f}".rjust(10) for j in range(len(PROBES)))
+        row = " ".join(
+            (f"{pc_probe_tlast[k, j]:+.2f}" if not np.isnan(pc_probe_tlast[k, j]) else "  nan").rjust(10)
+            for j in range(len(probes_all))
+        )
         print(f"  PC{k+1}: {row}")
 
     corr_path = M.figures_dir / "fig_v3_pca_probe_correlations.png"
     _plot_pc_probe_correlations(
         pc_probe_t0, pc_probe_tlast, n_components,
-        corr_path, M.short_name,
+        probes_all, corr_path, M.short_name,
     )
     print(f"wrote {corr_path}")
 
-    # Save TSV.
     tsv_rows = []
     for k in range(n_components):
         row = {"component": f"PC{k+1}", "explained_variance_pct": float(var[k] * 100)}
-        for j, probe in enumerate(PROBES):
+        for j, probe in enumerate(probes_all):
             row[f"t0_{probe}_r"] = float(pc_probe_t0[k, j])
             row[f"tlast_{probe}_r"] = float(pc_probe_tlast[k, j])
         tsv_rows.append(row)

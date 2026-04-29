@@ -129,17 +129,61 @@ def mix_quadrant_color(
 def load_rows(path: str) -> pd.DataFrame:
     """Load v3 emotional_raw.jsonl, explode probe vectors into per-
     probe columns (for probe-correlation analysis), attach quadrant.
-    Hidden-state analysis uses ``load_emotional_features`` instead."""
+    Hidden-state analysis uses ``load_emotional_features`` instead.
+
+    Unpacks both core probe lists (``probe_scores_t0/tlast``,
+    indexed by ``PROBES`` order) and extension probe dicts
+    (``extension_probe_scores_t0/tlast``, dict-keyed by name) into
+    ``t0_<probe>`` / ``tlast_<probe>`` columns. The
+    ``extension_probe_names`` returned by
+    :func:`available_extension_probes` lists which extension columns
+    were found.
+    """
     from .config import PROBES
     df: pd.DataFrame = pd.read_json(path, lines=True)
+    # Core probes — list-indexed by PROBES order.
     for prefix, src in (("t0", "probe_scores_t0"), ("tlast", "probe_scores_tlast")):
         if src in df.columns:
             stacked = np.asarray(df[src].tolist(), dtype=float)
             for i, probe in enumerate(PROBES):
                 df[f"{prefix}_{probe}"] = stacked[:, i]
             df = df.drop(columns=[src])
+    # Extension probes — dict-keyed; column union over all rows.
+    for prefix, src in (("t0", "extension_probe_scores_t0"),
+                         ("tlast", "extension_probe_scores_tlast")):
+        if src not in df.columns:
+            continue
+        keys: set[str] = set()
+        for d in df[src]:
+            if isinstance(d, dict):
+                keys.update(d.keys())
+        for k in sorted(keys):
+            df[f"{prefix}_{k}"] = [
+                (d.get(k) if isinstance(d, dict) else float("nan"))
+                for d in df[src]
+            ]
+        df = df.drop(columns=[src])
     df["quadrant"] = df["prompt_id"].str[:2].str.upper()
     return df
+
+
+def available_extension_probes(df: pd.DataFrame) -> list[str]:
+    """Names of extension probes whose ``t0_<name>`` (or ``tlast_<name>``)
+    columns were unpacked by :func:`load_rows`. Useful for callers that
+    want to iterate the extension subset without hardcoding it."""
+    from .config import PROBES
+    core = set(PROBES)
+    ext: set[str] = set()
+    for col in df.columns:
+        if not isinstance(col, str):
+            continue
+        for prefix in ("t0_", "tlast_"):
+            if col.startswith(prefix):
+                name = col[len(prefix):]
+                if name not in core:
+                    ext.add(name)
+                break
+    return sorted(ext)
 
 
 def load_v1v2_neutral_baseline(path: str) -> pd.DataFrame:
@@ -764,33 +808,48 @@ def plot_v3_pca_valence_arousal(
 
 def compute_probe_correlations(
     df: pd.DataFrame, *, timestep: str = "t0",
+    probes: list[str] | None = None,
 ) -> dict[str, Any]:
     """Full pairwise Pearson + Spearman correlation between probe
     scores at the given timestep. Returns overall + per-quadrant.
     Inputs: df must have ``t0_<probe>`` / ``tlast_<probe>`` columns
-    from ``load_rows``. Run on v3 unsteered data only — steering
-    would shift probes and confound the collapse reading."""
+    from ``load_rows`` (which unpacks core + extension into the same
+    naming scheme). Pass ``probes=`` to override the default probe
+    set; default is core PROBES + every extension probe whose column
+    is present on df. Run on v3 unsteered data only — steering would
+    shift probes and confound the collapse reading."""
     from scipy.stats import pearsonr, spearmanr
     from .config import PROBES
 
-    cols = [f"{timestep}_{p}" for p in PROBES]
-    out: dict[str, Any] = {"probes": list(PROBES), "by_subset": {}}
+    use_probes = probes
+    if use_probes is None:
+        use_probes = list(PROBES) + available_extension_probes(df)
+    cols = [f"{timestep}_{p}" for p in use_probes]
+    cols = [c for c in cols if c in df.columns]
+    use_probes = [c[len(timestep) + 1:] for c in cols]   # keep alignment
+    n_p = len(use_probes)
+    out: dict[str, Any] = {"probes": use_probes, "by_subset": {}}
 
     def pair_stats(sub: pd.DataFrame) -> dict[str, Any]:
         n = len(sub)
         if n < 3:
             return {"n": n, "pearson": None, "spearman": None}
-        vals = sub[cols].to_numpy()
-        p = np.full((len(PROBES), len(PROBES)), np.nan)
-        s = np.full((len(PROBES), len(PROBES)), np.nan)
-        for i in range(len(PROBES)):
-            for j in range(len(PROBES)):
+        vals = sub[cols].to_numpy(dtype=float)
+        p = np.full((n_p, n_p), np.nan)
+        s = np.full((n_p, n_p), np.nan)
+        for i in range(n_p):
+            xi = vals[:, i]; mi = ~np.isnan(xi)
+            for j in range(n_p):
                 if i == j:
                     p[i, j] = 1.0
                     s[i, j] = 1.0
-                else:
-                    p[i, j] = float(pearsonr(vals[:, i], vals[:, j])[0])
-                    s[i, j] = float(spearmanr(vals[:, i], vals[:, j])[0])
+                    continue
+                xj = vals[:, j]
+                m = mi & ~np.isnan(xj)
+                if m.sum() < 3:
+                    continue
+                p[i, j] = float(pearsonr(xi[m], xj[m])[0])
+                s[i, j] = float(spearmanr(xi[m], xj[m])[0])
         return {"n": int(n), "pearson": p.tolist(), "spearman": s.tolist()}
 
     out["by_subset"]["all"] = pair_stats(df)
@@ -802,20 +861,33 @@ def compute_probe_correlations(
 def plot_probe_correlation_matrix(
     df: pd.DataFrame, out_path: str, *,
     method: str = "pearson", timestep: str = "t0",
+    probes: list[str] | None = None,
 ) -> None:
-    """Multi-panel: overall probe-correlation matrix + one per quadrant."""
+    """Multi-panel: overall probe-correlation matrix + one per quadrant.
+
+    Default probe set is core PROBES + every extension probe present
+    on df (via :func:`available_extension_probes`). Pass ``probes=``
+    to subset, e.g. ``["happy.sad", "fearful.unflinching",
+    "angry.calm"]`` for the affect trio."""
     import matplotlib.pyplot as plt
     from .config import PROBES
 
     _use_cjk_font()
-    stats = compute_probe_correlations(df, timestep=timestep)
+    if probes is None:
+        probes = list(PROBES) + available_extension_probes(df)
+    stats = compute_probe_correlations(df, timestep=timestep, probes=probes)
+    probes_used = stats["probes"]
+    n_p = len(probes_used)
     panels = [
         ("all", "all v3 rows"), ("HP", "HP"), ("LP", "LP"),
         ("HN", "HN"), ("LN", "LN"), ("NB", "NB"),
     ]
 
-    fig, axes = plt.subplots(1, len(panels), figsize=(4 * len(panels), 4.5))
+    panel_w = max(3.5, 0.32 * n_p + 1.5)
+    fig, axes = plt.subplots(1, len(panels),
+                             figsize=(panel_w * len(panels), panel_w + 0.6))
     im = None
+    core_set = set(PROBES)
     for ax, (key, title) in zip(axes, panels):
         sub = stats["by_subset"].get(key, {"n": 0, "pearson": None, "spearman": None})
         mat = sub.get(method)
@@ -826,18 +898,26 @@ def plot_probe_correlation_matrix(
             continue
         arr = np.asarray(mat)
         im = ax.imshow(arr, cmap="RdBu_r", vmin=-1, vmax=1, aspect="equal")
-        ax.set_xticks(range(len(PROBES)))
-        ax.set_yticks(range(len(PROBES)))
-        ax.set_xticklabels(PROBES, rotation=45, ha="right", fontsize=7)
-        ax.set_yticklabels(PROBES, fontsize=7)
-        for i in range(len(PROBES)):
-            for j in range(len(PROBES)):
-                ax.text(j, i, f"{arr[i, j]:+.2f}", ha="center", va="center",
-                        fontsize=6, color="white" if abs(arr[i, j]) > 0.5 else "#333")
+        ax.set_xticks(range(n_p))
+        ax.set_yticks(range(n_p))
+        ax.set_xticklabels(probes_used, rotation=55, ha="right", fontsize=6.5)
+        ax.set_yticklabels(probes_used, fontsize=6.5)
+        # Mark core/extension boundary if both are present.
+        ext_present = any(p not in core_set for p in probes_used)
+        if ext_present:
+            sep = sum(1 for p in probes_used if p in core_set) - 0.5
+            ax.axhline(sep, color="black", linewidth=0.5)
+            ax.axvline(sep, color="black", linewidth=0.5)
+        for i in range(n_p):
+            for j in range(n_p):
+                v = arr[i, j]
+                if np.isnan(v): continue
+                ax.text(j, i, f"{v:+.2f}", ha="center", va="center",
+                        fontsize=5.5, color="white" if abs(v) > 0.5 else "#333")
         ax.set_title(f"{title}  n={sub['n']}")
     fig.suptitle(
-        f"v3 probe-probe {method} correlations "
-        f"(t0 = whole-generation aggregate under stateless)", fontsize=11,
+        f"v3 probe-probe {method} correlations  ({n_p} probes; "
+        f"core + extension separated by black line)", fontsize=11,
     )
     if im is not None:
         cb = fig.colorbar(im, ax=axes, shrink=0.7, label=f"{method} r")

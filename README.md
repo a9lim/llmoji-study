@@ -169,11 +169,12 @@ python scripts/18_claude_faces_pca.py          # PCA panel
 ## Findings summary
 
 A condensed read of what the local-side experiments have shown so far.
-Numbers cite the v3 follow-on analyses (`scripts/21`–`scripts/24`) run
+Numbers cite the v3 follow-on analyses (`scripts/21`–`scripts/29`) run
 on the existing 800-generation gemma and Qwen3.6-27B sidecars. Full
-details, gotchas, and the experiment plans live in
-[`CLAUDE.md`](CLAUDE.md) and [`docs/local-side.md`](docs/local-side.md);
-the four headline figures are in
+details and gotchas live in [`CLAUDE.md`](CLAUDE.md),
+[`docs/findings.md`](docs/findings.md), [`docs/local-side.md`](docs/local-side.md),
+and [`docs/gotchas.md`](docs/gotchas.md); the headline figures and
+interactive 3D HTMLs are in
 [`figures/local/cross_model/`](figures/local/cross_model/).
 
 ### 1. Affect emerges mid-network on gemma, late on Qwen
@@ -341,6 +342,50 @@ directions: kaomoji choice tracks the affect direction tightly,
 and is roughly independent of the bulk of hidden-state variance,
 which is content-related (which prompt, what topic) rather than
 affect-related.
+
+### 6. Anger and fear separate when you add the right probe (2026-04-29)
+
+V-A circumplex collapses anger and fear into HN. PAD's third axis
+(dominance) splits them: anger = HN + high dominance, fear = HN +
+low dominance. Three new contrastive packs registered into saklas
+via `scripts/26`: `powerful.powerless` (PAD dominance as felt
+agency), `surprised.unsurprised` (Plutchik surprise),
+`disgusted.accepting` (Plutchik disgust); `scripts/27` re-scores
+the existing v3 sidecars against these plus auto-discovers
+`fearful.unflinching`, `curious.disinterested`, and several
+register probes from a working-saklas-repo install — total
+12 extension probes per row at h_first / h_last / h_mean
+snapshots, no new generations.
+
+- **gemma** at h_last: `fearful.unflinching ↔ powerful.powerless`
+  per-row r = **−0.936** — the dominance and fear directions
+  collapse onto one axis in gemma's deep representation, sign-flipped.
+  `fearful.unflinching ↔ angry.calm` r = **−0.848** — the model
+  picks anger OR fear per HN row, not both. Per-quadrant means at
+  h_last separate cleanly: HN powerful −0.10, HP/LP/NB hover at
+  zero; HN fearful +0.22, HP/LP/NB ~+0.13.
+- **qwen** at h_last: extension probes are nearly flat across
+  quadrants (range ~0.013 on `powerful.powerless`, ~0.019 on
+  `fearful.unflinching`). `fearful ↔ powerful` r = +0.008.
+  Two interpretations both possible: qwen's hidden states are
+  genuinely orthogonal to the contrastive directions saklas
+  extracted from these statement sets, or h_last is the wrong
+  snapshot for qwen even though it's the deepest layer.
+- **HN dominance-split natural experiment on gemma**: split HN
+  rows into thirds by `powerful.powerless` and tally kaomoji
+  register. Bottom-third (most powerless / fearful): 25 shocked-
+  register `(╯°□°)/(⊙_⊙)/(>_<)` faces, 25 sad-teary
+  `(｡•́︿•̀｡)`. Top-third (most powerful / non-fear): 22 shocked,
+  29 sad-teary. Within-HN, kaomoji vocabulary is roughly stable
+  across the dominance split — same "kaomoji finer than vocabulary
+  in some axes, coarser in others" pattern as finding 2.
+
+Static figures: `figures/local/cross_model/fig_v3_extension_*.png`
+(per-quadrant means, fearful↔powerful scatter, HN dominance
+register stack, probe correlation matrix). Interactive 3D HTMLs:
+`fig_v3_extension_3d_{probes,pca}{,_per_face}.html` covering
+fearful × happy × angry and PC1 × PC2 × PC3 in both per-row and
+per-face aggregated forms, side-by-side gemma | qwen scenes.
 
 ### Open follow-ons
 
