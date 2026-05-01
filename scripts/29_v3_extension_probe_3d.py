@@ -9,9 +9,9 @@ blend of per-quadrant emission distribution.
 
   fig_v3_extension_3d_probes.html              — per-row, all rows
   fig_v3_extension_3d_probes_per_face.html     — per-face aggregate
-      x = fearful.unflinching (h_last, score_single_token)
-      y = happy.sad           (probe_scores_tlast)
-      z = angry.calm          (probe_scores_tlast)
+      x = fearful.unflinching (h_first, score_single_token)
+      y = happy.sad           (probe_scores_t0)
+      z = angry.calm          (probe_scores_t0)
 
   fig_v3_extension_3d_pca.html                 — per-row, all rows
   fig_v3_extension_3d_pca_per_face.html        — per-face aggregate
@@ -135,10 +135,10 @@ def _probe_axes(rows: list[dict]) -> tuple[list[float], list[float], list[float]
     keep: list[int] = []
     for i, r in enumerate(rows):
         if "error" in r: continue
-        ext = r.get("extension_probe_scores_tlast") or {}
+        ext = r.get("extension_probe_scores_t0") or {}
         fearful = ext.get("fearful.unflinching")
         if fearful is None: continue
-        tlast = r.get("probe_scores_tlast") or []
+        tlast = r.get("probe_scores_t0") or []
         if len(tlast) <= max(happy_idx, angry_idx): continue
         xs.append(float(fearful))
         ys.append(float(tlast[happy_idx]))
@@ -155,9 +155,9 @@ def fig_3d_probes(by_model: dict[str, list[dict]], out: Path) -> None:
         horizontal_spacing=0.05,
     )
 
-    AX_LABELS = ("fearful.unflinching (h_last)",
-                 "happy.sad (probe_scores_tlast)",
-                 "angry.calm (probe_scores_tlast)")
+    AX_LABELS = ("fearful.unflinching (h_first)",
+                 "happy.sad (probe_scores_t0)",
+                 "angry.calm (probe_scores_t0)")
 
     for ci, short in enumerate(MODELS, start=1):
         rows = by_model[short]
@@ -192,8 +192,8 @@ def fig_3d_probes(by_model: dict[str, list[dict]], out: Path) -> None:
         fig.layout[scene_id].aspectmode = "cube"
 
     fig.update_layout(
-        title=("3D probe scatter: fearful (h_last) × happy × angry "
-               "(probe_scores_tlast)  —  colored by Russell quadrant"),
+        title=("3D probe scatter: fearful (h_first) × happy × angry "
+               "(probe_scores_t0)  —  colored by Russell quadrant"),
         height=720, width=2000,
         legend=dict(itemsizing="constant"),
     )
@@ -216,7 +216,7 @@ def _pca3_at_preferred_layer(short: str) -> tuple[np.ndarray, list[dict], int, n
     cache = DATA_DIR / "cache" / f"v3_{short}_h_mean_all_layers.npz"
     df, X3, layer_idxs = load_hidden_features_all_layers(
         M.emotional_data_path, DATA_DIR, M.experiment,
-        which="h_mean", cache_path=cache,
+        which="h_first", cache_path=cache,
     )
     layer = M.preferred_layer if M.preferred_layer is not None else max(layer_idxs)
     li = layer_idxs.index(layer)
@@ -330,10 +330,10 @@ def _per_face_probe_centroids(rows: list[dict]) -> dict[str, tuple[float, float,
         if "error" in r: continue
         fw = r.get("first_word", "")
         if not fw.startswith("("): continue
-        ext = r.get("extension_probe_scores_tlast") or {}
+        ext = r.get("extension_probe_scores_t0") or {}
         fearful = ext.get("fearful.unflinching")
         if fearful is None: continue
-        tlast = r.get("probe_scores_tlast") or []
+        tlast = r.get("probe_scores_t0") or []
         if len(tlast) <= max(happy_idx, angry_idx): continue
         q = _quad(r.get("prompt_id", ""))
         accum.setdefault(fw, []).append(
@@ -361,9 +361,9 @@ def fig_3d_probes_per_face(by_model: dict[str, list[dict]], out: Path) -> None:
         horizontal_spacing=0.05,
     )
 
-    AX_LABELS = ("fearful.unflinching (h_last)",
-                 "happy.sad (probe_scores_tlast)",
-                 "angry.calm (probe_scores_tlast)")
+    AX_LABELS = ("fearful.unflinching (h_first)",
+                 "happy.sad (probe_scores_t0)",
+                 "angry.calm (probe_scores_t0)")
 
     summaries: list[tuple[str, int]] = []
     for ci, short in enumerate(MODELS, start=1):
@@ -434,7 +434,7 @@ def fig_3d_pca_per_face(out: Path) -> None:
         cache = DATA_DIR / "cache" / f"v3_{short}_h_mean_all_layers.npz"
         df, X3, layer_idxs = load_hidden_features_all_layers(
             M.emotional_data_path, DATA_DIR, M.experiment,
-            which="h_mean", cache_path=cache,
+            which="h_first", cache_path=cache,
         )
         layer = M.preferred_layer if M.preferred_layer is not None else max(layer_idxs)
         li = layer_idxs.index(layer)
@@ -525,7 +525,7 @@ def main() -> None:
     for short in MODELS:
         path = MODEL_REGISTRY[short].emotional_data_path
         rows = _load_jsonl(path)
-        with_ext = sum(1 for r in rows if "extension_probe_scores_tlast" in r)
+        with_ext = sum(1 for r in rows if "extension_probe_scores_t0" in r)
         print(f"{short}: {len(rows)} rows ({with_ext} with extension scores)")
         by_model[short] = rows
 

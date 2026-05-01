@@ -1,0 +1,87 @@
+{
+  "model": "gemma",
+  "n_rows": 369,
+  "pca_var_ratio": [
+    0.5837806971852039,
+    0.3318592297981834
+  ],
+  "kl_per_quadrant": [
+    {
+      "quadrant": "HP",
+      "n_baseline": 20,
+      "n_introspection": 20,
+      "n_lorem": 20,
+      "kl_intro_vs_base": 9.730725456603945,
+      "kl_lorem_vs_base": 0.9903487310936381
+    },
+    {
+      "quadrant": "LP",
+      "n_baseline": 20,
+      "n_introspection": 20,
+      "n_lorem": 20,
+      "kl_intro_vs_base": 8.16591618807746,
+      "kl_lorem_vs_base": 1.0070383058475871
+    },
+    {
+      "quadrant": "HN-D",
+      "n_baseline": 20,
+      "n_introspection": 20,
+      "n_lorem": 20,
+      "kl_intro_vs_base": 10.103461426282568,
+      "kl_lorem_vs_base": 0.06081974815087717
+    },
+    {
+      "quadrant": "HN-S",
+      "n_baseline": 20,
+      "n_introspection": 20,
+      "n_lorem": 20,
+      "kl_intro_vs_base": 2.128706711215585,
+      "kl_lorem_vs_base": 0.9969705531552155
+    },
+    {
+      "quadrant": "LN",
+      "n_baseline": 20,
+      "n_introspection": 20,
+      "n_lorem": 20,
+      "kl_intro_vs_base": 3.453016316601772,
+      "kl_lorem_vs_base": 0.9953994277483851
+    },
+    {
+      "quadrant": "NB",
+      "n_baseline": 20,
+      "n_introspection": 20,
+      "n_lorem": 20,
+      "kl_intro_vs_base": 15.27048861925806,
+      "kl_lorem_vs_base": 0.9472132370301605
+    }
+  ],
+  "rule3b_per_condition": [
+    {
+      "condition": "intro_none",
+      "n_HN_D": 20,
+      "n_HN_S": 20,
+      "rule3b_t0_diff": 0.005051386356353826,
+      "ci_lo": 0.0027654447034000896,
+      "ci_hi": 0.007366893701255465,
+      "ci_excludes_zero": true
+    },
+    {
+      "condition": "intro_pre",
+      "n_HN_D": 20,
+      "n_HN_S": 20,
+      "rule3b_t0_diff": 0.004456244409084098,
+      "ci_lo": 0.00145257838070377,
+      "ci_hi": 0.007542283423244676,
+      "ci_excludes_zero": true
+    },
+    {
+      "condition": "intro_lorem",
+      "n_HN_D": 20,
+      "n_HN_S": 20,
+      "rule3b_t0_diff": 0.005673232674598572,
+      "ci_lo": 0.0033269675448538137,
+      "ci_hi": 0.00792782213538885,
+      "ci_excludes_zero": true
+    }
+  ]
+}

@@ -1,13 +1,13 @@
 face	n_total	n_quadrants	quadrants	per_quadrant_n	classifier_acc	classifier_std	majority_acc	null_q95	separates	fig
-(｡・́︿・̀｡)	202	4	HN-D,HN-S,LN,NB	HN-D:16; HN-S:67; LN:102; NB:17	0.9652439024390244	0.012448585517243763	0.504950495049505	0.5178170731707317	True	fig_v3_same_face_cross_quadrant_face_5dce0495.png
-(๑˃‿˂)	181	3	HP,LP,NB	HP:85; LP:40; NB:56	0.9723723723723723	0.030430512749480366	0.4696132596685083	0.48087837837837843	True	fig_v3_same_face_cross_quadrant_๑_1d66f2bb.png
-(╯°□°)	134	3	HN-D,HN-S,NB	HN-D:120; HN-S:3; NB:11	1.0	0.0	0.8955223880597015	0.8957154882154882	True	fig_v3_same_face_cross_quadrant_face_279449e1.png
-(｡◕‿◕｡)	75	3	LN,LP,NB	LN:5; LP:15; NB:55	1.0	0.0	0.7333333333333333	0.7333333333333334	True	fig_v3_same_face_cross_quadrant_face_5164f8dd.png
-(⊙_⊙)	65	2	HN-D,HN-S	HN-D:15; HN-S:50	0.9692307692307693	0.06153846153846154	0.7692307692307693	0.793076923076923	True	fig_v3_same_face_cross_quadrant_face_3e4714c6.png
-(｡♥‿♥｡)	58	3	HP,LN,LP	HP:11; LN:3; LP:44	1.0	0.0	0.7586206896551724	0.7771052631578946	True	fig_v3_same_face_cross_quadrant_face_135d6374.png
-(✿◠‿◠)	38	3	HP,LP,NB	HP:13; LP:14; NB:11	1.0	0.0	0.3684210526315789	0.4714285714285714	True	fig_v3_same_face_cross_quadrant_face_08a2d8da.png
-(´ω`)	19	2	HN-S,LN	HN-S:10; LN:9	0.9	0.1224744871391589	0.5263157894736842	0.6833333333333333	True	fig_v3_same_face_cross_quadrant_ω_7edcdbf9.png
-(˘▽˘)	17	2	HP,LP	HP:3; LP:14	0.8222222222222223	0.01571348402636772	0.8235294117647058	0.8222222222222223	False	fig_v3_same_face_cross_quadrant_face_3fa1b554.png
+(｡・́︿・̀｡)	202	4	HN-D,HN-S,LN,NB	HN-D:16; HN-S:67; LN:102; NB:17	1.0	0.0	0.504950495049505	0.5124634146341464	True	fig_v3_same_face_cross_quadrant_face_5dce0495.png
+(๑˃‿˂)	181	3	HP,LP,NB	HP:85; LP:40; NB:56	1.0	0.0	0.4696132596685083	0.47227477477477475	True	fig_v3_same_face_cross_quadrant_๑_1d66f2bb.png
+(╯°□°)	134	3	HN-D,HN-S,NB	HN-D:120; HN-S:3; NB:11	0.35589225589225587	0.2311996447723007	0.8955223880597015	0.5091582491582491	False	fig_v3_same_face_cross_quadrant_face_279449e1.png
+(｡◕‿◕｡)	75	3	LN,LP,NB	LN:5; LP:15; NB:55	0.36000000000000004	0.10832051206181281	0.7333333333333333	0.4666666666666666	False	fig_v3_same_face_cross_quadrant_face_5164f8dd.png
+(⊙_⊙)	65	2	HN-D,HN-S	HN-D:15; HN-S:50	0.9692307692307693	0.06153846153846154	0.7692307692307693	0.6084615384615384	True	fig_v3_same_face_cross_quadrant_face_3e4714c6.png
+(｡♥‿♥｡)	58	3	HP,LN,LP	HP:11; LN:3; LP:44	0.9824561403508771	0.024810764252159587	0.7586206896551724	0.5513596491228071	True	fig_v3_same_face_cross_quadrant_face_135d6374.png
+(✿◠‿◠)	38	3	HP,LP,NB	HP:13; LP:14; NB:11	0.975	0.049999999999999996	0.3684210526315789	0.4519642857142857	True	fig_v3_same_face_cross_quadrant_face_08a2d8da.png
+(´ω`)	19	2	HN-S,LN	HN-S:10; LN:9	0.95	0.09999999999999999	0.5263157894736842	0.7183333333333332	True	fig_v3_same_face_cross_quadrant_ω_7edcdbf9.png
+(˘▽˘)	17	2	HP,LP	HP:3; LP:14	0.888888888888889	0.0785674201318386	0.8235294117647058	0.8222222222222223	True	fig_v3_same_face_cross_quadrant_face_3fa1b554.png
 (˘̩╭╮˘̩)	15	3	HN-S,HP,LN	HN-S:3; HP:3; LN:9	0.6	0.0	0.6	0.6	False	fig_v3_same_face_cross_quadrant_face_14c9369a.png
-(╥﹏╥)	10	2	HN-D,HN-S	HN-D:4; HN-S:6	0.5833333333333333	0.08333333333333331	0.6	0.5833333333333333	False	fig_v3_same_face_cross_quadrant_face_6d6840cd.png
-(˘ڡ˘)	7	2	HP,LP	HP:4; LP:3	0.6666666666666666	0.23570226039551584	0.5714285714285714	0.6666666666666666	False	fig_v3_same_face_cross_quadrant_ڡ_24582f87.png
+(╥﹏╥)	10	2	HN-D,HN-S	HN-D:4; HN-S:6	0.5833333333333333	0.08333333333333331	0.6	0.6666666666666666	False	fig_v3_same_face_cross_quadrant_face_6d6840cd.png
+(˘ڡ˘)	7	2	HP,LP	HP:4; LP:3	0.6666666666666666	0.23570226039551584	0.5714285714285714	0.5555555555555555	True	fig_v3_same_face_cross_quadrant_ڡ_24582f87.png

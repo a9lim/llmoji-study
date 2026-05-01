@@ -74,7 +74,7 @@ def _load_v3_layer_tensor(
 
     df, X3, layer_idxs = load_hidden_features_all_layers(
         M.emotional_data_path, DATA_DIR, M.experiment,
-        which="h_mean", cache_path=cache_path,
+        which="h_first", cache_path=cache_path,
     )
     if len(df) == 0:
         return df, X3, layer_idxs

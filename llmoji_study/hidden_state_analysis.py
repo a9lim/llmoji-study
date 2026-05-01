@@ -67,7 +67,7 @@ def load_hidden_features(
     data_dir: Path,
     experiment: str,
     *,
-    which: str = "h_last",
+    which: str = "h_first",
     layer: int | None = None,
     drop_errors: bool = True,
 ) -> tuple[pd.DataFrame, np.ndarray]:
@@ -86,7 +86,19 @@ def load_hidden_features(
     X : np.ndarray
         (n_rows, hidden_dim) fp32 matrix of the chosen snapshot at the
         chosen layer.
+
+    The ``$LLMOJI_WHICH`` environment variable (h_first|h_last|h_mean)
+    overrides ``which`` if set. Project-wide aggregate sweep hook.
     """
+    import os
+    env_which = os.environ.get("LLMOJI_WHICH")
+    if env_which:
+        if env_which not in WHICH_SNAPSHOTS:
+            raise ValueError(
+                f"LLMOJI_WHICH must be one of {WHICH_SNAPSHOTS}, got {env_which!r}"
+            )
+        which = env_which
+
     if which not in WHICH_SNAPSHOTS:
         raise ValueError(f"which must be one of {WHICH_SNAPSHOTS}")
 
@@ -245,7 +257,7 @@ def recompute_probe_scores(
     capture: FullSequenceCapture,
     session: Any,
     *,
-    which: str = "h_last",
+    which: str = "h_first",
 ) -> dict[str, float]:
     """Run saklas's own probe-scoring on saved hidden states for one
     snapshot. Used by the smoke test to verify sidecars faithfully
@@ -268,7 +280,7 @@ def recompute_probe_scores(
 def stack_snapshot(
     captures: list[FullSequenceCapture],
     *,
-    which: str = "h_last",
+    which: str = "h_first",
     layer: int | None = None,
 ) -> np.ndarray:
     """Stack one snapshot across captures into (n, hidden_dim)."""
@@ -297,7 +309,7 @@ def load_hidden_features_all_layers(
     data_dir: Path,
     experiment: str,
     *,
-    which: str = "h_mean",
+    which: str = "h_first",
     layers: list[int] | None = None,
     drop_errors: bool = True,
     cache_path: Path | None = None,
@@ -315,6 +327,21 @@ def load_hidden_features_all_layers(
     ``layers=None`` uses every layer present in the first sidecar.
     Pass an explicit list to subset (e.g. every 4th layer).
     """
+    import os
+    env_which = os.environ.get("LLMOJI_WHICH")
+    if env_which:
+        if env_which not in WHICH_SNAPSHOTS:
+            raise ValueError(
+                f"LLMOJI_WHICH must be one of {WHICH_SNAPSHOTS}, got {env_which!r}"
+            )
+        which = env_which
+        # Auto-rename cache path so we don't clobber the h_mean cache.
+        # Convention: callers pass paths with "h_mean" in the filename;
+        # we swap that to the active `which` so each aggregate gets its
+        # own cache. Falls through if the substring isn't present.
+        if cache_path is not None and "h_mean" in str(cache_path):
+            cache_path = Path(str(cache_path).replace("h_mean", which))
+
     if which not in WHICH_SNAPSHOTS:
         raise ValueError(f"which must be one of {WHICH_SNAPSHOTS}")
 

@@ -287,7 +287,7 @@ def load_emotional_features(
     data_dir: Path,
     *,
     experiment: str = "v3",
-    which: str = "h_last",
+    which: str = "h_first",
     layer: int | None = None,
     split_hn: bool = False,
 ) -> tuple[pd.DataFrame, np.ndarray]:
@@ -301,9 +301,23 @@ def load_emotional_features(
     Use this for figures that should show the dominance split as
     a first-class category.
 
+    The ``$LLMOJI_WHICH`` environment variable (if set to one of
+    ``h_first`` / ``h_last`` / ``h_mean``) overrides the ``which``
+    keyword argument. Used by 2026-05-02's project-wide h_first
+    sweep — set it once, run any script, and every hidden-state
+    aggregation respects it without per-script edits.
+
     Returns (metadata df, (n_rows, hidden_dim) feature matrix) aligned
     row-wise. Downstream plot functions take this pair directly.
     """
+    import os
+    env_which = os.environ.get("LLMOJI_WHICH")
+    if env_which:
+        if env_which not in ("h_first", "h_last", "h_mean"):
+            raise ValueError(
+                f"LLMOJI_WHICH must be h_first|h_last|h_mean, got {env_which!r}"
+            )
+        which = env_which
     from .hidden_state_analysis import load_hidden_features
     df, X = load_hidden_features(
         jsonl_path, data_dir, experiment,
@@ -348,7 +362,7 @@ def load_v1v2_neutral_baseline_features(
     data_dir: Path,
     *,
     experiment: str = "v1v2",
-    which: str = "h_last",
+    which: str = "h_first",
     layer: int | None = None,
 ) -> tuple[pd.DataFrame, np.ndarray]:
     """v1/v2 neutral-valence kaomoji_prompted rows as hidden-state

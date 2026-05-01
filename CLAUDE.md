@@ -123,6 +123,50 @@ phenomenal status. Aggregating that across 800+ generations is not nothing.
   [`a9lim/llmoji`](https://huggingface.co/datasets/a9lim/llmoji) on HF
   instead of scraping local exports + journals. The local-scrape pipeline
   lives in the `llmoji` package now.
+- **Hard early-stop default 2026-05-02.** `MAX_NEW_TOKENS` lowered
+  from 120 → 16 in `config.py`. Kaomoji reliably emit at tokens 1–3
+  with the canonical instruction; 16 is generous headroom and cuts
+  per-generation affect-loaded compute by ~7–8×. t0/h_first is
+  unchanged across the cutover; `tlast` and `h_mean` aggregates now
+  reference a tighter window around the kaomoji-emission event.
+  Pre-cutover data (~3300 generations) is preserved; treat
+  tlast/h_mean cross-comparability as scoped to within a generation
+  methodology.
+- **h_first standardization 2026-05-02.** Project-wide flip from
+  h_mean → h_first as the canonical hidden-state aggregate for v3
+  analyses. Why: at h_first (kaomoji-emission state, methodology-
+  invariant across the cutover), Russell-quadrant silhouette scores
+  roughly **doubled-to-tripled** vs h_mean — gemma 0.116→0.235 (2.0×),
+  qwen 0.116→0.244 (2.1×), ministral 0.045→0.149 (3.3×) — and the
+  peak layers shifted deeper for gemma+qwen (gemma L28→L50, qwen
+  L38→L59) but barely for ministral (L21→L20). The previous "gemma
+  is mid-depth, qwen is deep" framing dissolves: under h_first,
+  both gemma and qwen peak at the deep half of the network and
+  ministral is the only mid-depth model. `MODEL_REGISTRY.preferred_layer`
+  updated to L50/L59/L20. Implementation: `LLMOJI_WHICH` env-var
+  override on the loaders + explicit `which="h_first"` in v3 scripts
+  + library defaults flipped from h_last → h_first.
+- **Introspection-prompt pilot landed 2026-05-02 — Rule I PASS,
+  with cross-model divergence.** Design doc
+  `docs/2026-05-02-introspection-pilot.md`. Vogel-adapted preamble
+  (architectural grounding + arXiv reference) tested on gemma + ministral,
+  3 conditions × 123 prompts × 1 gen = 369 generations per model. Conditions:
+  `intro_none` (kaomoji instruction only), `intro_pre` (introspection
+  preamble), `intro_lorem` (token-count-matched lorem control).
+  Headlines: **(1)** introspection shifts kaomoji distribution
+  content-specifically (lorem doesn't reproduce); **(2)** rule-3b
+  HN-S vs HN-D probe-state separation is unchanged across conditions
+  — introspection acts at the readout layer, not the representation
+  layer; **(3) cross-model effect direction differs**: gemma's
+  vocabulary EXPANDS under introspection (19→31 unique faces),
+  ministral's CONTRACTS (25→10 unique faces). Lorem on ministral
+  causes 54% non-emission rate — ministral starts emitting unicode
+  emoji (🎉🥳✨) instead of kaomoji, lab-of-many-registers behavior.
+  Conclusion: cross-model robustness assumption fails; the upstream
+  `llmoji` "introspection hook" idea now gated on a follow-up
+  Claude pilot (the actual user-facing model). `scripts/32` runner,
+  `scripts/33` PCA+KL+rule-3b analysis, `scripts/34` predictiveness
+  comparison with `--which`/`--main` CLI for cross-cutover.
 - **v1.0 package split (2026-04-27):** `llmoji` (PyPI) owns taxonomy /
   canonicalization / hook templates / scrape / backfill / synth prompts;
   this repo's package was renamed `llmoji_study` and depends on

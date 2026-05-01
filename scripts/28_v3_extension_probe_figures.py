@@ -6,7 +6,7 @@ and `extension_probe_means` from script 27) and produces three
 cross-model figures (gemma | qwen | ministral):
 
   fig_v3_extension_quadrant_means.png
-      Per-quadrant mean probe score at h_last for the five most
+      Per-quadrant mean probe score at h_first for the five most
       relevant extension probes. With HN split into HN-D / HN-S
       (rule-3 redesign 2026-05-01), the per-quadrant bars show
       whether HN-D vs HN-S sit at meaningfully different probe
@@ -25,7 +25,7 @@ cross-model figures (gemma | qwen | ministral):
 
   fig_v3_extension_probe_correlations.png
       Per-row Pearson correlation matrix over the 5 core probes
-      (probe_means) + extension probes (extension_probe_scores_tlast).
+      (probe_means) + extension probes (extension_probe_scores_t0).
       Descriptive — shows which probes load on the same direction
       across each model.
 
@@ -126,7 +126,7 @@ def _register_of(form: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Figure A: per-quadrant mean probe score at h_last
+# Figure A: per-quadrant mean probe score at h_first
 # ---------------------------------------------------------------------------
 
 
@@ -142,10 +142,10 @@ def fig_quadrant_means(by_model: dict[str, list[dict]], out: Path) -> None:
             scores: list[float] = []
             for probe in HIGHLIGHT_PROBES:
                 vals = [
-                    r["extension_probe_scores_tlast"][probe]
+                    r["extension_probe_scores_t0"][probe]
                     for r in rows
-                    if "extension_probe_scores_tlast" in r
-                    and probe in r["extension_probe_scores_tlast"]
+                    if "extension_probe_scores_t0" in r
+                    and probe in r["extension_probe_scores_t0"]
                     and _quad(r["prompt_id"]) == q
                     and "error" not in r
                 ]
@@ -164,13 +164,13 @@ def fig_quadrant_means(by_model: dict[str, list[dict]], out: Path) -> None:
         )
         ax.set_title(f"{short}", fontsize=12)
         ax.grid(True, axis="y", linestyle=":", linewidth=0.4, alpha=0.6)
-    axes[0].set_ylabel("mean probe score at h_last")
+    axes[0].set_ylabel("mean probe score at h_first")
     axes[0].legend(
         title="quadrant", loc="upper left", fontsize=8, ncols=5,
         frameon=False,
     )
     fig.suptitle(
-        "v3 extension probes: per-quadrant mean at h_last",
+        "v3 extension probes: per-quadrant mean at h_first",
         fontsize=13, y=1.02,
     )
     fig.tight_layout()
@@ -261,15 +261,15 @@ CORE_PROBES = [
 
 def _build_probe_matrix(rows: list[dict]) -> tuple[list[str], np.ndarray]:
     """Build (probe_names, n_rows × n_probes matrix). Core probes use
-    `probe_means`; extension probes use `extension_probe_scores_tlast`.
+    `probe_means`; extension probes use `extension_probe_scores_t0`.
     Drops rows missing any probe."""
     if not rows:
         return [], np.zeros((0, 0))
 
-    sample = next((r for r in rows if "extension_probe_scores_tlast" in r), None)
+    sample = next((r for r in rows if "extension_probe_scores_t0" in r), None)
     if sample is None:
         return [], np.zeros((0, 0))
-    ext_names = sorted(sample["extension_probe_scores_tlast"].keys())
+    ext_names = sorted(sample["extension_probe_scores_t0"].keys())
     names = CORE_PROBES + ext_names
 
     mat: list[list[float]] = []
@@ -277,7 +277,7 @@ def _build_probe_matrix(rows: list[dict]) -> tuple[list[str], np.ndarray]:
         if "error" in r: continue
         try:
             row_vals = [r["probe_means"][p] for p in CORE_PROBES] + \
-                       [r["extension_probe_scores_tlast"][p] for p in ext_names]
+                       [r["extension_probe_scores_t0"][p] for p in ext_names]
         except KeyError:
             continue
         mat.append(row_vals)
@@ -339,7 +339,7 @@ def main() -> None:
     for short in MODELS:
         path = MODEL_REGISTRY[short].emotional_data_path
         rows = _load(path)
-        with_ext = sum(1 for r in rows if "extension_probe_scores_tlast" in r)
+        with_ext = sum(1 for r in rows if "extension_probe_scores_t0" in r)
         print(f"{short}: {len(rows)} rows ({with_ext} with extension scores)")
         if with_ext == 0:
             print(f"  WARN: no extension scores on {short}; run scripts/27 first")

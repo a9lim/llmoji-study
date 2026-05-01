@@ -81,7 +81,7 @@ def _load_at_preferred_layer(short: str) -> tuple[pd.DataFrame, np.ndarray, int]
     cache = DATA_DIR / "cache" / f"v3_{short}_h_mean_all_layers.npz"
     df, X3, layer_idxs = load_hidden_features_all_layers(
         M.emotional_data_path, DATA_DIR, M.experiment,
-        which="h_mean", cache_path=cache,
+        which="h_first", cache_path=cache,
     )
     layer = M.preferred_layer if M.preferred_layer is not None else max(layer_idxs)
     li = layer_idxs.index(layer)

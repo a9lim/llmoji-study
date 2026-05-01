@@ -67,7 +67,7 @@ def main() -> None:
     df, X = load_emotional_features(
         str(M.emotional_data_path), DATA_DIR,
         experiment=M.experiment,
-        which="h_mean",
+        which="h_first",
         layer=M.preferred_layer,
         split_hn=True,
     )

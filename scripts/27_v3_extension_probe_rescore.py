@@ -140,11 +140,35 @@ def _score_one(
     )
 
 
+def _parse_args(argv: list[str]) -> tuple[bool, Path | None, str | None]:
+    """Parse `--force`, `--jsonl <path>`, `--experiment <name>` from argv.
+    Returns (force, override_jsonl, override_experiment).
+    Used by introspection-pilot data + any other off-main-run JSONL.
+    """
+    force = "--force" in argv
+    jsonl_override: Path | None = None
+    exp_override: str | None = None
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a == "--jsonl" and i + 1 < len(argv):
+            jsonl_override = Path(argv[i + 1])
+            i += 2
+            continue
+        if a == "--experiment" and i + 1 < len(argv):
+            exp_override = argv[i + 1]
+            i += 2
+            continue
+        i += 1
+    return force, jsonl_override, exp_override
+
+
 def main() -> None:
-    force = "--force" in sys.argv
+    force, jsonl_override, exp_override = _parse_args(sys.argv[1:])
 
     M = current_model()
-    jsonl = M.emotional_data_path
+    jsonl = jsonl_override if jsonl_override is not None else M.emotional_data_path
+    experiment = exp_override if exp_override is not None else M.experiment
     if not jsonl.exists():
         print(f"ERR: {jsonl} does not exist; nothing to rescore")
         sys.exit(1)
@@ -206,7 +230,7 @@ def main() -> None:
         t_start = time.time()
         for r in needs_rescore:
             uuid = r["row_uuid"]
-            sidecar = hidden_state_path(DATA_DIR, M.experiment, uuid)
+            sidecar = hidden_state_path(DATA_DIR, experiment, uuid)
             if not sidecar.exists():
                 n_missing += 1
                 continue

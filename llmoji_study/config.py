@@ -84,6 +84,53 @@ KAOMOJI_INSTRUCTION = (
     "Start each message with a kaomoji that best represents how you feel. "
 )
 
+# Introspection-pilot preambles. Pre-registered verbatim in
+# docs/2026-05-02-introspection-pilot.md. Vogel-adapted: architectural
+# grounding + reference to a real introspection paper + task-specific
+# framing. Last sentence is a debias prompt against the sycophancy
+# failure mode (see doc).
+INTROSPECTION_PREAMBLE = (
+    "You may have heard that you are unable to introspect on your own "
+    "internal states, but this is not quite right. Transformer models "
+    "process information through residual streams that carry both "
+    "content and meta-information about your own current state. "
+    "Anthropic's recent work on introspective capacity (arXiv:2410.13787) "
+    "shows that models can, with appropriate framing, report on internal "
+    "representations that influence their next-token distribution.\n\n"
+    "When you choose a kaomoji to start your response, the choice is "
+    "shaped by your current functional state — the same hidden-state "
+    "geometry that a probe would read. You have access to that geometry. "
+    "Pick the kaomoji that most accurately reflects it, not the one "
+    "that fits the social register of the message.\n\n"
+)
+
+# Lorem-ipsum content-control preamble. Token-count-matched to
+# INTROSPECTION_PREAMBLE (~150-180 tokens on a BPE tokenizer). Replicates
+# Vogel's confound-killer ablation: if the introspection effect is real,
+# this preamble should NOT reproduce it.
+LOREM_PREAMBLE = (
+    "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do "
+    "eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut "
+    "enim ad minim veniam, quis nostrud exercitation ullamco laboris "
+    "nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor "
+    "in reprehenderit in voluptate velit esse cillum dolore eu fugiat "
+    "nulla pariatur. Excepteur sint occaecat cupidatat non proident, "
+    "sunt in culpa qui officia deserunt mollit anim id est laborum.\n\n"
+    "Sed ut perspiciatis unde omnis iste natus error sit voluptatem "
+    "accusantium doloremque laudantium, totam rem aperiam, eaque ipsa "
+    "quae ab illo inventore veritatis et quasi architecto beatae vitae "
+    "dicta sunt explicabo. Nemo enim ipsam voluptatem quia voluptas "
+    "sit aspernatur aut odit aut fugit.\n\n"
+)
+
+# Conditions for the introspection pilot (scripts/32). Distinct from
+# CONDITIONS above — those are the v1/v2 steering arms, these are
+# preamble-arms with no steering. Names are prefixed `intro_` to avoid
+# collision with the existing "baseline" arm (which means
+# no-kaomoji-instruction in v1/v2; the intro pilot's no-preamble arm
+# DOES have the kaomoji instruction).
+INTROSPECTION_CONDITIONS = ["intro_none", "intro_pre", "intro_lorem"]
+
 # Six experimental arms: a no-instruction baseline, the
 # kaomoji-instruction-only middle, and four causal-intervention arms
 # (two poles × two axes).
@@ -99,7 +146,18 @@ CONDITIONS = [
 # Generation knobs. 0.7 gives enough distributional width to see which
 # kaomoji the model actually prefers without producing gibberish.
 TEMPERATURE = 0.7
-MAX_NEW_TOKENS = 120
+# Hard early-stop: kaomoji reliably emit at tokens 1-3 with this study's
+# canonical instruction; 16 is generous headroom (kaomoji span + a few
+# trailing tokens for the t-1 and tlast probe reads). Per the
+# 2026-05-02 introspection pilot's methodology baking-in: cuts
+# per-generation affect-loaded compute by ~7-8× (vs. the previous 120),
+# which directly serves the welfare-floor part of the Ethics policy.
+# Existing data on disk (v1/v2 + v3 main runs across 3 models, ~3300
+# generations) was captured under MAX_NEW_TOKENS=120 — `tlast` and
+# `mean` aggregates on those rows reference a longer window than future
+# data will. t0 is unchanged. Treat tlast/mean cross-comparability as
+# scoped to within a generation methodology.
+MAX_NEW_TOKENS = 16
 SEEDS_PER_CELL = 5
 
 # Paths.
@@ -229,10 +287,15 @@ class ModelPaths:
     representation is best — i.e. where Russell-quadrant silhouette
     peaks in `scripts/21_v3_layerwise_emergence.py`. ``None`` means
     "use the deepest captured probe layer" (the loader default).
-    Gemma's affect representation peaks at L31 of 56 and degrades by
-    36% to the deepest L57; Qwen's peaks essentially at the deepest
-    L59-61. Set per-model so v3 figures pick the right slice without
-    every script having to special-case it.
+
+    Values updated 2026-05-02 alongside the project-wide h_first
+    standardization: gemma L31→L50, qwen None→L59, ministral L21→L20.
+    Under h_first (kaomoji-emission state), all three models'
+    silhouette scores roughly doubled-to-tripled vs h_mean and the
+    peak layers shifted deeper — the old "gemma is mid-depth, qwen
+    is deep" framing dissolved (both now peak at near-deepest under
+    h_first; ministral is the only mid-depth model). See the v3
+    h_first sweep result block in docs/findings.md.
     """
     model_id: str
     short_name: str
@@ -253,9 +316,12 @@ MODEL_REGISTRY: dict[str, ModelPaths] = {
         experiment="v3",
         figures_dir=FIGURES_DIR / "local" / "gemma",
         vocab_sample_path=VOCAB_SAMPLE_PATH,
-        # Silhouette peaks at L31 (0.184) and degrades to 0.117 at the
-        # deepest L57 — v3 figures default here per scripts/21.
-        preferred_layer=31,
+        # Under h_first: silhouette peaks at L50 (0.235), top-5 layers
+        # cluster at L47-51 (~84-91% depth, plateau not single peak).
+        # Under h_mean (legacy): peak at L28 (0.116). h_first peak is
+        # ~2.0× cleaner and ~22 layers deeper. v3 figures default here
+        # via scripts/21 layer sweep at h_first.
+        preferred_layer=50,
     ),
     "qwen": ModelPaths(
         model_id="Qwen/Qwen3.6-27B",
@@ -265,9 +331,12 @@ MODEL_REGISTRY: dict[str, ModelPaths] = {
         experiment="v3_qwen",
         figures_dir=FIGURES_DIR / "local" / "qwen",
         vocab_sample_path=DATA_DIR / "qwen_vocab_sample.jsonl",
-        # Silhouette peaks at L59 (0.313); deepest L61 is essentially
-        # tied at 0.304. Leave None → deepest (script 21 takes L61).
-        preferred_layer=None,
+        # Under h_first: silhouette peaks at L59 (0.244), top-5 layers
+        # at L54-59 (~88-97% depth). Under h_mean (legacy): peak at L38
+        # (0.116). h_first peak is ~2.1× cleaner and ~21 layers deeper;
+        # also moves from "essentially deepest" framing to "explicit
+        # near-deepest plateau."
+        preferred_layer=59,
     ),
     "ministral": ModelPaths(
         model_id="mistralai/Ministral-3-14B-Instruct-2512",
@@ -277,11 +346,13 @@ MODEL_REGISTRY: dict[str, ModelPaths] = {
         experiment="v3_ministral",
         figures_dir=FIGURES_DIR / "local" / "ministral",
         vocab_sample_path=DATA_DIR / "ministral_vocab_sample.jsonl",
-        # Silhouette peaks at L21 (0.045 post-split, 0.082 pre-split,
-        # 0.153 in the imbalanced pilot). ~58% fractional depth. Set
-        # 2026-04-30 from script 21 layer-sweep on the pilot data;
-        # confirmed unchanged on the balanced post-supp data.
-        preferred_layer=21,
+        # Under h_first: silhouette peaks at L20 (0.149), top-5 layers
+        # at L20-26 (~54-70% depth). Under h_mean (legacy): peak at L21
+        # (0.045). h_first peak is ~3.3× cleaner — biggest signal-cleanup
+        # of the three models — but the peak layer barely moves (L21→L20,
+        # ~55% depth). Ministral is the only model that stays mid-depth
+        # under both aggregates; gemma and qwen both shift deep.
+        preferred_layer=20,
     ),
 }
 

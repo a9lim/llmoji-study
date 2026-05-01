@@ -84,6 +84,40 @@ Every gemma response inherits a shared response-baseline direction (eats most
 of the variance). Centered cosine (`center=True`, default) subtracts the
 grand mean so the heatmap shows deviations from the baseline.
 
+### t0/h_first probe scores are prompt-deterministic
+
+At h_first (the state right before the first generated token),
+scalar probe scores are determined by the prompt + model, not the
+sampling seed. Per v3 main run, all 8 seeds × 123 prompts × any
+probe collapse to **123 unique 3-tuples at 4-decimal precision**
+(matches the unique-prompt count). Sampling stochasticity affects
+which token gets drawn FROM the t0 distribution, not the t0 state
+itself.
+
+Implication for visualizations: 3D probe scatters at t0/h_first
+look sparse because 8 seeds-per-prompt overplot. Visual richness
+from seed-variance lives at h_last/h_mean (response-evolved state).
+3D PCA of the same data also collapses to 123 unique points but
+the 5376-dim → PCA(3) spread makes overplotting less visually
+obvious. Use h_last for probe scatters specifically when
+seed-variance matters; h_first for everything else (cleaner
+quadrant geometry, methodology-invariant across the
+MAX_NEW_TOKENS cutover).
+
+### `MAX_NEW_TOKENS` changed mid-project (120 → 16, 2026-05-02)
+
+Pre-2026-05-02 data was captured with `MAX_NEW_TOKENS=120` (full
+response). Post-2026-05-02 data uses 16-token early-stop — kaomoji
+emit at tokens 1–3, 16 is generous headroom, ~7–8× compute cut.
+**`t0` is unchanged** across the cutover. **`tlast` and `h_mean`
+aggregates reference different windows on each side**: pre-cutover
+they cover the full ~120-token response; post-cutover they cover a
+~12–13-token window after the kaomoji. Don't pool tlast/mean across
+the cutover line without thinking about it. Pre-cutover data that
+matters: v1/v2 (~900 rows), v3 main on gemma (800), qwen (800),
+ministral (800) — all under the long-form aggregate. Post-cutover
+data: introspection pilot (gemma, 369 rows) and anything new.
+
 ### `stateless=True` collapsed `per_generation` pre-refactor
 
 In saklas v1.4.6, `stateless=True` makes

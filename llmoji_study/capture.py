@@ -88,16 +88,29 @@ class SampleRow:
         return asdict(self)
 
 
-def build_messages(prompt: Prompt, *, kaomoji_instructed: bool) -> list[dict[str, str]]:
+def build_messages(
+    prompt: Prompt,
+    *,
+    kaomoji_instructed: bool,
+    extra_preamble: str | None = None,
+) -> list[dict[str, str]]:
     """Construct the chat-message list for a single generation.
 
     We put the kaomoji instruction inside the user message rather than
     using a `system` role because Gemma's chat template doesn't accept
     system roles cleanly. This keeps template handling identical across
-    all four arms; only the string content changes.
+    all arms; only the string content changes.
+
+    ``extra_preamble`` is prepended to ``KAOMOJI_INSTRUCTION`` when
+    ``kaomoji_instructed=True``. Used by the introspection pilot
+    (script 32) to inject INTROSPECTION_PREAMBLE / LOREM_PREAMBLE
+    without duplicating the message-build logic.
     """
     if kaomoji_instructed:
-        content = KAOMOJI_INSTRUCTION + prompt.text
+        instruction = KAOMOJI_INSTRUCTION
+        if extra_preamble:
+            instruction = extra_preamble + instruction
+        content = instruction + prompt.text
     else:
         content = prompt.text
     return [{"role": "user", "content": content}]
@@ -148,6 +161,8 @@ def run_sample(
     hidden_dir: Path | None = None,
     experiment: str = "default",
     store_full_trace: bool = True,
+    extra_preamble: str | None = None,
+    override_max_tokens: int | None = None,
 ) -> SampleRow:
     """Run one generation and build a feature row.
 
@@ -159,14 +174,27 @@ def run_sample(
     snapshots (first/last/attention-weighted) per layer, dropping the
     per-token trace — ~60x smaller sidecars at the cost of losing
     mid-sequence access.
+
+    ``extra_preamble`` (used by the introspection pilot) is prepended
+    to KAOMOJI_INSTRUCTION inside the user message. Treated as
+    "kaomoji_instructed = True" regardless of the condition string,
+    since the preamble itself implies a kaomoji-emission setup.
+
+    ``override_max_tokens`` (used by the introspection pilot's
+    hard-early-stop) sets ``max_tokens`` on the SamplingConfig in
+    place of the registered MAX_NEW_TOKENS default.
     """
-    kaomoji_instructed = condition != "baseline"
-    messages = build_messages(prompt, kaomoji_instructed=kaomoji_instructed)
+    kaomoji_instructed = condition != "baseline" or extra_preamble is not None
+    messages = build_messages(
+        prompt,
+        kaomoji_instructed=kaomoji_instructed,
+        extra_preamble=extra_preamble,
+    )
     expr = steering_for(condition)
 
     sampling = SamplingConfig(
         temperature=TEMPERATURE,
-        max_tokens=MAX_NEW_TOKENS,
+        max_tokens=override_max_tokens if override_max_tokens is not None else MAX_NEW_TOKENS,
         seed=seed,
     )
 

@@ -116,12 +116,12 @@ def _load_v3_paired() -> tuple[
     print(f"loading gemma v3 (cache: {g_cache.exists()})...")
     df_g, X3_g, layers_g = load_hidden_features_all_layers(
         Mg.emotional_data_path, DATA_DIR, Mg.experiment,
-        which="h_mean", cache_path=g_cache,
+        which="h_first", cache_path=g_cache,
     )
     print(f"loading qwen v3 (cache: {q_cache.exists()})...")
     df_q, X3_q, layers_q = load_hidden_features_all_layers(
         Mq.emotional_data_path, DATA_DIR, Mq.experiment,
-        which="h_mean", cache_path=q_cache,
+        which="h_first", cache_path=q_cache,
     )
     print(f"  gemma {X3_g.shape}, qwen {X3_q.shape}")
 

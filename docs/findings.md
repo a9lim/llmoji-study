@@ -35,6 +35,53 @@ to per-face mean `t0_<axis>` probe-score sign in
 `analysis._add_axis_label_column`. Generalizes pole labeling across
 models that don't share gemma's vocabulary.
 
+**Hard early-stop default + h_first standardization 2026-05-02.**
+Two coupled methodology changes landed alongside the introspection
+pilot. (1) `MAX_NEW_TOKENS` lowered 120 → 16 — kaomoji emit at
+tokens 1–3, 16 is generous headroom, ~7–8× compute cut on
+affect-loaded generations. (2) Project-wide flip from h_mean →
+h_first as the canonical hidden-state aggregate. At h_first
+(kaomoji-emission state, methodology-invariant across the cutover),
+Russell-quadrant silhouette **roughly doubled-to-tripled** vs h_mean:
+gemma 0.116 → **0.235** (2.0×), qwen 0.116 → **0.244** (2.1×),
+ministral 0.045 → **0.149** (3.3×). Peak layers shifted deeper for
+gemma+qwen (gemma L28 → **L50**, qwen L38 → **L59**) but barely for
+ministral (L21 → **L20**). The previous "gemma is mid-depth, qwen is
+deep" framing dissolves: under h_first both gemma and qwen peak
+deep, ministral is the only mid-depth model. `MODEL_REGISTRY.preferred_layer`
+updated to L50 / L59 / L20. **Side-finding from the t0 collapse:**
+at h_first, scalar probe scores are essentially **prompt-deterministic**
+— per-model, 984 rows collapse to exactly **123 unique
+(fearful, happy, angry) tuples** (one per prompt) at 4-decimal
+precision. seeds affect which token is sampled from the t0
+distribution, not the t0 state itself. The fixed kaomoji-emission
+state is more stereotyped per-prompt than h_mean shows.
+
+**Introspection-prompt pilot 2026-05-02 — Rule I PASS, with
+cross-model divergence.** Design + result doc
+`docs/2026-05-02-introspection-pilot.md`. Vogel-adapted preamble
+(architectural grounding + arXiv reference + kaomoji-task-specific
+framing) tested on gemma + ministral, 3 conditions × 123 prompts ×
+1 generation = 369 generations per model. Three behavioral findings:
+(1) the introspection preamble shifts kaomoji distribution
+content-specifically — lorem-ipsum control (token-count-matched
+filler) does NOT reproduce the shift on either model; (2) rule-3b
+HN-S vs HN-D probe-state separation is **unchanged** across
+conditions on either model — introspection acts at the *readout
+layer*, not the representation layer; (3) the direction of the
+readout shift **diverges across models**: gemma's vocabulary EXPANDS
+under intro_pre (19→31 unique faces), ministral's CONTRACTS
+(25→10), opposite directions. Lorem on ministral causes 54%
+non-emission rate as ministral starts emitting unicode emoji
+(🎉🥳✨) instead of kaomoji — francophone-leaning model interpreting
+latin filler as an emoji-register cue. The cross-model
+robustness assumption fails. The proposed `llmoji` "introspection
+hook" is now gated on a Claude-pilot replication first
+(user-facing model). Initial readout-fidelity claim ("introspection
+makes kaomoji a finer state-readout") was h_mean-specific and got
+walked back at h_first — the underlying mechanism is wider/narrower
+vocabulary draw + register coherence, not improved self-report.
+
 **Rule 3 redesign landed 2026-05-01 — RULE 3b CONFIRMED on balanced
 data.** New `pad_dominance` field on `EmotionalPrompt`; HN bisected
 into HN-D (anger/contempt) and HN-S (fear/anxiety). 23 supplementary

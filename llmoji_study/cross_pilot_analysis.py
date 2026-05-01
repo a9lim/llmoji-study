@@ -68,7 +68,7 @@ def load_pooled_features(
     *,
     v1_v2_experiment: str = "v1v2",
     v3_experiment: str = "v3",
-    which: str = "h_last",
+    which: str = "h_first",
     layer: int | None = None,
 ) -> tuple[pd.DataFrame, np.ndarray]:
     """Union v1/v2 + v3 JSONL, load per-row hidden-state sidecars, and

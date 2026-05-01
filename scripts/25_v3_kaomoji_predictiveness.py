@@ -311,7 +311,7 @@ def run_model(short_name: str, *, min_n: int = 5) -> dict[str, Any]:
     print(f"\n=== {short_name} (h_mean, {layer_label}) ===")
     df, X = load_emotional_features(
         str(M.emotional_data_path), DATA_DIR,
-        experiment=M.experiment, which="h_mean",
+        experiment=M.experiment, which="h_first",
         layer=M.preferred_layer,
     )
     print(f"  {len(df)} rows, X {X.shape}, "

@@ -133,7 +133,7 @@ def main() -> None:
     print(f"loading v3 hidden-state features (which=h_mean, layer={layer_label})...")
     df, X = load_emotional_features(
         str(M.emotional_data_path), DATA_DIR,
-        experiment=M.experiment, which="h_mean",
+        experiment=M.experiment, which="h_first",
         layer=M.preferred_layer,
         split_hn=True,
     )

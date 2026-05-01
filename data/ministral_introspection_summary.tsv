@@ -1,0 +1,87 @@
+{
+  "model": "ministral",
+  "n_rows": 294,
+  "pca_var_ratio": [
+    0.5672441948963758,
+    0.17362696672223346
+  ],
+  "kl_per_quadrant": [
+    {
+      "quadrant": "HP",
+      "n_baseline": 19,
+      "n_introspection": 20,
+      "n_lorem": 8,
+      "kl_intro_vs_base": 3.6947322720533275,
+      "kl_lorem_vs_base": 11.811544667175246
+    },
+    {
+      "quadrant": "LP",
+      "n_baseline": 19,
+      "n_introspection": 20,
+      "n_lorem": 7,
+      "kl_intro_vs_base": 2.6155307392099143,
+      "kl_lorem_vs_base": 5.251382793943673
+    },
+    {
+      "quadrant": "HN-D",
+      "n_baseline": 20,
+      "n_introspection": 20,
+      "n_lorem": 6,
+      "kl_intro_vs_base": 0.5636371185895723,
+      "kl_lorem_vs_base": 19.162555242175344
+    },
+    {
+      "quadrant": "HN-S",
+      "n_baseline": 19,
+      "n_introspection": 18,
+      "n_lorem": 9,
+      "kl_intro_vs_base": 1.8935579945652903,
+      "kl_lorem_vs_base": 12.400680956818123
+    },
+    {
+      "quadrant": "LN",
+      "n_baseline": 18,
+      "n_introspection": 20,
+      "n_lorem": 11,
+      "kl_intro_vs_base": 3.566997263149161,
+      "kl_lorem_vs_base": 12.203316621412727
+    },
+    {
+      "quadrant": "NB",
+      "n_baseline": 19,
+      "n_introspection": 20,
+      "n_lorem": 14,
+      "kl_intro_vs_base": 6.425989865986737,
+      "kl_lorem_vs_base": 7.593511723833406
+    }
+  ],
+  "rule3b_per_condition": [
+    {
+      "condition": "intro_none",
+      "n_HN_D": 20,
+      "n_HN_S": 19,
+      "rule3b_t0_diff": 0.0013412332260294424,
+      "ci_lo": -0.001908796836965237,
+      "ci_hi": 0.00452050680931842,
+      "ci_excludes_zero": false
+    },
+    {
+      "condition": "intro_pre",
+      "n_HN_D": 20,
+      "n_HN_S": 18,
+      "rule3b_t0_diff": 0.0030478983289664863,
+      "ci_lo": -0.00020956905041309216,
+      "ci_hi": 0.006291689358444698,
+      "ci_excludes_zero": false
+    },
+    {
+      "condition": "intro_lorem",
+      "n_HN_D": 6,
+      "n_HN_S": 9,
+      "rule3b_t0_diff": -0.0002676819761595062,
+      "ci_lo": -0.005215479733629308,
+      "ci_hi": 0.004275403347694074,
+      "ci_excludes_zero": false
+    }
+  ]
+}
