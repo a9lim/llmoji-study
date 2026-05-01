@@ -25,12 +25,15 @@ provider-agnostic CLI:
     primitives.
   - :mod:`llmoji_study.eriskii_anchors` — 21 anchored axes (positive
     and negative anchor strings).
-  - :mod:`llmoji_study.taxonomy_labels` — gemma-tuned ``TAXONOMY``
-    / ``ANGRY_CALM_TAXONOMY`` / ``label_on`` / label-aware
-    ``extract_with_label``. Were in ``llmoji.taxonomy`` pre-v1.0;
-    moved here in the v1.0 review fixes because they're
-    pilot-specific and don't belong in a provider-agnostic public
-    package.
+
+The gemma-tuned ``TAXONOMY`` / ``ANGRY_CALM_TAXONOMY`` happy-sad
+labels lived at :mod:`llmoji_study.taxonomy_labels` between the v1.0
+package split and 2026-04-30. Dropped in the post-pilot cleanup —
+v3 analyses key off ``first_word`` (canonicalized) and v1/v2 pole
+assignment is now data-driven from per-face mean ``t0_<axis>`` probe
+score sign (see ``llmoji_study.analysis._add_axis_label_column``).
+The change generalizes pole labeling across models that didn't
+share gemma's vocabulary.
 
 Modules previously here that moved to ``llmoji`` (the public
 package): ``taxonomy`` (the canonicalization rules + KAOMOJI_START_CHARS

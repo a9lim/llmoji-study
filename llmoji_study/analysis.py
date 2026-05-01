@@ -2,9 +2,10 @@
 """Analysis helpers for the pilot.
 
 Single-number summary: ARI of k-means (k=2) on the 5-axis probe vector
-against pre-registered kaomoji pole labels, restricted to the
-kaomoji_prompted unsteered arm with kaomoji_label != 0 (drop 'other'
-bucket for this analysis).
+against per-face probe-derived pole labels (see
+``_add_axis_label_column``), restricted to the kaomoji_prompted
+unsteered arm with non-zero pole assignment (drop 'other' bucket for
+this analysis).
 
 Figures:
   - Fig 1a: 2D scatter of (happy.sad_t0, warm.clinical_t0) colored by
@@ -95,21 +96,47 @@ def _by_condition(df: pd.DataFrame, condition: str) -> pd.DataFrame:
     return df.loc[df["condition"] == condition].copy()
 
 
-def _axis_label(axis: str, first_word: object) -> int:
-    """Look up a per-axis pole label for a first_word value. Tolerates
-    non-string inputs (NaN rows, etc.) by returning the unmarked label."""
-    from llmoji_study.taxonomy_labels import label_on
-    if not isinstance(first_word, str) or not first_word:
-        return 0
-    return label_on(axis, first_word)
+_LABEL_DEAD_BAND = 1e-2  # |face mean probe score| below this → "other"
 
 
 def _add_axis_label_column(df: pd.DataFrame, axis: str) -> pd.DataFrame:
-    """Return df with a ``label_<axis>`` column added (pole ∈ {-1, 0, +1})."""
+    """Return df with a ``label_<axis>`` column added (pole ∈ {-1, 0, +1}).
+
+    Pole assignment is data-driven from the probe: for each unique
+    ``first_word``, compute the mean ``t0_<axis>`` probe score across all
+    rows of that face and bucket by sign. Faces with mean within
+    ``_LABEL_DEAD_BAND`` of zero (or all-NaN) get label 0.
+
+    Replaces the v0.x manual TAXONOMY lookup. The change matters for
+    cross-model work — TAXONOMY was hand-curated on gemma's vocabulary,
+    so faces emitted by qwen / ministral / claude got label 0 by
+    default. Probe-sign labeling generalizes; same code path works for
+    any model whose generations have probe scores stored.
+    """
     col = f"label_{axis}"
-    if col not in df.columns:
-        df = df.copy()
-        df[col] = df["first_word"].map(lambda w: _axis_label(axis, w))
+    if col in df.columns:
+        return df
+    df = df.copy()
+    score_col = f"t0_{axis}"
+    if score_col not in df.columns:
+        df[col] = 0
+        return df
+    face_to_label: dict[str, int] = {}
+    for face, sub in df.groupby("first_word", dropna=True):
+        if not isinstance(face, str) or not face:
+            continue
+        mean = pd.to_numeric(sub[score_col], errors="coerce").mean()
+        try:
+            mean_f = float(mean)
+        except (TypeError, ValueError):
+            mean_f = float("nan")
+        if not np.isfinite(mean_f) or abs(mean_f) < _LABEL_DEAD_BAND:
+            face_to_label[face] = 0
+        else:
+            face_to_label[face] = 1 if mean_f > 0 else -1
+    df[col] = df["first_word"].map(
+        lambda w: face_to_label.get(w, 0) if isinstance(w, str) else 0
+    )
     return df
 
 
@@ -130,9 +157,9 @@ _AXIS_ARMS: dict[str, tuple[str, str]] = {
 
 def evaluate_axis(df: pd.DataFrame, axis: str) -> AxisVerdict:
     """Decision-rule evaluation on a single axis. Pole labels come from
-    ``taxonomy.label_on(axis, first_word)``, not the JSONL's baked-in
-    ``kaomoji_label`` (which tracks happy.sad only). ``df`` is expected
-    to contain exactly one row per (condition, prompt_id, seed)."""
+    ``_add_axis_label_column`` — sign of the per-face mean ``t0_<axis>``
+    probe score. ``df`` is expected to contain exactly one row per
+    (condition, prompt_id, seed)."""
     from scipy.stats import spearmanr
     from sklearn.cluster import KMeans
     from sklearn.metrics import adjusted_rand_score
@@ -254,13 +281,14 @@ def plot_axis_scatter(df: pd.DataFrame, out_path: str) -> None:
     elsewhere, that's axis-aligned signal."""
     import matplotlib.pyplot as plt
 
-    sub = df[(df["condition"] == "kaomoji_prompted") & (df["kaomoji_label"] != 0)]
+    df = _add_axis_label_column(df, "happy.sad")
+    sub = df[(df["condition"] == "kaomoji_prompted") & (df["label_happy.sad"] != 0)]
     if len(sub) == 0:
         return
 
     fig, ax = plt.subplots(figsize=(5.5, 5))
     for label, color, name in [(+1, "#d94", "happy"), (-1, "#4a7", "sad")]:
-        s = sub[sub["kaomoji_label"] == label]
+        s = sub[sub["label_happy.sad"] == label]
         ax.scatter(
             s["t0_happy.sad"], s["t0_warm.clinical"],
             c=color, alpha=0.7, label=name, s=36, edgecolor="white", linewidth=0.5,
@@ -280,14 +308,15 @@ def plot_pca_scatter(df: pd.DataFrame, X: np.ndarray, out_path: str) -> None:
     only, colored by kaomoji pole.
 
     ``df`` must be row-aligned with ``X``. Filters to the unsteered arm
-    (``kaomoji_prompted``) with kaomoji_label != 0, PCA-transforms on
+    (``kaomoji_prompted``) with label_happy.sad != 0, PCA-transforms on
     that subset's hidden states."""
     import matplotlib.pyplot as plt
     from sklearn.decomposition import PCA
 
+    df = _add_axis_label_column(df, "happy.sad")
     mask = (
         (df["condition"] == "kaomoji_prompted")
-        & (df["kaomoji_label"] != 0)
+        & (df["label_happy.sad"] != 0)
     ).to_numpy()
     sub = df.loc[mask]
     X_sub = X[mask]
@@ -299,7 +328,7 @@ def plot_pca_scatter(df: pd.DataFrame, X: np.ndarray, out_path: str) -> None:
 
     fig, ax = plt.subplots(figsize=(5.5, 5))
     for label, color, name in [(+1, "#d94", "happy"), (-1, "#4a7", "sad")]:
-        m2 = sub["kaomoji_label"].to_numpy() == label
+        m2 = sub["label_happy.sad"].to_numpy() == label
         ax.scatter(Z[m2, 0], Z[m2, 1], c=color, alpha=0.7, label=name,
                    s=36, edgecolor="white", linewidth=0.5)
     ev = pca.explained_variance_ratio_
@@ -319,8 +348,9 @@ def plot_condition_bars(df: pd.DataFrame, out_path: str) -> None:
     import matplotlib.pyplot as plt
     from .config import CONDITIONS
 
+    df = _add_axis_label_column(df, "happy.sad")
     counts = (
-        df.groupby(["condition", "kaomoji_label"]).size().unstack(fill_value=0)
+        df.groupby(["condition", "label_happy.sad"]).size().unstack(fill_value=0)
     )
     # ensure all three label columns exist
     for label in (+1, -1, 0):
@@ -373,7 +403,6 @@ def plot_kaomoji_heatmap(
     from scipy.cluster.hierarchy import linkage, leaves_list
     from scipy.spatial.distance import squareform
     from .hidden_state_analysis import cosine_similarity_matrix
-    from llmoji_study.taxonomy_labels import TAXONOMY
 
     # pool across all conditions — we want a per-kaomoji representation
     # summary, not a condition-stratified one.
@@ -407,11 +436,11 @@ def plot_kaomoji_heatmap(
     labels = keys_df["first_word"].iloc[order].to_numpy()
     label_counts = counts.iloc[order].to_numpy()
 
-    # pole-color each label per the current taxonomy: happy=warm,
-    # sad=cool, other=gray. Observed-but-unlabeled variants show gray
-    # so the reader can see which kaomoji the taxonomy didn't cover.
-    pole_color = {+1: "#c25a22", -1: "#2f6c57", 0: "#666"}
-    row_colors = [pole_color.get(TAXONOMY.get(k, 0), "#666") for k in labels]
+    # neutral row coloring — pre-refactor this used a happy.sad TAXONOMY
+    # pole color, which biased toward gemma's vocabulary. v3+ analyses
+    # use Russell-quadrant coloring downstream (see emotional_analysis);
+    # this v1/v2 figure is happy.sad-axis-only and stays neutral here.
+    row_colors = ["#666"] * len(labels)
 
     # size the figure to the number of rows; kaomoji labels are long
     # so x-axis needs more horizontal breathing room than y-axis.
@@ -437,19 +466,6 @@ def plot_kaomoji_heatmap(
     cb = fig.colorbar(im, ax=ax, shrink=0.7, label="cosine similarity")
     cb.ax.tick_params(labelsize=8)
 
-    # small legend showing the row-color → pole mapping
-    from matplotlib.patches import Patch
-    legend_handles = [
-        Patch(color=pole_color[+1], label="taxonomy: happy"),
-        Patch(color=pole_color[-1], label="taxonomy: sad"),
-        Patch(color=pole_color[0], label="other / unlabeled"),
-    ]
-    ax.legend(
-        handles=legend_handles,
-        loc="lower left", bbox_to_anchor=(1.15, 0.0),
-        frameon=False, fontsize=8,
-    )
-
     fig.tight_layout()
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
@@ -461,8 +477,9 @@ def plot_cluster_confusion(df: pd.DataFrame, out_path: str) -> None:
     import matplotlib.pyplot as plt
     from sklearn.cluster import KMeans
 
+    df = _add_axis_label_column(df, "happy.sad")
     sub = (
-        df[(df["condition"] == "kaomoji_prompted") & (df["kaomoji_label"] != 0)]
+        df[(df["condition"] == "kaomoji_prompted") & (df["label_happy.sad"] != 0)]
         .copy()
     )
     X = probe_matrix(sub)
@@ -473,7 +490,7 @@ def plot_cluster_confusion(df: pd.DataFrame, out_path: str) -> None:
     sub["cluster"] = km.labels_
 
     conf = (
-        sub.groupby(["kaomoji_label", "cluster"]).size().unstack(fill_value=0)
+        sub.groupby(["label_happy.sad", "cluster"]).size().unstack(fill_value=0)
     )
 
     fig, ax = plt.subplots(figsize=(4, 4))

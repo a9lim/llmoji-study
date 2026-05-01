@@ -46,32 +46,35 @@ contain ALL layers, so script 21 (which iterates over layers)
 doesn't depend on `preferred_layer`. Same for the per-layer CKA
 grid in script 23.
 
-### Kaomoji taxonomy must be dialect-matched to the model
+### Kaomoji vocabulary differs sharply across model lineages — RESOLVED via TAXONOMY drop
 
-First draft from generic intuition hit 0/30 on gemma's actual emissions —
-model strongly prefers the `(｡X｡)` Japanese dialect. Always run
-`00_vocab_sample.py` before locking a taxonomy for a new model. Under strong
-sad-steering, gemma abandons the dialect for ASCII minimalism (`(._.)`,
-`( . . . )`); extend from steered-arm output too.
+Pre-2026-04-30: gemma-tuned `TAXONOMY` happy/sad labels (in
+`llmoji_study.taxonomy_labels`) didn't cover qwen / claude / ministral
+faces. Vocab-discovery scripts 00 / 19 / 20 were used to identify
+which faces to add per model. The whole machinery is now obsolete:
+v3 analyses key on `first_word` (canonicalized via
+`llmoji.taxonomy.canonicalize_kaomoji`), and v1/v2 pole assignment
+moved to per-face mean `t0_<axis>` probe-score sign in
+`analysis._add_axis_label_column`. No model-specific dictionaries
+needed; everything generalizes by construction.
 
-The labeled `TAXONOMY` / `ANGRY_CALM_TAXONOMY` live in
-`llmoji_study.taxonomy_labels` (research-side; v1.0 split moved them out of
-the public package). Edit + re-run the relabel snippet below.
+### Re-extracting pilot data after canonicalization rule changes
 
-### Re-labeling pilot data after taxonomy changes
-
-`kaomoji_label` is baked at write time. `04_emotional_analysis.py` calls
-`_relabel_in_place` at start of every run; for `pilot_raw.jsonl`, do it
-manually:
+`first_word` is baked at write time. `04_emotional_analysis.py` calls
+`_relabel_in_place` at start of every run, which re-extracts via
+`llmoji.taxonomy.extract` and drops legacy `kaomoji` /
+`kaomoji_label` fields if present. For other JSONLs do it manually:
 ```python
 import json
 from pathlib import Path
-from llmoji_study.taxonomy_labels import extract_with_label
+from llmoji.taxonomy import extract
 p = Path("data/pilot_raw.jsonl")
 rows = [json.loads(l) for l in p.read_text().splitlines() if l]
 for r in rows:
-    m = extract_with_label(r["text"])
-    r.update(first_word=m.first_word, kaomoji=m.kaomoji, kaomoji_label=m.label)
+    m = extract(r["text"])
+    r["first_word"] = m.first_word
+    r.pop("kaomoji", None)
+    r.pop("kaomoji_label", None)
 p.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
 ```
 
@@ -121,14 +124,33 @@ Claude interprets "start each message" as "start each top-level reply in a
 user turn", not "start every content block" — tool-use continuations skip
 the kaomoji. Smaller denominator than naive counting suggests.
 
-### v3 runner's per-quadrant "emission rate" is TAXONOMY coverage, not compliance
+### v3 runner's per-quadrant emission rate now reads first_word — RESOLVED in TAXONOMY drop
 
-`scripts/03_emotional_run.py` checkpoint reads e.g. "HP: 28% kaomoji-bearing".
-Numerator is `kaomoji_label != 0` (TAXONOMY match), denominator is rows in
-quadrant. For non-gemma models the gemma-tuned TAXONOMY drops to 10–30%,
-making this look like instruction-following collapse when it isn't. Real
-compliance (bracket-start, the v3 loader's actual filter) is ~100% on every
-model. Real check: `awk` for first-char in `([{（｛`, not the runner's log.
+Pre-2026-04-30 this checkpoint counted `kaomoji_label != 0` (TAXONOMY
+match) and read 10–30% on non-gemma models even though real
+instruction-following compliance was ~100%. Misled at least one
+mid-run abort. After the TAXONOMY drop the numerator is just
+`first_word` truthiness — bracket-leading kaomoji presence — which
+matches the v3 loader's actual filter. Now reports real compliance on
+every model.
+
+### Mistral tokenizer ships a buggy pre-tokenizer regex — fixed in saklas 2.0.0
+
+HF-distributed Mistral checkpoints (Mistral-Small-*, Ministral-*,
+third-party finetunes carrying the family name) ship a buggy
+pre-tokenizer regex that mis-splits ~1% of tokens — e.g. `"'The'"`
+tokenizes as `["'", "T", "he", "'"]` instead of `["'", "The", "'"]`.
+Bug is in encoding (text→tokens), not generation; affects words
+preceded by apostrophes / punctuation, so v3 prompts with `I'm`,
+`don't`, `it's` get slightly OOD tokenization. Saklas 2.0.0 fixes
+this by passing `fix_mistral_regex=True` to
+`AutoTokenizer.from_pretrained` whenever `model_id` substring-matches
+`"mistral"` (case-insensitive). See
+[discussion 84](https://huggingface.co/mistralai/Mistral-Small-3.1-24B-Instruct-2503/discussions/84).
+Pre-fix data: noisy but not broken — geometry findings (silhouette,
+CKA, probe scores) are robust. Post-fix should match or strengthen
+the signal. Cross-version compatibility verified: 2.0.0 reproduces
+1.4.6 probe scores within 5e-7 on existing sidecars.
 
 ### `06_claude_hf_pull.py` doesn't garbage-collect remote-deleted bundles
 

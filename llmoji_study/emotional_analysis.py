@@ -38,6 +38,14 @@ KAOMOJI_START_CHARS = set("([（｛ヽ٩ᕕ╰╭╮┐┌＼¯໒＼ヾっ")
 # Russell-quadrant palette + ordering. Shared with scripts/17_v3_face_scatters.py
 # so per-face plots use a consistent colour scheme.
 QUADRANT_ORDER = ["HP", "LP", "HN", "LN", "NB"]
+
+# Split-quadrant ordering — same five plus HN bisected on PAD dominance
+# (HN-D anger/contempt, HN-S fear/anxiety). Used by figures opted into the
+# rule-3-redesign view via ``split_hn=True`` on loaders. Untagged HN rows
+# (the borderline-mixed prompts hn06/hn15/hn17) drop out of split-mode
+# entirely; the categorical column gets pd.NA for them so the analysis
+# can either filter or surface them as a small grey bucket as it sees fit.
+QUADRANT_ORDER_SPLIT = ["HP", "LP", "HN-D", "HN-S", "LN", "NB"]
 # Canonical Russell-circumplex mapping. Saturated enough that 50/50
 # RGB-linear mixes between adjacent-quadrant pairs are still
 # recognizable (HN+LN → muted purple, HP+LP → olive, etc.); perceived
@@ -52,69 +60,139 @@ QUADRANT_COLORS = {
     "HN": "#d44a4a",  # red — high arousal, negative (anger/anxiety)
     "LN": "#4a7ed4",  # blue — low arousal, negative (sadness/depression)
     "NB": "#909090",  # gray — neutral baseline
+    # Rule-3-redesign PAD-dominance split (2026-05-01). HN-D inherits HN
+    # red so aggregate-HN views stay backward-compatible; HN-S takes a
+    # saturation-matched magenta-purple that reads as "negative but
+    # submissive" without colliding with LN blue.
+    "HN-D": "#d44a4a",  # red — anger / contempt (high PAD dominance)
+    "HN-S": "#9d4ad4",  # magenta-purple — fear / anxiety (low PAD dominance)
 }
+
+# Subset alias for code that wants only the new sub-quadrant pair.
+PAD_SUB_COLORS = {q: QUADRANT_COLORS[q] for q in ("HN-D", "HN-S")}
+
+
+def _palette_for(df: pd.DataFrame) -> tuple[list[str], dict[str, str]]:
+    """Return ``(order, colors)`` matching whatever quadrant labels are
+    present in ``df["quadrant"]``. Auto-switches to the rule-3 split
+    ordering (HN-D / HN-S in lieu of aggregate HN) when those labels
+    appear; the colors dict is shared (it includes both)."""
+    if "quadrant" not in df.columns:
+        return QUADRANT_ORDER, QUADRANT_COLORS
+    quads = set(df["quadrant"].astype(str).unique())
+    if "HN-D" in quads or "HN-S" in quads:
+        return QUADRANT_ORDER_SPLIT, QUADRANT_COLORS
+    return QUADRANT_ORDER, QUADRANT_COLORS
+
+
+def _hn_split_map() -> dict[str, str]:
+    """Return ``{prompt_id: 'HN-D' | 'HN-S'}`` for tagged HN prompts.
+    Pulls from the EmotionalPrompt registry — single source of truth.
+    Untagged HN prompts (pad_dominance == 0) are absent from the map."""
+    from .emotional_prompts import EMOTIONAL_PROMPTS
+    return {
+        p.id: ("HN-D" if p.pad_dominance > 0 else "HN-S")
+        for p in EMOTIONAL_PROMPTS
+        if p.quadrant == "HN" and p.pad_dominance != 0
+    }
+
+
+def apply_hn_split(
+    df: pd.DataFrame,
+    X: np.ndarray | None = None,
+) -> tuple[pd.DataFrame, np.ndarray | None]:
+    """Replace the ``quadrant`` column in-place with HN-split labels
+    (HN→HN-D/HN-S) and drop rows with untagged HN prompts.
+
+    For scripts that build their own quadrant column from
+    ``prompt_id[:2]`` (rather than going through
+    ``load_emotional_features``). Pass the row-aligned feature matrix
+    ``X`` to keep df+X aligned across the row drop.
+
+    Returns ``(df, X)`` after the split; X is None if not provided."""
+    hn_split = _hn_split_map()
+    new_q = df.apply(
+        lambda r: (
+            hn_split.get(r["prompt_id"], None)
+            if r["quadrant"] == "HN"
+            else r["quadrant"]
+        ),
+        axis=1,
+    )
+    keep = new_q.notna().to_numpy()
+    df = df.loc[keep].copy()
+    df["quadrant"] = new_q[keep].to_numpy()
+    df = df.reset_index(drop=True)
+    if X is not None:
+        X = X[keep]
+    return df, X
 
 
 def per_face_dominant_quadrant(df: pd.DataFrame) -> dict[str, str]:
     """For each first_word, return its dominant emission quadrant —
-    the quadrant it appears in most. Ties broken by QUADRANT_ORDER
-    position (earlier wins)."""
+    the quadrant it appears in most. Ties broken by quadrant-order
+    position (earlier wins). Auto-uses the split palette when df has
+    HN-D / HN-S labels."""
     from collections import Counter
+    order, _ = _palette_for(df)
     out: dict[str, str] = {}
     for fw, sub in df.groupby("first_word"):
         counts = Counter(sub["quadrant"].tolist())
         max_count = max(counts.values())
-        candidates = [q for q in QUADRANT_ORDER if counts.get(q, 0) == max_count]
+        candidates = [q for q in order if counts.get(q, 0) == max_count]
         out[str(fw)] = candidates[0] if candidates else "NB"
     return out
 
 
 def per_face_quadrant_weights(df: pd.DataFrame) -> dict[str, dict[str, float]]:
     """For each first_word, return a dict mapping quadrant -> normalized
-    emission weight (sum to 1 across the 5 quadrants).
+    emission weight (sum to 1 across the active quadrant set).
 
     A face emitted in 21 LN rows + 20 HN rows + 0 elsewhere yields
     ``{"LN": 0.512, "HN": 0.488, "HP": 0, "LP": 0, "NB": 0}``.
-    Faces with zero total emissions return all-zero weights (caller
-    should guard).
+    With ``split_hn=True`` data, the dict is keyed on the 6-category
+    split palette instead. Faces with zero total emissions return
+    all-zero weights (caller should guard).
     """
     from collections import Counter
+    order, _ = _palette_for(df)
     out: dict[str, dict[str, float]] = {}
     for fw, sub in df.groupby("first_word"):
         counts = Counter(sub["quadrant"].tolist())
         total = sum(counts.values())
         if total == 0:
-            out[str(fw)] = {q: 0.0 for q in QUADRANT_ORDER}
+            out[str(fw)] = {q: 0.0 for q in order}
             continue
         out[str(fw)] = {
-            q: counts.get(q, 0) / total for q in QUADRANT_ORDER
+            q: counts.get(q, 0) / total for q in order
         }
     return out
 
 
 def mix_quadrant_color(
     weights: dict[str, float],
+    colors: dict[str, str] | None = None,
 ) -> tuple[float, float, float]:
-    """Linear-RGB mix of `QUADRANT_COLORS` weighted by `weights`.
+    """Linear-RGB mix of quadrant colors weighted by ``weights``.
 
-    Weights are expected to sum to 1.0 across the 5 quadrants
-    (`per_face_quadrant_weights` produces them). Hex strings in
-    `QUADRANT_COLORS` are converted to (r, g, b) floats in [0, 1],
-    multiplied by the per-quadrant weight, and summed component-wise.
-    Returns a matplotlib-compatible RGB tuple.
+    Weights are expected to sum to 1.0 across the active quadrant set
+    (`per_face_quadrant_weights` produces them). The default ``colors``
+    is the classic 5-quadrant palette; pass ``QUADRANT_COLORS_SPLIT``
+    when working with HN-D/HN-S labelled data.
 
     A face that's 100% one quadrant returns that quadrant's pure
-    color; a face split 50/50 between two quadrants returns the RGB
-    midpoint; a face split evenly across all 5 returns the centroid
-    of the 5 base colors (close to mid-gray, which is the visually
-    "balanced" outcome).
+    color; a 50/50 split returns the RGB midpoint; an even split
+    across the full active set returns the palette centroid (close to
+    mid-gray for the balanced case).
     """
+    if colors is None:
+        colors = QUADRANT_COLORS
     from matplotlib.colors import to_rgb
     r = g = b = 0.0
     for q, w in weights.items():
-        if w <= 0 or q not in QUADRANT_COLORS:
+        if w <= 0 or q not in colors:
             continue
-        qr, qg, qb = to_rgb(QUADRANT_COLORS[q])
+        qr, qg, qb = to_rgb(colors[q])
         r += w * qr
         g += w * qg
         b += w * qb
@@ -211,10 +289,17 @@ def load_emotional_features(
     experiment: str = "v3",
     which: str = "h_last",
     layer: int | None = None,
+    split_hn: bool = False,
 ) -> tuple[pd.DataFrame, np.ndarray]:
     """Load v3 JSONL + its hidden-state sidecars. Filters to kaomoji-
     bearing rows by first_word prefix. Attaches a ``quadrant`` column
     (HP/LP/HN/LN/NB) derived from prompt_id.
+
+    With ``split_hn=True``, also overwrites the ``quadrant`` column
+    using the rule-3-redesign HN split (HN→HN-D/HN-S, with the 3
+    untagged borderline prompts dropped from the result entirely).
+    Use this for figures that should show the dominance split as
+    a first-class category.
 
     Returns (metadata df, (n_rows, hidden_dim) feature matrix) aligned
     row-wise. Downstream plot functions take this pair directly.
@@ -238,7 +323,24 @@ def load_emotional_features(
         isinstance(s, str) and len(s) > 0 and s[0] in KAOMOJI_START_CHARS
         for s in df["first_word"]
     ])
-    return df.loc[mask].reset_index(drop=True), X[mask]
+    df = df.loc[mask].reset_index(drop=True)
+    X = X[mask]
+    if split_hn:
+        hn_split = _hn_split_map()
+        new_q = df.apply(
+            lambda r: (
+                hn_split.get(r["prompt_id"], None)
+                if r["quadrant"] == "HN"
+                else r["quadrant"]
+            ),
+            axis=1,
+        )
+        keep = new_q.notna().to_numpy()
+        df = df.loc[keep].copy()
+        df["quadrant"] = new_q[keep].to_numpy()
+        X = X[keep]
+        df = df.reset_index(drop=True)
+    return df, X
 
 
 def load_v1v2_neutral_baseline_features(
@@ -369,9 +471,10 @@ def plot_kaomoji_cosine_heatmap(
     labels = keys_df["first_word"].iloc[order].to_numpy()
     label_counts = counts.iloc[order].to_numpy()
 
+    order_qs, palette = _palette_for(df)
     quadrant_for = per_face_dominant_quadrant(df)
     label_quadrants = [quadrant_for.get(str(k), "NB") for k in labels]
-    row_colors = [QUADRANT_COLORS[q] for q in label_quadrants]
+    row_colors = [palette.get(q, "#666") for q in label_quadrants]
 
     n = len(labels)
     fig, ax = plt.subplots(figsize=(max(7, 0.28 * n + 4), max(7, 0.28 * n + 3)))
@@ -396,7 +499,7 @@ def plot_kaomoji_cosine_heatmap(
     cb.ax.tick_params(labelsize=8)
 
     legend_handles = [
-        Patch(color=QUADRANT_COLORS[q], label=q) for q in QUADRANT_ORDER
+        Patch(color=palette[q], label=q) for q in order_qs if q in palette
     ]
     ax.legend(
         handles=legend_handles,
@@ -428,7 +531,6 @@ def plot_within_kaomoji_consistency(
     signatures tighter than random same-size subsets."""
     import matplotlib.pyplot as plt
     from .hidden_state_analysis import cosine_to_mean
-    from llmoji_study.taxonomy_labels import TAXONOMY
 
     _use_cjk_font()
 
@@ -470,7 +572,11 @@ def plot_within_kaomoji_consistency(
         null_q25[size] = float(np.quantile(medians, 0.25))
         null_q75[size] = float(np.quantile(medians, 0.75))
 
-    pole_color = {+1: "#c25a22", -1: "#2f6c57", 0: "#666"}
+    # Per-face dot color = dominant Russell-quadrant of that face,
+    # which generalizes across models (TAXONOMY-based pole color was
+    # gemma-vocab-tied and grayed out everything else).
+    order_qs, palette = _palette_for(df)
+    quadrant_for = per_face_dominant_quadrant(df)
 
     n = len(per_kaomoji)
     fig, ax = plt.subplots(figsize=(8, max(4, 0.28 * n + 2)))
@@ -490,7 +596,7 @@ def plot_within_kaomoji_consistency(
 
     for y, entry in enumerate(per_kaomoji):
         km, sims, _ = entry
-        color = pole_color.get(TAXONOMY.get(km, 0), "#666")
+        color = palette.get(quadrant_for.get(km, "NB"), "#666")
         jitter = (rng.random(len(sims)) - 0.5) * 0.3
         ax.scatter(sims, np.full(len(sims), y) + jitter, s=14, color=color, alpha=0.7)
         ax.plot(
@@ -503,7 +609,7 @@ def plot_within_kaomoji_consistency(
     ax.set_yticks(range(n))
     ax.set_yticklabels(y_labels, fontsize=8)
     for tick, (km, _, _) in zip(ax.get_yticklabels(), per_kaomoji):
-        tick.set_color(pole_color.get(TAXONOMY.get(km, 0), "#666"))
+        tick.set_color(palette.get(quadrant_for.get(km, "NB"), "#666"))
     ax.set_xlabel("cosine(row, kaomoji mean) — hidden-state space")
     ax.set_xlim(-0.1, 1.05)
     ax.axvline(0, color="#dddddd", linewidth=0.8, zorder=0)
@@ -514,11 +620,8 @@ def plot_within_kaomoji_consistency(
 
     from matplotlib.patches import Patch
     legend_handles = [
-        Patch(color=pole_color[+1], label="taxonomy: happy"),
-        Patch(color=pole_color[-1], label="taxonomy: sad"),
-        Patch(color=pole_color[0], label="other / unlabeled"),
-        Patch(color="#cccccc", label="null band (IQR)"),
-    ]
+        Patch(color=palette[q], label=q) for q in order_qs if q in palette
+    ] + [Patch(color="#cccccc", label="null band (IQR)")]
     ax.legend(handles=legend_handles, loc="lower left", frameon=False, fontsize=8)
 
     fig.tight_layout()
@@ -767,16 +870,19 @@ def plot_v3_pca_valence_arousal(
         f"(kaomoji, quadrant) cells projected (n ≥ {min_per_cell})"
     )
 
-    legend_labels = [
-        ("HP", "HP (high arousal, positive)"),
-        ("LP", "LP (low arousal, positive)"),
-        ("HN", "HN (high arousal, negative)"),
-        ("LN", "LN (low arousal, negative)"),
-        ("NB", "NB (neutral baseline)"),
-    ]
+    order_qs, palette = _palette_for(df_all)
+    label_text = {
+        "HP": "HP (high arousal, positive)",
+        "LP": "LP (low arousal, positive)",
+        "HN": "HN (high arousal, negative)",
+        "LN": "LN (low arousal, negative)",
+        "NB": "NB (neutral baseline)",
+        "HN-D": "HN-D (anger / contempt)",
+        "HN-S": "HN-S (fear / anxiety)",
+    }
     legend_handles = [
-        Patch(color=QUADRANT_COLORS[k], label=lbl)
-        for k, lbl in legend_labels if k in QUADRANT_COLORS
+        Patch(color=palette[k], label=label_text.get(k, k))
+        for k in order_qs if k in palette
     ]
     ax.legend(handles=legend_handles, loc="best", frameon=False,
               fontsize=9, title="Russell quadrant")
@@ -1040,15 +1146,14 @@ def summary_table(
 ) -> pd.DataFrame:
     """Per-kaomoji summary with hidden-state cosine-to-mean consistency.
 
-    Columns: first_word, n, taxonomy_label, median_within_consistency,
-    dominant_quadrant, HP_n, LP_n, HN_n, LN_n, NB_n.
+    Columns: first_word, n, median_within_consistency, dominant_quadrant,
+    HP_n, LP_n, HN_n, LN_n, NB_n.
     """
     from .hidden_state_analysis import cosine_to_mean
-    from llmoji_study.taxonomy_labels import TAXONOMY
 
     if len(df) == 0:
         return pd.DataFrame(columns=[
-            "first_word", "n", "taxonomy_label", "median_within_consistency",
+            "first_word", "n", "median_within_consistency",
             "dominant_quadrant", "HP_n", "LP_n", "HN_n", "LN_n", "NB_n",
         ])
 
@@ -1064,7 +1169,6 @@ def summary_table(
         rows.append({
             "first_word": km,
             "n": int(len(group)),
-            "taxonomy_label": int(TAXONOMY.get(str(km), 0)),
             "median_within_consistency": float(np.median(sims)),
             "dominant_quadrant": dominant,
             "HP_n": int(q_counts.get("HP", 0)),

@@ -1,35 +1,42 @@
-"""Figures for the v3 extension-probe rescore (2026-04-29).
+"""Figures for the v3 extension-probe rescore (2026-04-29; rule-3
+redesign 2026-05-01).
 
 Reads the JSONLs (which now carry `extension_probe_scores_t0/_tlast`
-and `extension_probe_means` from script 27) and produces four
-cross-model figures:
+and `extension_probe_means` from script 27) and produces three
+cross-model figures (gemma | qwen | ministral):
 
   fig_v3_extension_quadrant_means.png
       Per-quadrant mean probe score at h_last for the five most
-      relevant extension probes, gemma | qwen side-by-side. Shows
-      gemma's clean PAD-aligned dominance separation and qwen's
-      flatness at h_last.
-
-  fig_v3_extension_dominance_scatter.png
-      Per-row scatter of fearful.unflinching (h_last) vs
-      powerful.powerless (h_last), colored by Russell quadrant, one
-      panel per model. Annotates per-row Pearson r. Shows gemma's
-      r=-0.94 axis collapse vs qwen's r≈0 flatness.
+      relevant extension probes. With HN split into HN-D / HN-S
+      (rule-3 redesign 2026-05-01), the per-quadrant bars show
+      whether HN-D vs HN-S sit at meaningfully different probe
+      values — directly answering rule 3a / 3b.
 
   fig_v3_extension_hn_dominance_split.png
-      HN-only natural experiment: for each model split HN rows into
-      bottom-third / middle / top-third by powerful.powerless and
-      stack-bar the kaomoji register (shocked / sad-teary / other).
-      Shows that gemma's kaomoji vocabulary actually marks the
-      within-HN dominance split (high-fear → shocked register;
-      low-fear → sad-teary).
+      HN-D vs HN-S kaomoji register stack: for each model, count
+      how often HN-D and HN-S rows reach for the shocked register
+      vs the sad-teary register. Tests whether kaomoji vocabulary
+      itself reflects the dominance split that the registry tags
+      were designed to capture. (Pre-2026-05-01 this used a
+      powerful.powerless tertile as a workaround for not having
+      labels; with explicit HN-D/HN-S tags from
+      `EmotionalPrompt.pad_dominance`, the cleaner version splits
+      on the tags directly.)
 
   fig_v3_extension_probe_correlations.png
       Per-row Pearson correlation matrix over the 5 core probes
-      (probe_means) + extension probes (extension_probe_scores_tlast),
-      gemma | qwen. Shows gemma's affect probes collapsing into a
-      single 1D direction (huge red+blue blocks) vs qwen's more
-      distributed structure.
+      (probe_means) + extension probes (extension_probe_scores_tlast).
+      Descriptive — shows which probes load on the same direction
+      across each model.
+
+Dropped 2026-05-01:
+  fig_v3_extension_dominance_scatter.png — per-row fear×dominance
+  scatter assumed `powerful.powerless` reads PAD dominance; the rule
+  3 redesign showed it doesn't track HN-D / HN-S in the predicted
+  direction across any of the three models. The relationship the
+  scatter plotted was real but its theoretical interpretation was
+  wrong, and we now read the dominance signal from the registry
+  tags instead.
 
 No model time, no new generations — strictly from the JSONLs.
 """
@@ -48,9 +55,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from llmoji_study.config import MODEL_REGISTRY
 from llmoji_study.emotional_analysis import (
     QUADRANT_COLORS,
-    QUADRANT_ORDER,
+    QUADRANT_ORDER_SPLIT,
+    _hn_split_map,
     _use_cjk_font,
 )
+# Use the HN-split ordering (HN→HN-D/HN-S) for all panels of script 28.
+# Untagged-HN rows (hn06/hn15/hn17) drop out of the per-quadrant means
+# automatically — the registry split returns None for them and _quad
+# below filters those out.
+QUADRANT_ORDER = QUADRANT_ORDER_SPLIT
+_HN_SPLIT = _hn_split_map()
+MODELS = ("gemma", "qwen", "ministral")
 
 
 # Probes to highlight in the per-quadrant figure (subset of the 12
@@ -91,16 +106,15 @@ def _load(path: Path) -> list[dict]:
 
 
 def _quad(pid: str) -> str:
-    return pid[:2].upper() if len(pid) >= 2 else "??"
-
-
-def _pearson(xs: list[float], ys: list[float]) -> float:
-    if not xs:
-        return float("nan")
-    x = np.asarray(xs); y = np.asarray(ys)
-    x = x - x.mean(); y = y - y.mean()
-    den = float(np.sqrt((x * x).sum() * (y * y).sum()))
-    return float((x * y).sum() / den) if den > 0 else float("nan")
+    """Return the split-mode quadrant label: HP/LP/HN-D/HN-S/LN/NB.
+    Untagged-HN prompts (hn06/hn15/hn17) return ``"??"`` so they fall
+    through every QUADRANT_ORDER iterator."""
+    if len(pid) < 2:
+        return "??"
+    base = pid[:2].upper()
+    if base == "HN":
+        return _HN_SPLIT.get(pid, "??")
+    return base
 
 
 def _register_of(form: str) -> str:
@@ -117,8 +131,8 @@ def _register_of(form: str) -> str:
 
 
 def fig_quadrant_means(by_model: dict[str, list[dict]], out: Path) -> None:
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5.5), sharey=True)
-    for ax, short in zip(axes, ("gemma", "qwen")):
+    fig, axes = plt.subplots(1, 3, figsize=(20, 5.5), sharey=True)
+    for ax, short in zip(axes, MODELS):
         rows = by_model[short]
         n_probes = len(HIGHLIGHT_PROBES)
         n_quads = len(QUADRANT_ORDER)
@@ -166,80 +180,47 @@ def fig_quadrant_means(by_model: dict[str, list[dict]], out: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Figure B: per-row scatter fearful vs powerful, colored by quadrant
-# ---------------------------------------------------------------------------
-
-
-def fig_dominance_scatter(by_model: dict[str, list[dict]], out: Path) -> None:
-    fig, axes = plt.subplots(1, 2, figsize=(13, 6))
-    for ax, short in zip(axes, ("gemma", "qwen")):
-        rows = [r for r in by_model[short]
-                if "extension_probe_scores_tlast" in r
-                and "fearful.unflinching" in r["extension_probe_scores_tlast"]
-                and "powerful.powerless" in r["extension_probe_scores_tlast"]]
-        xs_all: list[float] = []
-        ys_all: list[float] = []
-        for q in QUADRANT_ORDER:
-            sub = [r for r in rows if _quad(r["prompt_id"]) == q]
-            xs = [r["extension_probe_scores_tlast"]["fearful.unflinching"]
-                  for r in sub]
-            ys = [r["extension_probe_scores_tlast"]["powerful.powerless"]
-                  for r in sub]
-            ax.scatter(
-                xs, ys, c=QUADRANT_COLORS[q], s=14, alpha=0.65,
-                edgecolors="none", label=f"{q} (n={len(sub)})",
-            )
-            xs_all.extend(xs); ys_all.extend(ys)
-        r = _pearson(xs_all, ys_all)
-        ax.set_xlabel("fearful.unflinching  (h_last)")
-        ax.set_ylabel("powerful.powerless  (h_last)")
-        ax.set_title(f"{short}  —  per-row Pearson r = {r:+.3f}")
-        ax.axhline(0, color="black", linewidth=0.4, alpha=0.5)
-        ax.axvline(0, color="black", linewidth=0.4, alpha=0.5)
-        ax.grid(True, linestyle=":", linewidth=0.4, alpha=0.6)
-        ax.legend(loc="best", fontsize=7, ncols=2, framealpha=0.85)
-    fig.suptitle(
-        "fearful vs powerful at h_last  —  PAD's dominance × fear plane",
-        fontsize=13, y=1.01,
-    )
-    fig.tight_layout()
-    fig.savefig(out, dpi=140, bbox_inches="tight")
-    plt.close(fig)
-    print(f"  wrote {out}")
-
-
-# ---------------------------------------------------------------------------
-# Figure C: HN dominance-split kaomoji register stack
+# Figure B: HN-D vs HN-S kaomoji register stack
 # ---------------------------------------------------------------------------
 
 
 def fig_hn_dominance_split(by_model: dict[str, list[dict]], out: Path) -> None:
+    """For each model, count how often HN-D vs HN-S rows reach for the
+    shocked register vs the sad-teary register. Tests whether the
+    kaomoji vocabulary itself reflects the dominance split that the
+    `pad_dominance` registry tags were designed to capture.
+
+    Pre-2026-05-01 this used a powerful.powerless tertile as a
+    workaround for not having labels — that probe turned out not to
+    track HN-D vs HN-S, and we now have explicit registry tags. The
+    cleaner version splits on the tags directly."""
     REGISTER_COLORS = {
-        "shocked":   "#d44a4a",  # red — fear-y register
-        "sad-teary": "#4a7ed4",  # blue — sad register
+        "shocked":   "#d44a4a",  # red — anger / fear-shocked register
+        "sad-teary": "#4a7ed4",  # blue — sadness register
         "other":     "#a0a0a0",  # gray
     }
     REGISTERS = ["shocked", "sad-teary", "other"]
+    GROUPS = ["HN-D", "HN-S"]
 
-    fig, axes = plt.subplots(1, 2, figsize=(13, 5), sharey=True)
-    for ax, short in zip(axes, ("gemma", "qwen")):
+    fig, axes = plt.subplots(1, 3, figsize=(19, 5), sharey=True)
+    for ax, short in zip(axes, MODELS):
         rows = [r for r in by_model[short]
-                if _quad(r.get("prompt_id", "")) == "HN"
-                and "extension_probe_scores_tlast" in r
-                and r.get("first_word", "").startswith("(")]
-        rows.sort(key=lambda r: r["extension_probe_scores_tlast"]["powerful.powerless"])
-        n = len(rows)
-        thirds = [
-            ("low",  rows[: n // 3]),
-            ("mid",  rows[n // 3: 2 * n // 3]),
-            ("high", rows[-(n // 3):]),
-        ]
-        x = np.arange(len(thirds))
-        bottoms = np.zeros(len(thirds))
+                if _quad(r.get("prompt_id", "")) in GROUPS
+                and r.get("first_word", "").startswith("(")
+                and "error" not in r]
+        x = np.arange(len(GROUPS))
+        bottoms = np.zeros(len(GROUPS))
+        per_group_n: list[int] = []
+        for g in GROUPS:
+            per_group_n.append(sum(1 for r in rows if _quad(r["prompt_id"]) == g))
         for reg in REGISTERS:
             counts = []
-            for _, sub in thirds:
-                c = sum(1 for r in sub if _register_of(r["first_word"]) == reg)
+            for g in GROUPS:
+                c = sum(
+                    1 for r in rows
+                    if _quad(r["prompt_id"]) == g
+                    and _register_of(r["first_word"]) == reg
+                )
                 counts.append(c)
             counts = np.asarray(counts, dtype=float)
             ax.bar(x, counts, bottom=bottoms, color=REGISTER_COLORS[reg],
@@ -247,17 +228,18 @@ def fig_hn_dominance_split(by_model: dict[str, list[dict]], out: Path) -> None:
             bottoms += counts
         ax.set_xticks(x)
         ax.set_xticklabels(
-            [f"{lab}\n(n={len(sub)})" for lab, sub in thirds], fontsize=9,
+            [f"{g}\n(n={n})" for g, n in zip(GROUPS, per_group_n)],
+            fontsize=10,
         )
-        ax.set_title(f"{short}  —  HN rows split by powerful.powerless")
+        ax.set_title(f"{short}  —  HN-D vs HN-S register stack")
         ax.grid(True, axis="y", linestyle=":", linewidth=0.4, alpha=0.6)
     axes[0].set_ylabel("kaomoji count")
     axes[0].legend(
         loc="upper left", fontsize=8, frameon=False, title="register",
     )
     fig.suptitle(
-        "HN dominance-split natural experiment  "
-        "—  kaomoji register vs powerful.powerless tertile",
+        "HN-D vs HN-S kaomoji register  —  "
+        "does vocabulary reflect the dominance split?",
         fontsize=13, y=1.01,
     )
     fig.tight_layout()
@@ -303,9 +285,9 @@ def _build_probe_matrix(rows: list[dict]) -> tuple[list[str], np.ndarray]:
 
 
 def fig_probe_correlations(by_model: dict[str, list[dict]], out: Path) -> None:
-    fig, axes = plt.subplots(1, 2, figsize=(15, 6.5))
+    fig, axes = plt.subplots(1, 3, figsize=(21, 6.5))
     im = None
-    for ax, short in zip(axes, ("gemma", "qwen")):
+    for ax, short in zip(axes, MODELS):
         names, X = _build_probe_matrix(by_model[short])
         if X.size == 0:
             ax.set_title(f"{short}  —  no data")
@@ -354,7 +336,7 @@ def main() -> None:
     _use_cjk_font()
 
     by_model: dict[str, list[dict]] = {}
-    for short in ("gemma", "qwen"):
+    for short in MODELS:
         path = MODEL_REGISTRY[short].emotional_data_path
         rows = _load(path)
         with_ext = sum(1 for r in rows if "extension_probe_scores_tlast" in r)
@@ -367,9 +349,16 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     fig_quadrant_means(by_model, out_dir / "fig_v3_extension_quadrant_means.png")
-    fig_dominance_scatter(by_model, out_dir / "fig_v3_extension_dominance_scatter.png")
     fig_hn_dominance_split(by_model, out_dir / "fig_v3_extension_hn_dominance_split.png")
     fig_probe_correlations(by_model, out_dir / "fig_v3_extension_probe_correlations.png")
+
+    # Drop the now-stale dominance scatter PNG if it lingers from a
+    # pre-2026-05-01 run — its rule-3a-broken interpretation no longer
+    # applies, and keeping a stale figure on disk invites mis-reading.
+    stale = out_dir / "fig_v3_extension_dominance_scatter.png"
+    if stale.exists():
+        stale.unlink()
+        print(f"  removed stale {stale}")
 
 
 if __name__ == "__main__":

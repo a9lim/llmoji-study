@@ -266,7 +266,7 @@ MODEL_REGISTRY: dict[str, ModelPaths] = {
         figures_dir=FIGURES_DIR / "local" / "qwen",
         vocab_sample_path=DATA_DIR / "qwen_vocab_sample.jsonl",
         # Silhouette peaks at L59 (0.313); deepest L61 is essentially
-        # tied at 0.304. Leave None → deepest.
+        # tied at 0.304. Leave None → deepest (script 21 takes L61).
         preferred_layer=None,
     ),
     "ministral": ModelPaths(
@@ -277,8 +277,11 @@ MODEL_REGISTRY: dict[str, ModelPaths] = {
         experiment="v3_ministral",
         figures_dir=FIGURES_DIR / "local" / "ministral",
         vocab_sample_path=DATA_DIR / "ministral_vocab_sample.jsonl",
-        # No v3 run yet; preferred layer will be set after running 21.
-        preferred_layer=None,
+        # Silhouette peaks at L21 (0.045 post-split, 0.082 pre-split,
+        # 0.153 in the imbalanced pilot). ~58% fractional depth. Set
+        # 2026-04-30 from script 21 layer-sweep on the pilot data;
+        # confirmed unchanged on the balanced post-supp data.
+        preferred_layer=21,
     ),
 }
 

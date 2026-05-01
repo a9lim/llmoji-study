@@ -1,27 +1,27 @@
 """Interactive 3D plots for the v3 extension-probe rescore (HTML output).
 
-Four figures, each two-panel (gemma | qwen), each colored by Russell
-quadrant. Per-row plots use one-marker-per-generation; per-face plots
-are aggregated (mean over each canonical kaomoji) with marker size
-log-scaled to emission count and color = RGB blend of per-quadrant
-emission distribution (via `per_face_quadrant_weights` +
-`mix_quadrant_color` from `llmoji_study.emotional_analysis`; same
-conventions the now-retired 2D per-face scatters used to follow).
+Four figures, each three-panel (gemma | qwen | ministral), each colored
+by Russell quadrant with the rule-3-redesign HN split (HN-D / HN-S
+broken out as separate categories). Per-row plots use one-marker-per-
+generation; per-face plots are aggregated (mean over each canonical
+kaomoji) with marker size log-scaled to emission count and color = RGB
+blend of per-quadrant emission distribution.
 
-  fig_v3_extension_3d_probes.html              — per-row, all 800
+  fig_v3_extension_3d_probes.html              — per-row, all rows
   fig_v3_extension_3d_probes_per_face.html     — per-face aggregate
       x = fearful.unflinching (h_last, score_single_token)
       y = happy.sad           (probe_scores_tlast)
       z = angry.calm          (probe_scores_tlast)
 
-  fig_v3_extension_3d_pca.html                 — per-row, all 800
+  fig_v3_extension_3d_pca.html                 — per-row, all rows
   fig_v3_extension_3d_pca_per_face.html        — per-face aggregate
       x, y, z = PC1, PC2, PC3 of h_mean at each model's preferred
-      layer (gemma L31, qwen L61), fit independently per model from
-      the cached `data/cache/v3_<short>_h_mean_all_layers.npz`.
-      Per-face: PCA fit on the per-face mean h_mean matrix (one row
-      per canonical kaomoji), so the PC axes describe variance ACROSS
-      faces rather than across individual generations.
+      layer (gemma L31, qwen L61, ministral L21), fit independently
+      per model from the cached
+      `data/cache/v3_<short>_h_mean_all_layers.npz`. Per-face: PCA fit
+      on the per-face mean h_mean matrix (one row per canonical
+      kaomoji), so the PC axes describe variance ACROSS faces rather
+      than across individual generations.
 
 Hover: prompt_id / kaomoji / prompt-text preview / axis values for
 per-row; canonical face / total emissions / per-quadrant emission
@@ -47,15 +47,29 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from llmoji_study.config import DATA_DIR, MODEL_REGISTRY, PROBES
 from llmoji_study.emotional_analysis import (
     QUADRANT_COLORS,
-    QUADRANT_ORDER,
+    QUADRANT_ORDER_SPLIT,
+    _hn_split_map,
     mix_quadrant_color,
     per_face_quadrant_weights,
 )
 from llmoji_study.hidden_state_analysis import load_hidden_features_all_layers
 
+# Use the rule-3-redesign split ordering (HN→HN-D/HN-S) throughout.
+QUADRANT_ORDER = QUADRANT_ORDER_SPLIT
+_HN_SPLIT = _hn_split_map()
+MODELS = ("gemma", "qwen", "ministral")
+
 
 def _quad(pid: str) -> str:
-    return pid[:2].upper() if len(pid) >= 2 else "??"
+    """Return the split-mode quadrant label: HP/LP/HN-D/HN-S/LN/NB.
+    Untagged-HN prompts (hn06/hn15/hn17) return ``"??"`` so they fall
+    through every QUADRANT_ORDER iterator."""
+    if len(pid) < 2:
+        return "??"
+    base = pid[:2].upper()
+    if base == "HN":
+        return _HN_SPLIT.get(pid, "??")
+    return base
 
 
 def _load_jsonl(path: Path) -> list[dict]:
@@ -135,9 +149,9 @@ def _probe_axes(rows: list[dict]) -> tuple[list[float], list[float], list[float]
 
 def fig_3d_probes(by_model: dict[str, list[dict]], out: Path) -> None:
     fig = make_subplots(
-        rows=1, cols=2,
-        specs=[[{"type": "scene"}, {"type": "scene"}]],
-        subplot_titles=("gemma", "qwen"),
+        rows=1, cols=3,
+        specs=[[{"type": "scene"}, {"type": "scene"}, {"type": "scene"}]],
+        subplot_titles=("gemma", "qwen", "ministral"),
         horizontal_spacing=0.05,
     )
 
@@ -145,7 +159,7 @@ def fig_3d_probes(by_model: dict[str, list[dict]], out: Path) -> None:
                  "happy.sad (probe_scores_tlast)",
                  "angry.calm (probe_scores_tlast)")
 
-    for ci, short in enumerate(("gemma", "qwen"), start=1):
+    for ci, short in enumerate(MODELS, start=1):
         rows = by_model[short]
         xs, ys, zs, keep = _probe_axes(rows)
         # One trace per quadrant for legend grouping + correct
@@ -180,7 +194,7 @@ def fig_3d_probes(by_model: dict[str, list[dict]], out: Path) -> None:
     fig.update_layout(
         title=("3D probe scatter: fearful (h_last) × happy × angry "
                "(probe_scores_tlast)  —  colored by Russell quadrant"),
-        height=720, width=1500,
+        height=720, width=2000,
         legend=dict(itemsizing="constant"),
     )
     fig.write_html(out, include_plotlyjs="cdn")
@@ -215,15 +229,15 @@ def _pca3_at_preferred_layer(short: str) -> tuple[np.ndarray, list[dict], int, n
 
 def fig_3d_pca(out: Path) -> None:
     fig = make_subplots(
-        rows=1, cols=2,
-        specs=[[{"type": "scene"}, {"type": "scene"}]],
-        subplot_titles=("gemma  (loading…)", "qwen  (loading…)"),
+        rows=1, cols=3,
+        specs=[[{"type": "scene"}, {"type": "scene"}, {"type": "scene"}]],
+        subplot_titles=("gemma  (loading…)", "qwen  (loading…)", "ministral  (loading…)"),
         horizontal_spacing=0.05,
     )
 
     summaries: list[tuple[str, int, np.ndarray]] = []
 
-    for ci, short in enumerate(("gemma", "qwen"), start=1):
+    for ci, short in enumerate(MODELS, start=1):
         Y, rows, layer, evr = _pca3_at_preferred_layer(short)
         summaries.append((short, layer, evr))
         AX_LABELS = (
@@ -269,7 +283,7 @@ def fig_3d_pca(out: Path) -> None:
     fig.update_layout(
         title=("3D PCA scatter of h_mean at each model's preferred layer  "
                "(gemma L31, qwen L61)  —  colored by Russell quadrant"),
-        height=720, width=1500,
+        height=720, width=2000,
         legend=dict(itemsizing="constant"),
     )
     fig.write_html(out, include_plotlyjs="cdn")
@@ -341,9 +355,9 @@ def _per_face_probe_centroids(rows: list[dict]) -> dict[str, tuple[float, float,
 
 def fig_3d_probes_per_face(by_model: dict[str, list[dict]], out: Path) -> None:
     fig = make_subplots(
-        rows=1, cols=2,
-        specs=[[{"type": "scene"}, {"type": "scene"}]],
-        subplot_titles=("gemma  (loading…)", "qwen  (loading…)"),
+        rows=1, cols=3,
+        specs=[[{"type": "scene"}, {"type": "scene"}, {"type": "scene"}]],
+        subplot_titles=("gemma  (loading…)", "qwen  (loading…)", "ministral  (loading…)"),
         horizontal_spacing=0.05,
     )
 
@@ -352,7 +366,7 @@ def fig_3d_probes_per_face(by_model: dict[str, list[dict]], out: Path) -> None:
                  "angry.calm (probe_scores_tlast)")
 
     summaries: list[tuple[str, int]] = []
-    for ci, short in enumerate(("gemma", "qwen"), start=1):
+    for ci, short in enumerate(MODELS, start=1):
         rows = by_model[short]
         face_data = _per_face_probe_centroids(rows)
         n_faces = len(face_data)
@@ -399,7 +413,7 @@ def fig_3d_probes_per_face(by_model: dict[str, list[dict]], out: Path) -> None:
     fig.update_layout(
         title=("3D probe scatter (per-face): fearful × happy × angry  "
                "—  size = log(emissions), color = per-face quadrant blend"),
-        height=720, width=1500,
+        height=720, width=2000,
     )
     fig.write_html(out, include_plotlyjs="cdn")
     print(f"  wrote {out}")
@@ -407,15 +421,15 @@ def fig_3d_probes_per_face(by_model: dict[str, list[dict]], out: Path) -> None:
 
 def fig_3d_pca_per_face(out: Path) -> None:
     fig = make_subplots(
-        rows=1, cols=2,
-        specs=[[{"type": "scene"}, {"type": "scene"}]],
-        subplot_titles=("gemma  (loading…)", "qwen  (loading…)"),
+        rows=1, cols=3,
+        specs=[[{"type": "scene"}, {"type": "scene"}, {"type": "scene"}]],
+        subplot_titles=("gemma  (loading…)", "qwen  (loading…)", "ministral  (loading…)"),
         horizontal_spacing=0.05,
     )
 
     summaries: list[tuple[str, int, int, np.ndarray]] = []
 
-    for ci, short in enumerate(("gemma", "qwen"), start=1):
+    for ci, short in enumerate(MODELS, start=1):
         M = MODEL_REGISTRY[short]
         cache = DATA_DIR / "cache" / f"v3_{short}_h_mean_all_layers.npz"
         df, X3, layer_idxs = load_hidden_features_all_layers(
@@ -495,7 +509,7 @@ def fig_3d_pca_per_face(out: Path) -> None:
     fig.update_layout(
         title=("3D PCA scatter (per-face): PC1 × PC2 × PC3 of per-face mean h_mean  "
                "—  size = log(emissions), color = per-face quadrant blend"),
-        height=720, width=1500,
+        height=720, width=2000,
     )
     fig.write_html(out, include_plotlyjs="cdn")
     print(f"  wrote {out}")
@@ -508,7 +522,7 @@ def fig_3d_pca_per_face(out: Path) -> None:
 
 def main() -> None:
     by_model: dict[str, list[dict]] = {}
-    for short in ("gemma", "qwen"):
+    for short in MODELS:
         path = MODEL_REGISTRY[short].emotional_data_path
         rows = _load_jsonl(path)
         with_ext = sum(1 for r in rows if "extension_probe_scores_tlast" in r)

@@ -41,7 +41,7 @@ from llmoji_study.config import (
     current_model,
 )
 from llmoji_study.emotional_analysis import (
-    QUADRANT_ORDER,
+    QUADRANT_ORDER_SPLIT as QUADRANT_ORDER,
     _use_cjk_font,
     load_emotional_features,
     mix_quadrant_color,
@@ -135,6 +135,7 @@ def main() -> None:
         str(M.emotional_data_path), DATA_DIR,
         experiment=M.experiment, which="h_mean",
         layer=M.preferred_layer,
+        split_hn=True,
     )
     df = df[df["first_word"].notna() & (df["first_word"] != "")].reset_index(drop=True)
     print(f"  {len(df)} kaomoji-bearing rows; "

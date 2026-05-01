@@ -15,6 +15,7 @@ completed rows so the user can bail early if emission falls below ~50%.
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -27,12 +28,31 @@ from llmoji_study.capture import run_sample
 from llmoji_study.config import (
     DATA_DIR,
     EMOTIONAL_CONDITION,
-    EMOTIONAL_SEEDS_PER_CELL,
+    EMOTIONAL_SEEDS_PER_CELL as _DEFAULT_SEEDS_PER_CELL,
     PROBE_CATEGORIES,
     current_model,
 )
 from llmoji_study.emotional_prompts import EMOTIONAL_PROMPTS
 from llmoji_study.prompts import Prompt
+
+
+# Pilot-N gate. Pre-registered main-run N=8 lives in config.py; pilots
+# override here without touching the registered constant. See
+# docs/2026-04-30-v3-ministral-pilot.md for the active design that uses this.
+def _seeds_per_cell() -> int:
+    raw = os.environ.get("LLMOJI_PILOT_GENS")
+    if raw is None:
+        return _DEFAULT_SEEDS_PER_CELL
+    try:
+        n = int(raw)
+    except ValueError as e:
+        raise SystemExit(f"LLMOJI_PILOT_GENS must be int, got {raw!r}") from e
+    if n < 1:
+        raise SystemExit(f"LLMOJI_PILOT_GENS must be >= 1, got {n}")
+    return n
+
+
+EMOTIONAL_SEEDS_PER_CELL = _seeds_per_cell()
 
 
 def _already_done(path: Path) -> set[tuple[str, int]]:
@@ -97,7 +117,7 @@ def _emission_rate_by_quadrant(path: Path) -> dict[str, tuple[int, int]]:
             if q not in stats:
                 continue
             stats[q][1] += 1
-            if r.get("kaomoji"):
+            if r.get("first_word"):
                 stats[q][0] += 1
     return {q: (v[0], v[1]) for q, v in stats.items()}
 
@@ -108,6 +128,11 @@ def main() -> None:
     print(f"model: {M.short_name} ({M.model_id})")
     print(f"output: {M.emotional_data_path}")
     print(f"experiment: {M.experiment}")
+    if EMOTIONAL_SEEDS_PER_CELL != _DEFAULT_SEEDS_PER_CELL:
+        print(
+            f"PILOT MODE: seeds/cell = {EMOTIONAL_SEEDS_PER_CELL} "
+            f"(registered main-run = {_DEFAULT_SEEDS_PER_CELL})"
+        )
     dropped = _drop_error_rows(M.emotional_data_path)
     if dropped:
         print(f"dropped {dropped} prior error rows for retry")
@@ -159,7 +184,7 @@ def main() -> None:
                     out.write(json.dumps(row.to_dict()) + "\n")
                     out.flush()
                     dt = time.time() - t0
-                    tag = row.kaomoji if row.kaomoji else f"[{row.first_word!r}]"
+                    tag = row.first_word if row.first_word else "(no-kaomoji)"
                     print(
                         f"  [{i}/{remaining}] {ep.id} ({ep.quadrant}) "
                         f"s={seed} {tag}  ({dt:.1f}s, {row.tok_per_sec:.1f} tok/s)"

@@ -205,7 +205,6 @@ def plot_pooled_pca_scatter(
     from matplotlib.patches import Patch
     from sklearn.decomposition import PCA
     from .emotional_analysis import _use_cjk_font
-    from llmoji_study.taxonomy_labels import TAXONOMY
 
     _use_cjk_font()
 
@@ -226,10 +225,8 @@ def plot_pooled_pca_scatter(
         km = keys_df["first_word"].iloc[i]
         src = keys_df["source"].iloc[i]
         color = SOURCE_COLORS.get(src, "#666")
-        pole = TAXONOMY.get(str(km), 0)
-        edge = {+1: "#c25a22", -1: "#2f6c57", 0: "#444"}[pole]
         ax.scatter(coords[i, 0], coords[i, 1], c=color, s=60,
-                   edgecolor=edge, linewidth=1.2, alpha=0.85, zorder=3)
+                   edgecolor="#444", linewidth=0.8, alpha=0.85, zorder=3)
         ax.annotate(km, (coords[i, 0], coords[i, 1]), fontsize=5, alpha=0.75,
                     xytext=(4, 4), textcoords="offset points", zorder=4)
 
@@ -239,7 +236,7 @@ def plot_pooled_pca_scatter(
     ax.set_ylabel(f"PC2  ({var[1] * 100:.1f}% var)")
     ax.set_title(
         f"Pooled (kaomoji, source) hidden-state means — PC1 vs PC2\n"
-        f"(n ≥ {min_count}; {len(keys_df)} points; fill=source, edge=taxonomy pole)"
+        f"(n ≥ {min_count}; {len(keys_df)} points; fill=source)"
     )
     source_legend = [Patch(color=c, label=s) for s, c in SOURCE_COLORS.items()]
     ax.legend(handles=source_legend, loc="best", frameon=False, fontsize=8,
@@ -261,12 +258,11 @@ def pooled_summary_table(
     *,
     min_count: int = 3,
 ) -> pd.DataFrame:
-    """Per-(kaomoji, source) count + taxonomy label + within-group
-    cosine-to-mean consistency. Drops the 5 probe-mean columns the
-    probe-based version had (per-dim hidden-state means aren't
-    interpretable; the consistency column is the summary stat)."""
+    """Per-(kaomoji, source) count + within-group cosine-to-mean
+    consistency. Drops the 5 probe-mean columns the probe-based version
+    had (per-dim hidden-state means aren't interpretable; the
+    consistency column is the summary stat)."""
     from .hidden_state_analysis import cosine_to_mean
-    from llmoji_study.taxonomy_labels import TAXONOMY
 
     rows: list[dict[str, Any]] = []
     if len(df) == 0:
@@ -282,7 +278,6 @@ def pooled_summary_table(
             "first_word": km,
             "source": src,
             "n": int(len(g)),
-            "taxonomy_label": int(TAXONOMY.get(str(km), 0)),
             "median_within_consistency": float(np.median(sims)),
         })
     out = pd.DataFrame(rows)

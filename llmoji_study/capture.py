@@ -36,7 +36,7 @@ from .config import (
 from .hidden_capture import read_after_generate
 from .hidden_state_io import hidden_state_path, save_hidden_states
 from .prompts import Prompt
-from llmoji_study.taxonomy_labels import extract_with_label as extract
+from llmoji.taxonomy import extract
 
 
 @dataclass
@@ -56,8 +56,6 @@ class SampleRow:
     # --- what the model did ---
     text: str
     first_word: str
-    kaomoji: str | None
-    kaomoji_label: int        # +1, -1, 0
     token_count: int
     tok_per_sec: float
     finish_reason: str
@@ -262,8 +260,6 @@ def run_sample(
         steering=result.applied_steering,
         text=result.text,
         first_word=match.first_word,
-        kaomoji=match.kaomoji,
-        kaomoji_label=match.label,
         token_count=result.token_count,
         tok_per_sec=result.tok_per_sec,
         finish_reason=result.finish_reason,

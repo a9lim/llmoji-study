@@ -1,9 +1,9 @@
 """Emotional-battery analysis driver (hidden-state).
 
 Reads data/emotional_raw.jsonl + per-row hidden-state sidecars from
-data/hidden/v3/. Re-labels kaomoji in place via taxonomy.extract,
-prints per-quadrant emission stats, writes three hidden-state figures
-(Fig A, B, C) + a per-kaomoji summary TSV.
+data/hidden/v3/. Re-extracts first_word in place via the current
+canonicalization, prints per-quadrant emission stats, writes three
+hidden-state figures (Fig A, B, C) + a per-kaomoji summary TSV.
 """
 
 from __future__ import annotations
@@ -25,13 +25,15 @@ from llmoji_study.emotional_analysis import (
     plot_within_kaomoji_consistency,
     summary_table,
 )
-from llmoji_study.taxonomy_labels import extract_with_label as extract
+from llmoji.taxonomy import extract
 
 
 def _relabel_in_place(path: Path) -> None:
-    """Re-extract first_word / kaomoji / kaomoji_label via the current
-    taxonomy and rewrite the JSONL in place. Cheap; safe to run every
-    time the analysis script starts."""
+    """Re-extract first_word via the current llmoji.taxonomy.extract
+    rules and rewrite the JSONL in place. Cheap; safe to run every
+    time the analysis script starts. Drops legacy kaomoji /
+    kaomoji_label fields if present (pre-2026-04-30 capture wrote
+    those gemma-tuned TAXONOMY columns; new captures don't)."""
     if not path.exists():
         return
     lines = [l for l in path.read_text().splitlines() if l.strip()]
@@ -43,8 +45,9 @@ def _relabel_in_place(path: Path) -> None:
             continue
         m = extract(r.get("text", ""))
         r["first_word"] = m.first_word
-        r["kaomoji"] = m.kaomoji
-        r["kaomoji_label"] = m.label
+        # Drop legacy TAXONOMY-tuned fields if present.
+        r.pop("kaomoji", None)
+        r.pop("kaomoji_label", None)
         out_lines.append(json.dumps(r))
     path.write_text("\n".join(out_lines) + "\n")
 
@@ -66,21 +69,22 @@ def main() -> None:
         experiment=M.experiment,
         which="h_mean",
         layer=M.preferred_layer,
+        split_hn=True,
     )
-    print(f"loaded {len(df)} kaomoji-bearing rows; X shape {X.shape}")
+    print(f"loaded {len(df)} kaomoji-bearing rows; X shape {X.shape}  (HN split into HN-D/HN-S; untagged HN rows dropped)")
     if len(df) == 0:
         print("nothing to plot; the v3 run needs to land hidden-state sidecars first")
         return
 
     print("\nper-quadrant kaomoji emission (first-word filter):")
-    for q in ("HP", "LP", "HN", "LN", "NB"):
+    for q in ("HP", "LP", "HN-D", "HN-S", "LN", "NB"):
         q_rows = df[df["quadrant"] == q]
         n = len(q_rows)
         uniq = int(q_rows["first_word"].nunique()) if n else 0
         print(f"  {q}: {n} kaomoji-bearing rows; {uniq} distinct forms")
 
     print("\ntop-5 first_words per quadrant (by count):")
-    for q in ("HP", "LP", "HN", "LN", "NB"):
+    for q in ("HP", "LP", "HN-D", "HN-S", "LN", "NB"):
         q_rows = df[df["quadrant"] == q]
         top = q_rows["first_word"].value_counts().head(5)
         print(f"  {q}:")

@@ -15,7 +15,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from llmoji_study.analysis import all_figures, evaluate_axis, load_rows
+from llmoji_study.analysis import (
+    _add_axis_label_column, all_figures, evaluate_axis, load_rows,
+)
 from llmoji_study.config import (
     DATA_DIR,
     FIGURES_DIR,
@@ -47,9 +49,10 @@ def main() -> None:
     print(f"loaded {total} rows ({errors} errors, {total - errors} usable)")
 
     # --- breakdown ---
-    print("\n=== breakdown by (condition, kaomoji pole) ===")
+    print("\n=== breakdown by (condition, happy.sad pole) ===")
+    df_lab = _add_axis_label_column(df, "happy.sad")
     breakdown = (
-        df.groupby(["condition", "kaomoji_label"]).size().unstack(fill_value=0)
+        df_lab.groupby(["condition", "label_happy.sad"]).size().unstack(fill_value=0)
     )
     print(breakdown)
 

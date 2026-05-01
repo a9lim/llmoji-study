@@ -27,10 +27,10 @@ from saklas import SaklasSession
 from llmoji_study.capture import run_sample
 from llmoji_study.config import (
     DATA_DIR,
-    MODEL_ID,
     PROBE_CATEGORIES,
     PROBES,
     STEERED_AXIS,
+    current_model,
 )
 from llmoji_study.emotional_prompts import EMOTIONAL_PROMPTS
 from llmoji_study.hidden_state_io import hidden_state_path, load_hidden_states
@@ -53,9 +53,10 @@ def _pick_smoke_prompts():
 
 
 def main() -> None:
-    print(f"bootstrapping saklas session on {MODEL_ID}...")
+    M = current_model()
+    print(f"bootstrapping saklas session on {M.model_id} (short_name={M.short_name})...")
     session = SaklasSession.from_pretrained(
-        MODEL_ID, probes=PROBE_CATEGORIES,
+        M.model_id, probes=PROBE_CATEGORIES,
     )
 
     # Register the steered profile so expressions would resolve if

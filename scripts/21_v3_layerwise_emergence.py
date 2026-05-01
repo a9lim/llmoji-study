@@ -40,9 +40,15 @@ from llmoji_study.config import DATA_DIR, FIGURES_DIR, MODEL_REGISTRY, current_m
 from llmoji_study.emotional_analysis import (
     KAOMOJI_START_CHARS,
     QUADRANT_COLORS,
-    QUADRANT_ORDER,
+    QUADRANT_ORDER_SPLIT,
     _use_cjk_font,
+    apply_hn_split,
 )
+# In split mode (rule 3 redesign), iterate the 6-element ordering so
+# HN-D and HN-S each get a centroid + scatter; non-split data shows up
+# under aggregate HN, which falls through the split iterator harmlessly
+# (apply_hn_split below ensures we ARE in split mode here).
+QUADRANT_ORDER = QUADRANT_ORDER_SPLIT
 from llmoji_study.hidden_state_analysis import load_hidden_features_all_layers
 
 
@@ -87,6 +93,15 @@ def _load_v3_layer_tensor(
     ])
     df = df.loc[mask].reset_index(drop=True)
     X3 = X3[mask]
+    # Apply rule-3 HN split: HN→HN-D/HN-S; drop the 3 untagged HN
+    # borderline prompts. This re-aligns the layer tensor X3 row-wise
+    # via the same boolean mask the df gets filtered by.
+    n_before = len(df)
+    df, X3_split = apply_hn_split(df, X3)
+    assert X3_split is not None
+    X3 = X3_split
+    if len(df) < n_before:
+        print(f"  [{short_name}] dropped {n_before - len(df)} HN-untagged rows for split-mode")
     return df, X3, layer_idxs
 
 

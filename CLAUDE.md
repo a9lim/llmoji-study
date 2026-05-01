@@ -53,6 +53,49 @@ phenomenal status. Aggregating that across 800+ generations is not nothing.
   `.npz` sidecars each). Multi-model wiring via
   `LLMOJI_MODEL=gemma|qwen|ministral`. v1/v2 re-run pre-registered as gated
   on v3 hidden-state findings — justified now, not urgent.
+- **Ministral pilot landed 2026-04-30** (n=100, design doc
+  `docs/2026-04-30-v3-ministral-pilot.md`). All gating rules pass: silhouette
+  0.153 at L21 (~58% depth, gemma-like mid-depth pattern, NOT qwen's
+  deepest-leaning); CKA(gemma↔ministral)=0.741, CKA(qwen↔ministral)=0.812
+  (latter exceeds gemma↔qwen baseline of 0.795). Single canonical alignment
+  layer at ministral L21 regardless of partner. **Tokenizer bug found +
+  fixed in saklas (`fix_mistral_regex=True` via `model_id` substring-match
+  in `core/model.py`); pilot data kept as lower bound on true geometry.**
+  **Ministral main run landed 2026-04-30** at N=800 with the tokenizer fix
+  active; pilot data archived as `*_pilot.*`.
+- **TAXONOMY drop refactor 2026-04-30.** Gemma-tuned `TAXONOMY` /
+  `ANGRY_CALM_TAXONOMY` / `kaomoji_label` machinery deleted. v3 analyses key
+  on `first_word` (canonicalized via `llmoji.taxonomy.canonicalize_kaomoji`);
+  v1/v2 pole assignment moved to per-face mean `t0_<axis>` probe-score sign
+  in `analysis._add_axis_label_column`. Generalizes pole labeling across
+  models that don't share gemma's vocabulary.
+- **Rule 3 redesign landed 2026-05-01 — RULE 3b CONFIRMED on balanced data.**
+  Design doc `docs/2026-05-01-rule3-redesign.md`. New `pad_dominance` field
+  on `EmotionalPrompt` (orthogonal to `quadrant`); HN bisected into HN-D
+  (anger/contempt) and HN-S (fear/anxiety), 3 borderline reads
+  (hn06/hn15/hn17) untagged. 23 supplementary prompts (hn21–hn43, 13 D + 10
+  S) brought the post-supp balance to 20/20 (160/160 rows per model).
+  **Final verdict on balanced data:** rule 3a (powerful.powerless) DROPPED —
+  wrong direction on most aggregates across (gemma, qwen, ministral) ×
+  (t0, tlast, mean), so the probe doesn't read PAD dominance in the HN
+  context. **Rule 3b (fearful.unflinching) PASS on all 3 models** —
+  directional + bootstrap 95% CI excludes zero on ≥2 of 3 aggregates per
+  model. Largest effects: qwen t0 (Cohen's d=+2.35), ministral mean
+  (d=+0.81). Auto-generated verdict block at
+  `figures/local/cross_model/rule3_dominance_check.md` from
+  `scripts/30_rule3_dominance_check.py`. Triplet Procrustes
+  (`scripts/31_v3_triplet_procrustes.py`,
+  `figures/local/cross_model/fig_v3_triplet_procrustes.png`) — 2×2
+  layout: gemma / qwen / ministral centroids in their own PCA(2),
+  plus a Procrustes overlay showing all three aligned to gemma
+  (○ gemma, △ qwen, □ ministral). Alignment-to-gemma residuals: qwen
+  5.6, ministral 6.4 (after ministral's −176° axis flip — PCA sign
+  indeterminacy, not a divergence finding). Same order of magnitude
+  despite ministral's smaller scale + different lab. Display palette: HN-D `#d44a4a`
+  (red, inherits HN), HN-S `#9d4ad4` (magenta-purple). New helpers
+  `apply_hn_split` / `_palette_for` / `_hn_split_map` in
+  `emotional_analysis`. Ministral `preferred_layer` set to L21 in
+  `MODEL_REGISTRY` (was None → defaulted to deepest L37).
 - **v3 follow-on analyses landed 2026-04-28** (no new model time): layer-wise
   emergence trajectory, same-face-cross-quadrant natural experiment,
   cross-model alignment (CKA + Procrustes), PC3+ × probes. Headline: gemma's
@@ -103,7 +146,6 @@ pip install -e .   # saklas, sentence-transformers, pyarrow, plotly, anthropic
 python scripts/99_hidden_state_smoke.py
 
 # v1/v2 (gemma steering, 900 generations)
-python scripts/00_vocab_sample.py
 python scripts/01_pilot_run.py
 python scripts/02_pilot_analysis.py
 
@@ -181,10 +223,6 @@ llmoji-study/
                                # description embeddings
     eriskii_anchors.py         # 21-axis AXIS_ANCHORS + CLUSTER_LABEL_PROMPT
     eriskii.py                 # axis projection + cluster labeling primitives
-    taxonomy_labels.py         # gemma-tuned TAXONOMY + ANGRY_CALM_TAXONOMY +
-                               # label_on + extract_with_label (pulled out
-                               # of llmoji.taxonomy in the v1.0 split —
-                               # pilot-specific, not provider-agnostic)
     probe_extensions.py        # registration helper for v3-extension probe packs;
                                # idempotent copy into ~/.saklas/vectors/default/
                                # with synthesized pack.json (correct sha256)
@@ -193,9 +231,11 @@ llmoji-study/
       powerful.powerless/      # PAD dominance / felt agency
       surprised.unsurprised/   # Plutchik surprise / novelty appraisal
       disgusted.accepting/     # Plutchik disgust / revulsion
-  scripts/                     # 00–04, 06, 07, 10–12, 15–25, 26–29, 99
+  scripts/                     # 01–04, 06, 07, 10–12, 15–18, 21–29, 99
                                # (13 deleted 2026-04-29 — Russell-quadrant
-                               # PCA subsumed by 3D HTML in script 29)
+                               # PCA subsumed by 3D HTML in script 29;
+                               # 00/19/20 deleted 2026-04-30 — vocab-discovery
+                               # tooling moot once gemma-tuned TAXONOMY dropped)
   docs/                        # design+plan docs per experiment +
                                # findings.md / internals.md / gotchas.md +
                                # local-side.md, harness-side.md
@@ -215,7 +255,7 @@ llmoji-study/
                                # Procrustes) + extension-probe figures + 3D HTMLs
       gemma/                   # fig_emo_*, fig_v3_*, fig_pool_*
       qwen/                    # fig_emo_*, fig_v3_*
-      ministral/               # ready when v3 lands
+      ministral/               # fig_emo_*, fig_v3_* (pilot N=100; main pending)
   logs/                        # tee'd run output (gitignored)
 ```
 
@@ -224,9 +264,10 @@ Modules that USED to live here and now live in `llmoji` (import from
 
 - `llmoji.taxonomy` — KAOMOJI_START_CHARS, is_kaomoji_candidate, `extract`
   (span-only), `KaomojiMatch` (slim), canonicalize_kaomoji. Gemma-tuned
-  `TAXONOMY` / `ANGRY_CALM_TAXONOMY` / `label_on` are NOT in the package —
-  they live at `llmoji_study.taxonomy_labels` (v1.0 review pulled pilot
-  labels out of the public schema).
+  Gemma-tuned `TAXONOMY` / `ANGRY_CALM_TAXONOMY` happy-sad labels were dropped
+  2026-04-30 (post-ministral pilot). v3 analyses key on `first_word`
+  (canonicalized); v1/v2 pole assignment moved to per-face mean
+  `t0_<axis>` probe-score sign in `analysis._add_axis_label_column`.
 - `llmoji.scrape` — `ScrapeRow` (span-only; no `kaomoji` / `kaomoji_label`)
   + `iter_all` chain helper.
 - `llmoji.sources.journal` — generic kaomoji-journal reader.

@@ -85,9 +85,50 @@ because saklas's contrastive probes are extracted at saklas's own
 internal layer and inherit each model's probe-space layout, not the
 hidden-state layout the L31 PCA is reading.
 
+`Ministral-3-14B-Instruct-2512` was added as a third model 2026-04-30
+(pilot at N=100, then main at N=800). Same v3 prompts, same probes,
+same analysis chain. Russell-quadrant separation lands cleanly:
+silhouette 0.153 at L21 (~58% fractional depth, gemma-like
+mid-depth not qwen's deepest-leaning), CKA(gemma↔ministral) = 0.741
+and CKA(qwen↔ministral) = 0.812 at preferred layers — the
+qwen↔ministral pair actually exceeds the gemma↔qwen baseline of
+0.795. A single canonical alignment layer at ministral L21
+maximizes CKA against either reference model regardless of where
+the partner's affect representation sits. The face inventory is
+structurally distinct (heavy use of `(◕‿◕✿)`, `(╯°□°)`, `(╥﹏╥)`,
+plus emoji-eyed variants — possibly a francophone-internet
+register), but the geometry under those faces matches gemma + qwen.
+A tokenizer bug in HF-distributed Mistral checkpoints (mis-splits
+~1% of tokens after apostrophes / punctuation) was found and fixed
+in saklas 2.0.0; pilot ran on the buggy version, main run uses the
+fix.
+
+Rule 3 of the v3 cross-model gating rules (originally a
+`powerful.powerless` HN−LN sign-check) was redesigned 2026-05-01
+because HN aggregates anger (high PAD dominance) with fear (low
+PAD dominance), washing out the within-quadrant mean. New schema:
+HN bisects into HN-D (anger / contempt) and HN-S (fear / anxiety)
+via a `pad_dominance` field on `EmotionalPrompt`. 23 supplementary
+prompts (hn21–hn43) brought the post-supp dataset to 20 D / 20 S
+balanced (160 rows per group per model). On the balanced data,
+**rule 3b (`fearful.unflinching` mean(HN-S) > mean(HN-D))
+PASSES on all three models**: directional + bootstrap 95% CI
+excludes zero on at least 2 of 3 aggregates (t0, tlast, mean). Largest
+effects: qwen t0 Cohen's d = +2.35, ministral mean d = +0.81. Rule
+3a (`powerful.powerless`) was dropped — fails across all three models
+in the wrong direction with CI-excludes-zero on gemma + ministral
+mean-aggregates, so the probe doesn't read PAD dominance in the HN
+context (likely reads "felt agency in achievement contexts" instead).
+Cross-model takeaway: PAD dominance has a real internal
+representation in all three architectures + labs (Google / Alibaba /
+Mistral) and reads cleanly via the fear axis against the registry
+HN-D / HN-S split.
+
 Full setup, decision rules, per-quadrant centroids, all the
-cross-model comparisons, and the Ministral vocabulary pilot are in
-[`docs/local-side.md`](docs/local-side.md).
+cross-model comparisons, the Ministral pilot + main + rule-3
+redesign details are in
+[`docs/local-side.md`](docs/local-side.md) and
+[`docs/findings.md`](docs/findings.md).
 
 ### Harness side
 
