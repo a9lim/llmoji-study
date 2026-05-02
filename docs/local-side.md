@@ -610,44 +610,67 @@ face-space. Different decompositions of the same affect space.
 Per-model fidelity in two directions, h_mean at preferred layer,
 faces filtered to n ≥ 5.
 
+Numbers refreshed 2026-05-03 to reflect (a) the
+`StratifiedGroupKFold` methodology fix in script 25 — CV now keyed
+on `prompt_id` so all 8 seeds of any prompt land in the same fold,
+removing the prompt-level leakage that inflated quadrant accuracy
+to 1.000 — and (b) the post-2026-05-02 h_first standardization at
+L50 / L59 / L20.
+
 - **Hidden → face** (multi-class logistic on PCA(50)-reduced
-  h_mean, 5-fold CV): gemma top-1 accuracy 0.71 across 19 face
-  classes (uniform 0.05, majority 0.23, macro-F1 0.52); qwen
-  0.495 across 28 classes (uniform 0.04, majority 0.14, macro-F1
-  0.30). Both 13–14× uniform.
-- **Hidden → quadrant** (5-class, same pipeline): both models
-  1.000 accuracy — caveat: 5-fold CV is by row not by prompt;
-  with 8 seeds × 100 prompts the same prompt appears in train
-  and test folds with different seeds, so this number is inflated
-  by prompt-level leakage. Need a `GroupKFold` keyed on
-  `prompt_id` for the rigorous version.
+  h_first, `StratifiedGroupKFold` by `prompt_id`, n_splits=3):
+  gemma top-1 accuracy 0.68 across 17 face classes (uniform 0.06,
+  majority 0.22, macro-F1 0.37); qwen 0.39 across 31 classes
+  (uniform 0.03, majority 0.12, macro-F1 0.15); ministral 0.40
+  across 21 classes (uniform 0.05, majority 0.34, macro-F1 0.07 —
+  high majority is the `(◕‿◕✿)` flower-face dominating ministral's
+  vocabulary). Drops vs the prior leaky-CV numbers are smaller
+  than expected — face identity generalizes to never-seen prompts.
+- **Hidden → quadrant** (5-class, same pipeline, n_splits=5):
+  gemma 0.95, qwen 0.94, ministral 0.90. Pre-fix prediction was
+  that quadrant accuracy would drop to ~0.7–0.8 once leakage was
+  removed; actual drop is only 5–10 pp. **The v3 quadrant signal
+  genuinely generalizes to held-out prompts**, not just memorized
+  — a stronger result than pre-fix, cross-model consistent.
 - **Face → hidden** (η² of face identity per PC, summed weighted
-  by explained variance): face identity recovers **49%** of the
-  top-5 PC subspace on gemma, **60%** on qwen.
-- **Concrete reconstruction**: predict h_mean = face_centroid in
-  full hidden space gives R² = **0.260** (gemma) / **0.287**
-  (qwen); mean centered cosine 0.49 / 0.52; ‖error‖/‖row deviation‖
-  0.86 / 0.84. Quadrant-centroid baseline gets R² 0.254 / 0.264
-  — face buys only +0.6 / +2.3 percentage points over quadrant
-  alone in full hidden space. Reconciles with the η² above:
-  kaomoji choice tracks the affect direction tightly and is roughly
-  independent of the bulk of hidden state, which is content-
-  related. The marginal information beyond quadrant is
-  concentrated where affect lives.
+  by explained variance): face identity recovers **73%** of the
+  top-5 PC subspace on gemma, **77%** on qwen, **35%** on
+  ministral. The η² jumps over the pre-h_first numbers (gemma 49%,
+  qwen 60%) reflect h_first being more prompt-deterministic — face
+  identity, which is largely prompt-driven, explains more of the
+  variance at h_first than at h_mean.
+- **Concrete reconstruction**: predict h_first = face_centroid in
+  full hidden space gives R² = **0.580** (gemma) / **0.570** (qwen) /
+  **0.219** (ministral); mean centered cosine 0.75 / 0.74 / 0.44;
+  ‖error‖/‖row deviation‖ 0.63 / 0.64 / 0.88. Quadrant-centroid
+  baseline gets R² 0.530 / 0.520 / 0.352 — on gemma + qwen, face
+  buys +5.0 pp over quadrant alone (much larger than the prior
+  +0.6 / +2.3 pp under h_mean — the kaomoji is a substantially
+  stronger residual readout above the Russell-quadrant signal at
+  h_first). **Ministral inverts the pattern**: face-centroid R²
+  (0.219) is *lower* than quadrant-centroid R² (0.352). Ministral's
+  196-face vocabulary spreads signal too thin per face for
+  face-as-identifier to beat the 5-class quadrant label —
+  vocabulary breadth past some threshold makes the kaomoji stop
+  being a useful readout of state.
 
 ### Open follow-ons
 
 - v1/v2 hidden-state analyses still default to the deepest probe
   layer (no v1/v2 sidecars exist yet anyway, but the loaders are
-  wired for L31 when they land).
-- L31 was found via h_mean silhouette. v1/v2 + cross-pilot scripts
-  use h_last at L31 — assumes "best layer for affect" is
-  snapshot-independent. Worth re-running script 21 with
-  `which="h_last"` to verify.
-- Script 25's quadrant accuracy of 1.000 is real but inflated by
+  wired for `preferred_layer` when they land).
+- The h_first cutover (2026-05-02) shifted gemma's peak from L31
+  (h_mean) to L50, qwen's from L38 to L59, ministral's from L21 to
+  L20 — the old "gemma is mid-depth, qwen is deep" framing
+  dissolved. Both gemma and qwen now peak deep; ministral is the
+  only mid-depth model.
+- ~~Script 25's quadrant accuracy of 1.000 is real but inflated by
   prompt-level leakage in the 5-fold CV; needs `GroupKFold` for the
-  honest number. Expected to drop to ~0.7–0.8 under leave-prompts-
-  out CV.
+  honest number.~~ **Resolved 2026-05-03.** Now uses
+  `StratifiedGroupKFold` keyed on `prompt_id`; numbers in the
+  pipeline section above. Drops were smaller than the predicted
+  ~0.7–0.8 (actual: 0.90–0.95) — the quadrant signal generalizes
+  much better than expected.
 - Qwen has 16 cross-quadrant emitters; gemma has 10. Wider net for
   natural-experiment work on qwen as the dataset grows.
 - The remaining 7.8° Procrustes rotation between gemma L31 and
@@ -711,74 +734,40 @@ probe scores for back-compat and audit.
 
 Loading: `llmoji_study.hidden_state_analysis.load_hidden_features(...)`
 returns `(metadata df, (n_rows, hidden_dim) feature matrix)`.
-Defaults: `which="h_mean"` (whole-generation aggregate; smoother
-and more probative than `h_last`), `layer=None` (deepest probe
-layer). All v3 figures use `h_mean`.
+Defaults: `which="h_first"` (kaomoji-emission state;
+methodology-invariant across the 2026-05-02 MAX_NEW_TOKENS
+cutover; substantially cleaner Russell-quadrant separation than
+`h_mean`), `layer=None` (deepest probe layer; per-model
+`preferred_layer` overrides via `MODEL_REGISTRY`). v3 figures
+default to `h_first` since 2026-05-02; `$LLMOJI_WHICH` overrides
+per run.
 
 Per-model layer override: `ModelPaths.preferred_layer` (in
 `llmoji_study.config`) carries the peak-affect probe layer per
-model — gemma = 31, qwen = None (uses deepest L61), ministral =
-None (no v3 data yet). v3 scripts (04, 13, 17, 22, 23, 24, 25)
-all pass `layer=M.preferred_layer` so figures get the right
-snapshot per model. v1/v2 + cross-pilot scripts (02, 10) follow
-the same convention; both currently bail because
-`pilot_raw.jsonl` doesn't exist (v1/v2 hidden-state pipeline
-gated on v3 findings). The 2026-04-28 layer-wise emergence
-analysis is the source of L31; see v3 follow-on analyses above.
+model under h_first — gemma L50, qwen L59, ministral L20. v3
+scripts pass `layer=M.preferred_layer` so figures get the right
+snapshot per model. v1/v2 scripts bail because `pilot_raw.jsonl`
+doesn't exist (v1/v2 hidden-state pipeline gated on v3 findings).
+The 2026-04-28 layer-wise emergence analysis (rerun under h_first
+2026-05-02) is the source of these layers; see v3 follow-on
+analyses above.
 
-Multi-layer cache: `load_hidden_features_all_layers(...)` opens
-each sidecar once and returns a `(n_rows, n_layers, hidden_dim)`
-tensor with optional disk cache at
-`data/cache/v3_<short>_h_mean_all_layers.npz` (gitignored,
-~800 MB compressed per model — npz compression doesn't help much
-with dense float32 hidden states). Used by `scripts/21` (layer
-trajectory) and `scripts/23` (per-layer CKA grid).
+Multi-layer cache: `load_emotional_features_all_layers(short, ...)`
+in `llmoji_study.emotional_analysis` opens each sidecar once and
+returns a `(n_rows, n_layers, hidden_dim)` tensor with optional
+disk cache at `data/cache/v3_<short>_h_mean_all_layers.npz`
+(gitignored; legacy filename, contents reflect whatever `which`
+is set to). Wraps `load_hidden_features_all_layers` from
+`hidden_state_analysis` plus the canonicalize + kaomoji-start
+filter + optional HN-D/HN-S split. Used by `scripts/local/21`
+(layer trajectory), `scripts/local/23` (per-layer CKA grid), and
+`scripts/local/31` (triplet Procrustes).
 
 ## Reproducing
 
-```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -e ../llmoji   # during dev; replace with `pip install llmoji>=1.0,<2` once published
-pip install -e .
-
-# Smoke test the hidden-state pipeline (~5 min)
-python scripts/99_hidden_state_smoke.py
-
-# v1/v2 (gemma steering, 900 generations)
-python scripts/00_vocab_sample.py
-python scripts/01_pilot_run.py
-python scripts/02_pilot_analysis.py
-
-# v3 (naturalistic, 800 generations); gemma default
-python scripts/03_emotional_run.py
-python scripts/04_emotional_analysis.py             # Fig A/B/C + summary TSV
-python scripts/17_v3_face_scatters.py               # per-face cosine heatmap
-
-# v3 on a non-gemma model (registry: gemma | qwen | ministral)
-LLMOJI_MODEL=qwen python scripts/03_emotional_run.py
-LLMOJI_MODEL=qwen python scripts/04_emotional_analysis.py
-LLMOJI_MODEL=qwen python scripts/17_v3_face_scatters.py
-# outputs land at data/{short_name}_emotional_*, figures/local/{short_name}/*
-
-# Cross-pilot + v3-extension analyses
-python scripts/10_cross_pilot_clustering.py
-python scripts/11_emotional_probe_correlations.py   # trio + PROBES_ALL
-python scripts/12_emotional_prompt_matrix.py
-
-# v3 follow-on analyses (2026-04-28; uses existing sidecars, no model time)
-python scripts/21_v3_layerwise_emergence.py        # multi-layer, both models
-python scripts/22_v3_same_face_cross_quadrant.py   # respects LLMOJI_MODEL
-python scripts/23_v3_cross_model_alignment.py      # gemma↔qwen, both required
-python scripts/24_v3_pca3plus.py                   # PC × PROBES_ALL correlation
-python scripts/25_v3_kaomoji_predictiveness.py     # both models in one run
-
-# Probe extension (2026-04-29; PAD dominance + Plutchik surprise + disgust;
-# also auto-picks-up fearful.unflinching et al). All gradient-free.
-python scripts/26_register_extension_probes.py     # one-time per-model bootstrap
-python scripts/27_v3_extension_probe_rescore.py    # rescores existing v3 sidecars
-python scripts/28_v3_extension_probe_figures.py    # 4 PNG cross-model figures
-python scripts/29_v3_extension_probe_3d.py         # 4 interactive HTMLs
-```
+See `../CLAUDE.md` § Commands for the full reproducer (one source
+of truth post-2026-05-04 cleanup). Local-LM scripts live under
+`scripts/local/`; harness-side under `scripts/harness/`.
 
 The v1 and v2 run is approximately thirty minutes end-to-end on
 an M5 Max with the model cached locally. v3 is approximately four
@@ -799,12 +788,6 @@ A few of the worst gotchas (the full list is in [`docs/gotchas.md`](gotchas.md))
   `epistemic`, `register`), not concept names (`happy.sad`).
 - Steering vectors aren't auto-registered from probe bootstrap;
   call `session.steer(name, profile)` explicitly.
-- The kaomoji taxonomy is strongly model-dialect-specific; always
-  run `00_vocab_sample.py` before locking a taxonomy for a new
-  model.
-- The v3 runner's per-quadrant "emission rate" log line counts
-  TAXONOMY matches, not instruction-following compliance, which
-  reads as collapse on any non-gemma model when it isn't.
 - Uncentered cosine on hidden-state vectors collapses to near-1
   because every gemma response inherits a shared response-baseline
   direction. Centered cosine (`center=True`) is the default.

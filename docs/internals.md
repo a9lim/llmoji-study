@@ -14,9 +14,13 @@ gitignored; regenerable from the runners. JSONL keeps probe scores for
 back-compat and audit.
 
 `llmoji.hidden_state_analysis.load_hidden_features(...)` returns
-`(metadata df, (n_rows, hidden_dim) feature matrix)`. Defaults: `which="h_mean"`
-(whole-generation aggregate; smoother and more probative than `h_last`),
-`layer=None` (deepest probe layer). All v3 figures use `h_mean`.
+`(metadata df, (n_rows, hidden_dim) feature matrix)`. Defaults: `which="h_first"`
+(kaomoji-emission state; methodology-invariant across the
+2026-05-02 MAX_NEW_TOKENS cutover; substantially cleaner Russell-
+quadrant separation than `h_mean` — see findings.md), `layer=None`
+(deepest probe layer; per-model `preferred_layer` overrides via
+`MODEL_REGISTRY`). `$LLMOJI_WHICH` overrides the default per-run.
+v3 figures default to `h_first` since 2026-05-02.
 
 ## Kaomoji canonicalization
 

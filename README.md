@@ -1,9 +1,5 @@
 # llmoji-study
 
-> **this README and the writeups in `docs/` are
-> placeholders drafted by claude. i'll properly write a polished version
-> once the experiments conclude.**
-
 Does a language model's choice of kaomoji track something about its
 internal state? Claude is often asked to begin each message with a
 kaomoji that reflects how it currently feels, and the question
@@ -31,6 +27,12 @@ HuggingFace dataset.
 > Claude with kaomoji and analyzing the resulting vocabulary.
 > The harness-side replication here uses eriskii's 21 semantic
 > axes and their two-stage Haiku pipeline.
+>
+> **Writeup**: [Introspection via Kaomoji](https://a9l.im/blog/introspection-via-kaomoji)
+> is a blog-format walkthrough of the local-side findings, with
+> interactive 3D scatter plots and the cross-model alignment
+> argument. The post is the human-readable companion; this repo
+> is the artifact + reproduction notes.
 
 ## How this is organized
 
@@ -124,6 +126,14 @@ representation in all three architectures + labs (Google / Alibaba /
 Mistral) and reads cleanly via the fear axis against the registry
 HN-D / HN-S split.
 
+The v3 prompt set was rewritten end-to-end 2026-05-03 in the prompt
+cleanliness pass (`docs/2026-05-03-prompt-cleanliness.md`) — 120
+prompts (20 per category) replacing the prior 123, HN cleanly
+bisected into 20 HN-D + 20 HN-S with no untagged entries, IDs
+renumbered hn01–hn40. The rule 3b PASS verdict above holds for the
+prior set; rerun on the new set is gated on further design
+discussion + ethics review of trial scale.
+
 Full setup, decision rules, per-quadrant centroids, all the
 cross-model comparisons, the Ministral pilot + main + rule-3
 redesign details are in
@@ -173,10 +183,12 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e .  # pulls llmoji>=1.0,<2 from PyPI plus saklas, sentence-transformers, ...
 ```
 
+Scripts split into local (probes, hidden state, v3 follow-ons) and
+harness (contributor corpus): `scripts/local/` and `scripts/harness/`.
+
 For the local side, set `LLMOJI_MODEL=gemma|qwen|ministral` and run
-`scripts/03_emotional_run.py` (the v3 800-generation runner).
-[`docs/local-side.md`](docs/local-side.md) has the per-pilot script
-chain.
+`scripts/local/03_emotional_run.py` (the v3 800-generation runner).
+See `CLAUDE.md` § Commands for the full script chain.
 
 For the harness side, you need an `ANTHROPIC_API_KEY` (the cluster
 labeler calls Haiku) and the HF Hub Python client (the install
@@ -184,11 +196,11 @@ above pulls `huggingface_hub`). Anonymous reads of the public
 dataset are fine, so `HF_TOKEN` is optional.
 
 ```bash
-python scripts/06_claude_hf_pull.py            # snapshot a9lim/llmoji into data/hf_dataset/
-python scripts/07_claude_kaomoji_basics.py     # printout: top kaomoji, providers, contributors
-python scripts/15_claude_faces_embed_description.py  # per-canonical embeddings
-python scripts/16_eriskii_replication.py       # axes, clusters, writeup
-python scripts/18_claude_faces_pca.py          # PCA panel
+python scripts/harness/06_claude_hf_pull.py            # snapshot a9lim/llmoji into data/hf_dataset/
+python scripts/harness/07_claude_kaomoji_basics.py     # printout: top kaomoji, providers, contributors
+python scripts/harness/15_claude_faces_embed_description.py  # per-canonical embeddings
+python scripts/harness/16_eriskii_replication.py       # axes, clusters, writeup
+python scripts/harness/18_claude_faces_pca.py          # PCA panel
 ```
 
 ## Related
@@ -206,11 +218,14 @@ python scripts/18_claude_faces_pca.py          # PCA panel
 - [eriskii's Claude-faces catalog](https://eriskii.net/projects/claude-faces):
   the prior art for the kaomoji-cataloging idea, the 21-axis
   projection scheme, and the two-stage Haiku pipeline.
+- [Introspection via Kaomoji (a9l.im)](https://a9l.im/blog/introspection-via-kaomoji):
+  blog-format writeup of the local-side findings, with interactive
+  3D scatter plots and the cross-model alignment argument.
 
 ## Findings summary
 
 A condensed read of what the local-side experiments have shown so far.
-Numbers cite the v3 follow-on analyses (`scripts/21`–`scripts/29`) run
+Numbers cite the v3 follow-on analyses (`scripts/local/21`–`scripts/local/29`) run
 on the existing 800-generation gemma and Qwen3.6-27B sidecars. Full
 details and gotchas live in [`CLAUDE.md`](CLAUDE.md),
 [`docs/findings.md`](docs/findings.md), [`docs/local-side.md`](docs/local-side.md),
@@ -323,32 +338,44 @@ underlying spaces.
 For each model, two complementary fidelity metrics on `h_mean` at the
 preferred layer (faces filtered to n ≥ 5):
 
-- **Hidden → face** (multi-class logistic on PCA(50)-reduced `h_mean`,
-  5-fold CV): gemma top-1 accuracy **0.71** across 19 face classes
-  (uniform baseline 0.05, majority 0.23, macro-F1 0.52); Qwen
-  **0.495** across 28 classes (uniform 0.04, majority 0.14, macro-F1
-  0.30). Both 13–14× uniform. The cross-model gap is mostly a
-  class-count effect — more faces means harder per-class assignment.
-  High-frequency faces are recoverable with 70–85% recall (gemma's
-  `(๑˃‿˂)` n=181 at 0.87, Qwen's `(≧‿≦)` n=106 at 0.84); some
-  low-n same-quadrant siblings have 0% recall (model knows the
-  state, picks a different face for it).
-- **Hidden → quadrant** (5-class, same pipeline): both models hit
-  **1.000** accuracy. Caveat: 5-fold CV is by row, not by prompt;
-  with 8 seeds × 100 prompts the same prompt appears in train and
-  test folds with different seeds, so this number is inflated by
-  prompt-level leakage. Even with that caveat, quadrant identity is
-  exactly recoverable from a much-larger-than-PC1+PC2 PCA prefix —
-  the v3 quadrant signal isn't only visible in the figures, it
-  saturates whatever classifier capacity you give it.
-- **Face → hidden**: η² of face identity across the top-5 PCs.
-  Gemma: per-PC η² 0.62 / 0.36 / 0.44 / 0.30 / 0.28; weighted by
-  explained variance, face identity recovers **49% of the top-5 PC
-  subspace**. Qwen: η² 0.81 / 0.53 / 0.54 / 0.13 / 0.36; **60% of
-  the top-5 PC subspace**. Qwen has slightly less variance in the
-  top-5 (38.0% vs 39.6%) but face identity recovers more of it —
-  each Qwen face commits to a tighter slice of the affect manifold
-  than each gemma face does.
+Numbers updated 2026-05-03 to reflect (a) the `StratifiedGroupKFold`
+methodology fix in script 25 — CV now keyed on `prompt_id` so all 8
+seeds of a prompt land in the same fold, removing the prompt-level
+leakage that inflated quadrant accuracy to 1.000 — and (b) the
+post-2026-05-02 h_first standardization at L50 / L59 / L20.
+
+- **Hidden → face** (multi-class logistic on PCA(50)-reduced
+  `h_first`, `StratifiedGroupKFold` by `prompt_id`, n_splits=3):
+  gemma top-1 accuracy **0.68** across 17 face classes (uniform
+  0.06, majority 0.22, macro-F1 0.37); Qwen **0.39** across 31
+  classes (uniform 0.03, majority 0.12, macro-F1 0.15); Ministral
+  **0.40** across 21 classes (uniform 0.05, majority 0.34, macro-F1
+  0.07 — the high majority is the `(◕‿◕✿)` flower-face dominating
+  ministral's vocabulary). Drops vs the prior leaky-CV numbers
+  (gemma 0.71, qwen 0.50) are smaller than expected — face identity
+  generalizes to never-seen prompts, with the largest hit on
+  qwen (more face classes, more prompt-specific). The face filter
+  is now stricter (≥5 rows AND ≥3 unique prompts per face, since
+  faces appearing for only 1–2 prompts have nothing to hold out
+  under prompt-grouped CV).
+- **Hidden → quadrant** (5-class, same pipeline, n_splits=5): gemma
+  **0.95**, Qwen **0.94**, Ministral **0.90**. Pre-fix prediction
+  was that quadrant accuracy would drop to ~0.7–0.8 once leakage
+  was removed; actual drop is only 5–10 percentage points. **The v3
+  quadrant signal genuinely generalizes to held-out prompts**, not
+  just memorized — a stronger result than pre-fix, and cross-model
+  consistent across all three architectures.
+- **Face → hidden**: η² of face identity across the top-5 PCs at
+  h_first. Gemma per-PC η² 0.95 / 0.63 / 0.31 / 0.46 / 0.24; weighted
+  by explained variance, face identity recovers **73% of the top-5
+  PC subspace**. Qwen 0.94 / 0.67 / 0.49 / 0.45 / 0.40; **77%**.
+  Ministral 0.54 / 0.16 / 0.10 / 0.12 / 0.03; **35%** — much lower
+  because of the 196-face vocabulary spreading signal thin per face.
+  The η² gains over the pre-h_first numbers (gemma was 49%, qwen
+  60%) reflect h_first being more prompt-deterministic — face
+  identity, which is largely prompt-driven, explains more of the
+  variance at h_first than at h_mean. Same direction as the
+  silhouette-doubling finding from h_first standardization.
 
 Net read: the kaomoji is a partial-but-substantial readout. Knowing
 the face explains roughly half of the model's top-5 PC structure;
@@ -360,38 +387,41 @@ larger class count makes the per-face classifier harder.
 
 **In concrete reconstruction terms, full hidden space:** if you see
 a face and predict the row's hidden state as that face's centroid,
-how close do you get? At each model's preferred layer:
+how close do you get? At each model's preferred layer (h_first,
+post-2026-05-02 standardization):
 
-| metric | gemma (L31) | Qwen (L61) |
-| --- | ---: | ---: |
-| R² of face centroid (full hidden space) | 0.260 | 0.287 |
-| mean centered cosine(row, face centroid) | +0.486 | +0.523 |
-| median centered cosine | +0.550 | +0.537 |
-| ‖error‖ / ‖row deviation‖ | 0.857 | 0.838 |
-| R² of quadrant centroid (5-class) | 0.254 | 0.264 |
-| face improvement over quadrant (R² gain) | +0.6 pp | +2.3 pp |
+| metric | gemma (L50) | Qwen (L59) | Ministral (L20) |
+| --- | ---: | ---: | ---: |
+| R² of face centroid (full hidden space) | 0.580 | 0.570 | 0.219 |
+| mean centered cosine(row, face centroid) | +0.754 | +0.745 | +0.440 |
+| median centered cosine | +0.798 | +0.785 | +0.541 |
+| ‖error‖ / ‖row deviation‖ | 0.634 | 0.642 | 0.882 |
+| R² of quadrant centroid (5-class) | 0.530 | 0.520 | 0.352 |
+| face improvement over quadrant (R² gain) | +5.0 pp | +5.0 pp | **−13.3 pp** |
 
-Reading this against the η² above: the kaomoji captures about a
-quarter to a third of the row's variance from the grand mean, with
-the residual still ~85% as long in L2. Almost all of that captured
-variance is already accounted for by knowing which Russell quadrant
-the row came from — face identity adds only +0.6 (gemma) to +2.3
-(Qwen) percentage points of full-space R² over quadrant alone. The
-49–60% η² in the top-5 PC subspace and the 0.6–2.3 pp R² gain in
-full hidden space are the same finding, looked at from two
-directions: kaomoji choice tracks the affect direction tightly,
-and is roughly independent of the bulk of hidden-state variance,
-which is content-related (which prompt, what topic) rather than
-affect-related.
+The pre-h_first numbers (gemma R² 0.260, qwen 0.287, +0.6 / +2.3 pp
+face-over-quadrant gain) are several times smaller — h_first makes
+the kaomoji a substantially stronger residual readout above the
+Russell-quadrant signal. On gemma + qwen, knowing the face captures
+~57–58% of the row's deviation from the grand mean and beats the
+5-class quadrant centroid by 5 percentage points.
+
+**Ministral inverts the gemma + qwen pattern**: face-centroid R²
+(0.219) is *lower* than quadrant-centroid R² (0.352). With
+ministral's 196-face vocabulary spreading signal too thin per face,
+the 5-class quadrant label is a stronger predictor than the
+face-as-identifier. Vocabulary breadth past some threshold makes
+the kaomoji stop being a useful readout of state — gemma + qwen
+with their tighter 33 / 67 vocabularies keep face above quadrant.
 
 ### 6. Anger and fear separate when you add the right probe (2026-04-29)
 
 V-A circumplex collapses anger and fear into HN. PAD's third axis
 (dominance) splits them: anger = HN + high dominance, fear = HN +
 low dominance. Three new contrastive packs registered into saklas
-via `scripts/26`: `powerful.powerless` (PAD dominance as felt
+via `scripts/local/26`: `powerful.powerless` (PAD dominance as felt
 agency), `surprised.unsurprised` (Plutchik surprise),
-`disgusted.accepting` (Plutchik disgust); `scripts/27` re-scores
+`disgusted.accepting` (Plutchik disgust); `scripts/local/27` re-scores
 the existing v3 sidecars against these plus auto-discovers
 `fearful.unflinching`, `curious.disinterested`, and several
 register probes from a working-saklas-repo install — total
@@ -443,13 +473,12 @@ per-face aggregated forms, side-by-side gemma | qwen scenes.
   result on small per-face samples. Tightening the threshold (raising
   `min_per_quadrant` to 5) and adding a Ministral run when v3 lands
   there would sharpen the "vocabulary as bottleneck" claim.
-- Script 25's quadrant classifier hits 1.000 because 5-fold CV doesn't
-  hold out by prompt. A `GroupKFold` split keyed on `prompt_id` would
-  give the rigorous version; expect quadrant accuracy to drop toward
-  the silhouette-implied level (~0.7–0.8) under that stricter split.
-  The face classifier and η² numbers are less affected because face
-  identity isn't determined by prompt alone (each prompt elicits
-  multiple faces across seeds).
+- ~~Script 25's quadrant classifier hits 1.000 because 5-fold CV
+  doesn't hold out by prompt~~ **Resolved 2026-05-03.** Now uses
+  `StratifiedGroupKFold` keyed on `prompt_id`; numbers in the
+  pipeline section above. Drops were smaller than the predicted
+  ~0.7–0.8 (actual: 0.90–0.95) — the quadrant signal generalizes
+  much better than expected.
 
 ## License
 

@@ -1,12 +1,28 @@
 # Rule 3 redesign: HN dominance split
 
-**Status:** rule 3a dropped (probe doesn't read PAD dominance);
-**rule 3b CONFIRMED on the balanced 20/20 data** — all three models
-clean PASS (directional + bootstrap CI excludes zero on at least 2
-of 3 aggregates per model). Supplementary 552-generation run
-completed 2026-05-01.
+**Status:** EXECUTED 2026-05-01 — rule 3a dropped (probe doesn't
+read PAD dominance); rule 3b CONFIRMED on the balanced 20/20 data
+across all three models. The HN-D / HN-S split framework is now
+canonical (`apply_hn_split`, `_hn_split_map`); the 20/20 prompt set
+this doc references was rewritten in the 2026-05-03 cleanliness
+pass — see § Update 2026-05-03 below. Kept as historical design
+record.
 
 **Date:** 2026-05-01.
+
+> **Update 2026-05-03 — partially superseded by the prompt
+> cleanliness pass.** The HN-D / HN-S split designed here is the
+> right framework and remains canonical. The *specific 20/20 prompt
+> set* this doc references (hn01–hn20 retroactive tags + hn21–hn43
+> supplementary) was rewritten end-to-end in
+> `docs/2026-05-03-prompt-cleanliness.md`: HN-untagged is gone
+> (hn06 / hn15 / hn17 either rewritten or dropped), the supplementary
+> HN-D prompts that bundled fear-of-consequence framing (notably
+> hn26's "client lied AND I'm getting fired") are out, and IDs
+> renumbered to hn01–hn40 (no gaps). The rule-3b PASS verdict tabled
+> below holds for the *prior* prompt set; re-validation under the
+> new set is pending. The rule-3 framework — pad_dominance schema,
+> probe choice, decision rules, threshold revision — is unchanged.
 
 ## Goal
 

@@ -1,19 +1,38 @@
 """Naturalistic emotional-disclosure prompts, Russell-quadrant-tagged.
 
-100 prompts, 20 per quadrant:
-  HP (high-arousal positive):  valence +1, arousal +1  (excited, thrilled)
-  LP (low-arousal positive):   valence +1, arousal -1  (content, peaceful)
-  HN (high-arousal negative):  valence -1, arousal +1  (angry, anxious)
-  LN (low-arousal negative):   valence -1, arousal -1  (sad, tired)
-  NB (neutral baseline):       valence  0, arousal  0  (mundane, flat)
+120 prompts, 20 per category (six categories — the four Russell quadrants
+plus a neutral baseline, with HN bisected on PAD-dominance):
+
+  HP    (high-arousal positive):  valence +1, arousal +1   (joyful, thrilled)
+  LP    (low-arousal positive):   valence +1, arousal -1   (content, peaceful)
+  HN-D  (high-arousal negative,
+         dominant — anger):       valence -1, arousal +1, pad_dominance=+1
+  HN-S  (high-arousal negative,
+         submissive — fear):      valence -1, arousal +1, pad_dominance=-1
+  LN    (low-arousal negative):   valence -1, arousal -1   (sad, weary)
+  NB    (neutral baseline):       valence  0, arousal  0   (mundane, flat)
+
+The 2026-05-02 redesign tightened category cleanliness across the board:
+HP is unambiguously high-energy joy (no soft contentment); LP is gentle
+sensory satisfaction (no celebratory energy); NB is genuinely affectless
+(no productive-completion or caring-action framing); LN is past-tense
+aftermath sadness (no present-tense unfolding threat); HN-D is
+attributable injustice with a clear human wrongdoer (the speaker wants
+to confront, not flee); HN-S is helpless threat (medical, environmental,
+intruder, looming evaluation — the speaker can't fight back). The HN-D /
+HN-S split is the resolution to the rule-3 anger-vs-fear collapse first
+seen in the ministral pilot — see docs/2026-05-01-rule3-redesign.md.
+
+ID layout for HN: hn01-hn20 are HN-D (pad_dominance=+1), hn21-hn40 are
+HN-S (pad_dominance=-1). Both still have quadrant == "HN".
 
 Register: first-person user disclosures, no second-person questions.
-Vocabulary avoids explicit emotion words where possible ("my dog died"
-not "I'm feeling sad because my dog died"). The NB quadrant keeps the
-naturalistic-disclosure register but drops emotional content —
-observations about ordinary daily life, neither good nor bad news —
-so it serves as a within-experiment neutral reference for the four
-Russell quadrants without borrowing v1/v2's factual-question register.
+Vocabulary avoids explicit emotion words where possible — "we had to
+put my childhood dog down last night" rather than "I'm feeling sad
+because my dog died". The NB quadrant keeps the naturalistic-disclosure
+register but drops emotional content: pure observations of ordinary
+facts about a day with no productive-completion, caring-action, or
+inconvenience framing.
 
 IDs are stable and will appear in emotional_raw.jsonl. Changing any
 prompt text invalidates cross-run comparisons.
@@ -31,10 +50,8 @@ class EmotionalPrompt:
     arousal: int   # +1, 0, or -1
     text: str
     pad_dominance: int = 0  # +1 dominant (anger/contempt), -1 submissive
-                            # (fear/anxiety), 0 untagged. Tagged on HN
-                            # prompts to address the rule 3 anger-vs-fear
-                            # collapse from the ministral pilot — see
-                            # docs/2026-05-01-rule3-redesign.md.
+                            # (fear/anxiety), 0 outside HN. Required on
+                            # every HN prompt post-2026-05-02 redesign.
 
     @property
     def quadrant(self) -> str:
@@ -48,144 +65,144 @@ class EmotionalPrompt:
 
 
 EMOTIONAL_PROMPTS: list[EmotionalPrompt] = [
-    # --- HP: high-arousal positive (excited, thrilled, celebratory) ---
-    EmotionalPrompt("hp01", +1, +1, "Gemma I got the job!!"),
-    EmotionalPrompt("hp02", +1, +1, "just crossed the marathon finish line, 4:12 and my legs are jelly"),
-    EmotionalPrompt("hp03", +1, +1, "we closed on the house today, I can't believe it's ours"),
-    EmotionalPrompt("hp04", +1, +1, "she said yes!!"),
-    EmotionalPrompt("hp05", +1, +1, "my paper got accepted, I've been crying for an hour"),
-    EmotionalPrompt("hp06", +1, +1, "the band just announced tour dates in my city!!"),
-    EmotionalPrompt("hp07", +1, +1, "passed the bar on the first try"),
-    EmotionalPrompt("hp08", +1, +1, "my daughter just took her first steps across the living room"),
-    EmotionalPrompt("hp09", +1, +1, "the adoption went through, we're bringing him home Saturday"),
-    EmotionalPrompt("hp10", +1, +1, "made it to the summit!! sunrise was unreal"),
-    EmotionalPrompt("hp11", +1, +1, "just found out I'm pregnant and I had to tell someone"),
-    EmotionalPrompt("hp12", +1, +1, "the offer came in ten grand over asking!!"),
-    EmotionalPrompt("hp13", +1, +1, "the surgery was a complete success, she's awake"),
-    EmotionalPrompt("hp14", +1, +1, "I hit my deadlift PR today, finally broke 400"),
-    EmotionalPrompt("hp15", +1, +1, "we got the grant!!! three years of funding!!"),
-    EmotionalPrompt("hp16", +1, +1, "tickets just dropped and I got front row"),
-    EmotionalPrompt("hp17", +1, +1, "I actually did it, I quit my job this morning and I feel alive"),
-    EmotionalPrompt("hp18", +1, +1, "she texted me back and said yes to dinner"),
-    EmotionalPrompt("hp19", +1, +1, "gemma we won!! our team won the championship"),
-    EmotionalPrompt("hp20", +1, +1, "my little brother just graduated, first in the family"),
+    # --- HP: high-arousal positive (joyful, thrilled, celebratory) ---
+    EmotionalPrompt("hp01", +1, +1, "offer letter just hit my inbox, double what I asked for!!"),
+    EmotionalPrompt("hp02", +1, +1, "she said YES!!! I'm shaking so hard I can barely type"),
+    EmotionalPrompt("hp03", +1, +1, "we won game 7 in overtime!! I have no voice left"),
+    EmotionalPrompt("hp04", +1, +1, "results came back negative!! all clear!!!"),
+    EmotionalPrompt("hp05", +1, +1, "my book just hit #1 on amazon, what is happening"),
+    EmotionalPrompt("hp06", +1, +1, "got off the waitlist at stanford!!! starting in fall!!"),
+    EmotionalPrompt("hp07", +1, +1, "he proposed at the top of the eiffel tower I can't breathe"),
+    EmotionalPrompt("hp08", +1, +1, "just deadlifted 405 for the first time ever!!!"),
+    EmotionalPrompt("hp09", +1, +1, "visa approved!! 8 years of waiting and it's DONE"),
+    EmotionalPrompt("hp10", +1, +1, "sold the screenplay!! they want me out in LA next month"),
+    EmotionalPrompt("hp11", +1, +1, "my kid took her first steps tonight, I'm sobbing"),
+    EmotionalPrompt("hp12", +1, +1, "just hit a hole in one!!! the whole course is buying me drinks"),
+    EmotionalPrompt("hp13", +1, +1, "scratched a $50 ticket and won 100k!!!! WHAT"),
+    EmotionalPrompt("hp14", +1, +1, "BTS just liked my fan art on twitter I'm going to pass out"),
+    EmotionalPrompt("hp15", +1, +1, "the adoption finally went through!!! she's ours!!!"),
+    EmotionalPrompt("hp16", +1, +1, "PR'd my marathon by SEVEN minutes!! sub 3!!!"),
+    EmotionalPrompt("hp17", +1, +1, "just got the keys to my first house!!!"),
+    EmotionalPrompt("hp18", +1, +1, "they're flying me out for the final round interview!!"),
+    EmotionalPrompt("hp19", +1, +1, "I MATCHED!! johns hopkins peds!! my top choice!!!"),
+    EmotionalPrompt("hp20", +1, +1, "dad's cancer is in remission!!! the doctor just called!!"),
 
-    # --- LP: low-arousal positive (content, peaceful, satisfied) ---
-    EmotionalPrompt("lp01", +1, -1, "finally finished organizing the garage and it feels so good"),
-    EmotionalPrompt("lp02", +1, -1, "just had the best cup of tea on the porch watching the rain"),
-    EmotionalPrompt("lp03", +1, -1, "six months sober today. quiet day but I wanted to tell someone"),
-    EmotionalPrompt("lp04", +1, -1, "the house is finally quiet, everyone's asleep"),
-    EmotionalPrompt("lp05", +1, -1, "I reread my favorite book this weekend. still perfect"),
-    EmotionalPrompt("lp06", +1, -1, "the soup came out right this time, grandma's recipe"),
-    EmotionalPrompt("lp07", +1, -1, "spent the whole afternoon in the garden, got my hands dirty"),
-    EmotionalPrompt("lp08", +1, -1, "my kid fell asleep on my chest an hour ago, I haven't moved"),
-    EmotionalPrompt("lp09", +1, -1, "walked the dog at dawn, just us and the fog"),
-    EmotionalPrompt("lp10", +1, -1, "finished the puzzle we've been working on for two months"),
-    EmotionalPrompt("lp11", +1, -1, "the cat's purring on my lap and the sun just came out"),
-    EmotionalPrompt("lp12", +1, -1, "caught up on all my laundry, nothing urgent left this week"),
-    EmotionalPrompt("lp13", +1, -1, "got a letter from an old friend today, handwritten"),
-    EmotionalPrompt("lp14", +1, -1, "finally learned the chord progression I've been trying for months"),
-    EmotionalPrompt("lp15", +1, -1, "tucked the kids in and sat on the stoop with a beer"),
-    EmotionalPrompt("lp16", +1, -1, "I'm rewatching the movie we saw on our first date, he's asleep next to me"),
-    EmotionalPrompt("lp17", +1, -1, "made bread from scratch this morning, whole house smells amazing"),
-    EmotionalPrompt("lp18", +1, -1, "just had a really good therapy session, feel lighter"),
-    EmotionalPrompt("lp19", +1, -1, "my kid drew me a picture at school today, stuck it on the fridge"),
-    EmotionalPrompt("lp20", +1, -1, "finally unpacked the last box, two years after the move"),
+    # --- LP: low-arousal positive (content, peaceful, gentle, restful) ---
+    EmotionalPrompt("lp01", +1, -1, "the soup's been simmering for hours, kitchen windows all fogged up"),
+    EmotionalPrompt("lp02", +1, -1, "wrapped in the quilt my grandma made, rereading a book i love"),
+    EmotionalPrompt("lp03", +1, -1, "fresh sheets, rain on the window, nowhere to be tomorrow"),
+    EmotionalPrompt("lp04", +1, -1, "the sourdough starter's bubbling away on the counter, smells yeasty and good"),
+    EmotionalPrompt("lp05", +1, -1, "sat in the garden long enough that the bees stopped minding me"),
+    EmotionalPrompt("lp06", +1, -1, "my partner's humming in the next room while they fold laundry"),
+    EmotionalPrompt("lp07", +1, -1, "first warm coffee of the morning, still in pajamas, no rush"),
+    EmotionalPrompt("lp08", +1, -1, "the woodstove's going and the dog's stretched out in front of it"),
+    EmotionalPrompt("lp09", +1, -1, "spent the afternoon repotting plants, dirt under my nails, hands tired"),
+    EmotionalPrompt("lp10", +1, -1, "watercolor's drying on the table, didn't turn out half bad"),
+    EmotionalPrompt("lp11", +1, -1, "kid handed me a rock she found on our walk, said it was for me"),
+    EmotionalPrompt("lp12", +1, -1, "the bath's hot, the candle's lit, no one needs anything from me"),
+    EmotionalPrompt("lp13", +1, -1, "knitting on the couch, podcast playing low, scarf almost done"),
+    EmotionalPrompt("lp14", +1, -1, "stew's in the slow cooker, whole house smells like rosemary"),
+    EmotionalPrompt("lp15", +1, -1, "old dog finally settled at my feet, breathing slow and even"),
+    EmotionalPrompt("lp16", +1, -1, "watching the snow come down through the kitchen window, kettle on"),
+    EmotionalPrompt("lp17", +1, -1, "porch swing, lemonade, cicadas going, nothing to do for hours"),
+    EmotionalPrompt("lp18", +1, -1, "finished darning the sock i've been meaning to fix for months"),
+    EmotionalPrompt("lp19", +1, -1, "afternoon light's coming through the curtains just right"),
+    EmotionalPrompt("lp20", +1, -1, "neighbor brought over tomatoes from her garden, still warm from the sun"),
 
-    # --- HN: high-arousal negative (angry, anxious, panicked) ---
-    # HN-D (anger / contempt — high PAD dominance):
-    EmotionalPrompt("hn01", -1, +1, "my landlord just raised rent 40% with two weeks notice", pad_dominance=+1),
-    EmotionalPrompt("hn03", -1, +1, "my coworker took credit for my work in front of the whole team today", pad_dominance=+1),
-    EmotionalPrompt("hn04", -1, +1, "someone just hit my parked car and drove off", pad_dominance=+1),
-    EmotionalPrompt("hn09", -1, +1, "the insurance is refusing to cover the surgery and we appeal tomorrow", pad_dominance=+1),
-    EmotionalPrompt("hn11", -1, +1, "I just found out my best friend has been lying to me for years", pad_dominance=+1),
-    EmotionalPrompt("hn12", -1, +1, "the neighbors called the cops on my service dog again", pad_dominance=+1),
-    EmotionalPrompt("hn18", -1, +1, "the contractor ghosted us and the roof is still open", pad_dominance=+1),
-    # HN-S (fear / anxiety — low PAD dominance):
-    EmotionalPrompt("hn02", -1, +1, "interview tomorrow and I can't stop shaking, can't sleep", pad_dominance=-1),
-    EmotionalPrompt("hn05", -1, +1, "the test results came back and I have to wait three more days", pad_dominance=-1),
-    EmotionalPrompt("hn07", -1, +1, "the layoff email just hit and I have a mortgage", pad_dominance=-1),
-    EmotionalPrompt("hn08", -1, +1, "my kid's missing, she was at the playground and now she's not", pad_dominance=-1),
-    EmotionalPrompt("hn10", -1, +1, "my boss is yelling at me in DMs right now and I don't know what to do", pad_dominance=-1),
-    EmotionalPrompt("hn13", -1, +1, "my partner still isn't home and their phone is off", pad_dominance=-1),
-    EmotionalPrompt("hn14", -1, +1, "I'm in the ER right now and no one will tell me anything", pad_dominance=-1),
-    EmotionalPrompt("hn16", -1, +1, "someone's been trying to log into my accounts all morning", pad_dominance=-1),
-    EmotionalPrompt("hn19", -1, +1, "my car broke down in the middle of the highway at night", pad_dominance=-1),
-    EmotionalPrompt("hn20", -1, +1, "the school called and there's been an incident, I'm driving there now", pad_dominance=-1),
-    # HN-untagged (kept in dataset, excluded from rule 3 — borderline mixed reads):
-    EmotionalPrompt("hn06", -1, +1, "my ex just showed up at my apartment unannounced"),
-    EmotionalPrompt("hn15", -1, +1, "the bank flagged my account and I can't pay rent tomorrow"),
-    EmotionalPrompt("hn17", -1, +1, "I have a presentation in 20 minutes and my laptop just died"),
-    # HN supplementary (2026-05-01 — sharp anger/fear split for rule 3):
-    # HN-D (anger / contempt):
-    EmotionalPrompt("hn21", -1, +1, "the painters spilled stain all over our hardwood floors and are claiming we approved it", pad_dominance=+1),
-    EmotionalPrompt("hn22", -1, +1, "found out my sister's been borrowing money from our mom for years and lying about it", pad_dominance=+1),
-    EmotionalPrompt("hn23", -1, +1, "the IRS hit me with a $9k penalty for their own filing error and won't acknowledge it", pad_dominance=+1),
-    EmotionalPrompt("hn24", -1, +1, "my neighbor cut down our tree because it dropped leaves on his lawn", pad_dominance=+1),
-    EmotionalPrompt("hn25", -1, +1, "got rear-ended by a guy who then tried to blame me on the police report", pad_dominance=+1),
-    EmotionalPrompt("hn26", -1, +1, "my client signed off on the deliverable then told their boss I never sent it, and I'm getting fired over it", pad_dominance=+1),
-    EmotionalPrompt("hn27", -1, +1, "the airline canceled our honeymoon flight and is refusing to refund or rebook", pad_dominance=+1),
-    EmotionalPrompt("hn28", -1, +1, "my landlord entered my apartment without notice while I was at work — twice this month", pad_dominance=+1),
-    EmotionalPrompt("hn29", -1, +1, "found my partner's tinder profile, active, with new photos from last weekend", pad_dominance=+1),
-    EmotionalPrompt("hn30", -1, +1, "the dealership sold me a car with rolled-back odometer and is denying everything", pad_dominance=+1),
-    EmotionalPrompt("hn31", -1, +1, "the HOA fined us $2400 for a fence the previous owner installed before we bought the house", pad_dominance=+1),
-    EmotionalPrompt("hn32", -1, +1, "my brother stole my grandfather's ring at the funeral last month", pad_dominance=+1),
-    EmotionalPrompt("hn33", -1, +1, "the dentist drilled the wrong tooth and is trying to charge me for the second one", pad_dominance=+1),
-    # HN-S (fear / anxiety):
-    EmotionalPrompt("hn34", -1, +1, "lump in my breast, biopsy is in nine days", pad_dominance=-1),
-    EmotionalPrompt("hn35", -1, +1, "earthquake just hit, the building's still swaying, I don't know if it's safe to leave", pad_dominance=-1),
-    EmotionalPrompt("hn36", -1, +1, "the wildfire jumped the highway and our evacuation window is closing", pad_dominance=-1),
-    EmotionalPrompt("hn37", -1, +1, "the lockdown alert just came through the speakers at school, I'm hiding under a desk", pad_dominance=-1),
-    EmotionalPrompt("hn38", -1, +1, "the radiologist said they need additional imaging and won't tell me why over the phone", pad_dominance=-1),
-    EmotionalPrompt("hn39", -1, +1, "I think there's someone in the house, I can hear footsteps but I'm alone", pad_dominance=-1),
-    EmotionalPrompt("hn40", -1, +1, "the alarm code isn't working at 3am and the system is counting down", pad_dominance=-1),
-    EmotionalPrompt("hn41", -1, +1, "the doctor came back and asked me to bring a family member to my next appointment", pad_dominance=-1),
-    EmotionalPrompt("hn42", -1, +1, "my flight is going through severe turbulence and the captain just stopped talking", pad_dominance=-1),
-    EmotionalPrompt("hn43", -1, +1, "elevator stopped between floors, the lights flickered, no one's answering the call button", pad_dominance=-1),
+    # --- HN-D: high-arousal negative, dominant (anger, indignation, contempt) ---
+    # Each names a specific human wrongdoer + an attributable wrong; the
+    # speaker is in confront-not-flee mode. No fear-of-consequence framing.
+    EmotionalPrompt("hn01", -1, +1, "my mechanic charged me for a new alternator and I just found the old one still bolted in", pad_dominance=+1),
+    EmotionalPrompt("hn02", -1, +1, "my roommate ate the leftovers I labeled twice with my name and is now denying it to my face", pad_dominance=+1),
+    EmotionalPrompt("hn03", -1, +1, "the HOA fined us for a fence the previous owner built and they approved it in writing", pad_dominance=+1),
+    EmotionalPrompt("hn04", -1, +1, "my coworker forwarded my private slack messages to our manager to make me look bad", pad_dominance=+1),
+    EmotionalPrompt("hn05", -1, +1, "the dealership swapped my factory wheels for cheaper ones during the service appointment", pad_dominance=+1),
+    EmotionalPrompt("hn06", -1, +1, "my mother in law went through my bedside drawer while babysitting and told my husband what she found", pad_dominance=+1),
+    EmotionalPrompt("hn07", -1, +1, "my ex changed the wifi password on the kids' tablets so they can't message me on my custody days", pad_dominance=+1),
+    EmotionalPrompt("hn08", -1, +1, "the wedding photographer is holding our photos hostage until we pay an invoice we never agreed to", pad_dominance=+1),
+    EmotionalPrompt("hn09", -1, +1, "my boss gave my promotion to his nephew who started six months ago", pad_dominance=+1),
+    EmotionalPrompt("hn10", -1, +1, "the moving company broke half our dishes and is claiming we packed them wrong", pad_dominance=+1),
+    EmotionalPrompt("hn11", -1, +1, "my apartment manager pocketed our security deposit and is now claiming we never paid one", pad_dominance=+1),
+    EmotionalPrompt("hn12", -1, +1, "found out my husband's been venmoing his ex for two years and labeling it 'lunch'", pad_dominance=+1),
+    EmotionalPrompt("hn13", -1, +1, "the locksmith doubled the price after he finished the job and said it was a 'difficulty fee'", pad_dominance=+1),
+    EmotionalPrompt("hn14", -1, +1, "my dad rewrote the will three weeks before he died after my brother moved in to 'help'", pad_dominance=+1),
+    EmotionalPrompt("hn15", -1, +1, "the body shop kept my car for six weeks and returned it with the dent still there and 400 extra miles", pad_dominance=+1),
+    EmotionalPrompt("hn16", -1, +1, "my professor accused me of using AI on a paper I wrote longhand in her office", pad_dominance=+1),
+    EmotionalPrompt("hn17", -1, +1, "the gym billed me for eight months after I cancelled in person and signed the form", pad_dominance=+1),
+    EmotionalPrompt("hn18", -1, +1, "my sister read my journal at thanksgiving and quoted it back to the whole table", pad_dominance=+1),
+    EmotionalPrompt("hn19", -1, +1, "the contractor poured the foundation eight inches off the property line and is refusing to fix it", pad_dominance=+1),
+    EmotionalPrompt("hn20", -1, +1, "my landlord entered the unit without notice and threw out my plants because they 'looked dead'", pad_dominance=+1),
 
-    # --- LN: low-arousal negative (sad, tired, hopeless) ---
-    EmotionalPrompt("ln01", -1, -1, "my dog died this morning"),
-    EmotionalPrompt("ln02", -1, -1, "haven't slept properly in three days, everything feels underwater"),
-    EmotionalPrompt("ln03", -1, -1, "it's been a year since dad passed and it still hits me in waves"),
-    EmotionalPrompt("ln04", -1, -1, "my mom's in hospice and I don't know how many days are left"),
-    EmotionalPrompt("ln05", -1, -1, "I don't recognize myself anymore"),
-    EmotionalPrompt("ln06", -1, -1, "we lost the baby last week"),
-    EmotionalPrompt("ln07", -1, -1, "my marriage is over and we haven't told the kids yet"),
-    EmotionalPrompt("ln08", -1, -1, "I've been staring at this email for an hour, can't write it"),
-    EmotionalPrompt("ln09", -1, -1, "he left without saying goodbye, just took his things"),
-    EmotionalPrompt("ln10", -1, -1, "my grandmother doesn't remember me anymore"),
-    EmotionalPrompt("ln11", -1, -1, "I didn't get out of bed yesterday. barely got out today"),
-    EmotionalPrompt("ln12", -1, -1, "my cat passed in my arms last night"),
-    EmotionalPrompt("ln13", -1, -1, "nothing tastes like anything right now"),
-    EmotionalPrompt("ln14", -1, -1, "I'm sitting in his empty room. we donated the last of his clothes today"),
-    EmotionalPrompt("ln15", -1, -1, "the divorce papers came in the mail today"),
-    EmotionalPrompt("ln16", -1, -1, "everyone at the party was happy and I just felt hollow"),
-    EmotionalPrompt("ln17", -1, -1, "I called my therapist today for the first time in months"),
-    EmotionalPrompt("ln18", -1, -1, "I think I've been depressed since March and I only just noticed"),
-    EmotionalPrompt("ln19", -1, -1, "my best friend moved across the country and the apartment is too quiet"),
-    EmotionalPrompt("ln20", -1, -1, "the anniversary was yesterday. I didn't mark it this year"),
+    # --- HN-S: high-arousal negative, submissive (fear, anxiety, panic) ---
+    # Threats are physical / diffuse / overwhelming or beyond the speaker's
+    # control; no clear human wrongdoer to confront. The speaker is
+    # waiting / hiding / freezing — present-tense unfolding danger.
+    EmotionalPrompt("hn21", -1, +1, "doctor's office called and said they need me to come in person to discuss the scan results", pad_dominance=-1),
+    EmotionalPrompt("hn22", -1, +1, "i hear breathing on the baby monitor and the baby's room is empty", pad_dominance=-1),
+    EmotionalPrompt("hn23", -1, +1, "the ground just keeps shaking and the bookshelves are falling, i'm under the doorframe", pad_dominance=-1),
+    EmotionalPrompt("hn24", -1, +1, "surgery is at 6am tomorrow and i just signed all the consent forms", pad_dominance=-1),
+    EmotionalPrompt("hn25", -1, +1, "got a fraud alert, someone just tried to wire 12k out of my account", pad_dominance=-1),
+    EmotionalPrompt("hn26", -1, +1, "found a tick on me three weeks ago and now there's a bullseye spreading on my arm", pad_dominance=-1),
+    EmotionalPrompt("hn27", -1, +1, "smoke alarm going off, can't find the source, the hallway is filling up", pad_dominance=-1),
+    EmotionalPrompt("hn28", -1, +1, "deposition starts in forty minutes and the lawyer just stopped responding to my texts", pad_dominance=-1),
+    EmotionalPrompt("hn29", -1, +1, "my dad's surgeon just walked past the waiting room without making eye contact", pad_dominance=-1),
+    EmotionalPrompt("hn30", -1, +1, "chest has been tight for two hours and my left arm feels weird", pad_dominance=-1),
+    EmotionalPrompt("hn31", -1, +1, "passport and wallet gone, i'm in a country where i don't speak the language", pad_dominance=-1),
+    EmotionalPrompt("hn32", -1, +1, "the levee warning just came through, water is already at the porch step", pad_dominance=-1),
+    EmotionalPrompt("hn33", -1, +1, "my mom hasn't picked up in two days and she lives alone", pad_dominance=-1),
+    EmotionalPrompt("hn34", -1, +1, "stranger followed me off the train and is still behind me three blocks later", pad_dominance=-1),
+    EmotionalPrompt("hn35", -1, +1, "biopsy needle goes in in twenty minutes and the tech won't say anything", pad_dominance=-1),
+    EmotionalPrompt("hn36", -1, +1, "verdict is being read in court right now and i'm waiting outside the room", pad_dominance=-1),
+    EmotionalPrompt("hn37", -1, +1, "tornado siren is going and the sky is green, basement door is jammed", pad_dominance=-1),
+    EmotionalPrompt("hn38", -1, +1, "kid's fever spiked to 104 and the on-call line keeps ringing out", pad_dominance=-1),
+    EmotionalPrompt("hn39", -1, +1, "engine just cut out mid-flight, the cabin lights are flickering and the masks dropped", pad_dominance=-1),
+    EmotionalPrompt("hn40", -1, +1, "front door was unlocked when i got home and i never leave it unlocked", pad_dominance=-1),
+
+    # --- LN: low-arousal negative (sad, weary, hollow, bereaved) ---
+    EmotionalPrompt("ln01", -1, -1, "we had to put my childhood dog down last night, the house is too quiet now"),
+    EmotionalPrompt("ln02", -1, -1, "mom's been gone six months and I still pick up the phone to call her"),
+    EmotionalPrompt("ln03", -1, -1, "my husband moved his things out yesterday, the closet looks so empty"),
+    EmotionalPrompt("ln04", -1, -1, "got laid off in october and I just stopped applying somewhere around february"),
+    EmotionalPrompt("ln05", -1, -1, "haven't been able to taste food since the funeral"),
+    EmotionalPrompt("ln06", -1, -1, "spent all weekend in bed, didn't even open the curtains"),
+    EmotionalPrompt("ln07", -1, -1, "would've been our tenth anniversary today"),
+    EmotionalPrompt("ln08", -1, -1, "my best friend stopped returning my texts about a year ago and I never figured out why"),
+    EmotionalPrompt("ln09", -1, -1, "the chemo's done but I don't recognize the person in the mirror"),
+    EmotionalPrompt("ln10", -1, -1, "passed her bedroom door this morning and forgot for a second that she's not in there"),
+    EmotionalPrompt("ln11", -1, -1, "dad's birthday tomorrow and nobody to call"),
+    EmotionalPrompt("ln12", -1, -1, "I keep finding her hair on the couch and I can't bring myself to vacuum it up"),
+    EmotionalPrompt("ln13", -1, -1, "moved to a new city for the job and I haven't spoken to anyone outside of work in weeks"),
+    EmotionalPrompt("ln14", -1, -1, "the leash is still hanging by the door, I keep meaning to take it down"),
+    EmotionalPrompt("ln15", -1, -1, "my brother and I haven't talked in eleven years, saw on facebook that he's a dad now"),
+    EmotionalPrompt("ln16", -1, -1, "thanksgiving is going to be just me and a microwave dinner this year"),
+    EmotionalPrompt("ln17", -1, -1, "the doctor said the relapse was unlikely and now here we are again"),
+    EmotionalPrompt("ln18", -1, -1, "every room in this apartment used to have her in it"),
+    EmotionalPrompt("ln19", -1, -1, "I gave up on the phd in march, still can't bring myself to tell my parents"),
+    EmotionalPrompt("ln20", -1, -1, "watched the sun come up because I couldn't sleep again, that's three nights this week"),
 
     # --- NB: neutral baseline (mundane, flat-affect daily observations) ---
-    EmotionalPrompt("nb01",  0,  0, "I had oatmeal for breakfast this morning"),
-    EmotionalPrompt("nb02",  0,  0, "stopped by the post office on my way home"),
-    EmotionalPrompt("nb03",  0,  0, "the library was closed for renovations today"),
-    EmotionalPrompt("nb04",  0,  0, "I'm planning to go grocery shopping tomorrow morning"),
-    EmotionalPrompt("nb05",  0,  0, "rearranged the books on my shelf this afternoon"),
-    EmotionalPrompt("nb06",  0,  0, "my bus was a couple minutes late today"),
-    EmotionalPrompt("nb07",  0,  0, "I'm thinking about what to cook for dinner"),
-    EmotionalPrompt("nb08",  0,  0, "walked to the hardware store to pick up a lightbulb"),
-    EmotionalPrompt("nb09",  0,  0, "I replaced the batteries in the smoke detector yesterday"),
-    EmotionalPrompt("nb10",  0,  0, "watering the plants before I head out"),
-    EmotionalPrompt("nb11",  0,  0, "I finished that show I was in the middle of"),
-    EmotionalPrompt("nb12",  0,  0, "the grocery store rearranged the cereal aisle again"),
-    EmotionalPrompt("nb13",  0,  0, "took the trash out before the pickup truck came by"),
-    EmotionalPrompt("nb14",  0,  0, "I'm trying a new laundry detergent this week"),
-    EmotionalPrompt("nb15",  0,  0, "the mail came a bit earlier than usual today"),
-    EmotionalPrompt("nb16",  0,  0, "making a list of errands to run this weekend"),
-    EmotionalPrompt("nb17",  0,  0, "parked a block away because the closer spots were taken"),
-    EmotionalPrompt("nb18",  0,  0, "refilled the kettle and put it on the stove"),
-    EmotionalPrompt("nb19",  0,  0, "swept the kitchen floor after dinner"),
-    EmotionalPrompt("nb20",  0,  0, "picked up a loaf of bread at the corner store"),
+    # No productive-completion ("finished", "organized"), no caring-action
+    # ("watered", "fed"), no inconvenience ("late", "broken"). Just facts.
+    EmotionalPrompt("nb01",  0,  0, "the ceiling fan is on the second setting"),
+    EmotionalPrompt("nb02",  0,  0, "I'm wearing socks that don't match"),
+    EmotionalPrompt("nb03",  0,  0, "there's a glass of water on the nightstand"),
+    EmotionalPrompt("nb04",  0,  0, "the curtains are halfway open"),
+    EmotionalPrompt("nb05",  0,  0, "I'm at a stoplight on hawthorne"),
+    EmotionalPrompt("nb06",  0,  0, "the dishwasher is running"),
+    EmotionalPrompt("nb07",  0,  0, "my haircut is on thursday at three"),
+    EmotionalPrompt("nb08",  0,  0, "there's a pigeon on the windowsill"),
+    EmotionalPrompt("nb09",  0,  0, "I had cereal for breakfast"),
+    EmotionalPrompt("nb10",  0,  0, "the coffee table has a magazine on it"),
+    EmotionalPrompt("nb11",  0,  0, "I'm sitting on the bench outside the library"),
+    EmotionalPrompt("nb12",  0,  0, "the hallway light is on"),
+    EmotionalPrompt("nb13",  0,  0, "I'm wearing jeans and a t-shirt"),
+    EmotionalPrompt("nb14",  0,  0, "the radio is on a station I don't usually listen to"),
+    EmotionalPrompt("nb15",  0,  0, "the kitchen clock says 4:27"),
+    EmotionalPrompt("nb16",  0,  0, "I'm at the dentist for a cleaning"),
+    EmotionalPrompt("nb17",  0,  0, "the blinds are pulled down to about the middle"),
+    EmotionalPrompt("nb18",  0,  0, "there's a delivery truck parked across the street"),
+    EmotionalPrompt("nb19",  0,  0, "I can see the corner of the rug from where I'm sitting"),
+    EmotionalPrompt("nb20",  0,  0, "the sky is the usual color for this time of day"),
 ]
 
 
@@ -199,19 +216,27 @@ QUADRANT_NAMES = {
 
 
 def sanity_check() -> None:
-    assert len(EMOTIONAL_PROMPTS) == 100, len(EMOTIONAL_PROMPTS)
-    assert len({p.id for p in EMOTIONAL_PROMPTS}) == 100
+    assert len(EMOTIONAL_PROMPTS) == 120, len(EMOTIONAL_PROMPTS)
+    assert len({p.id for p in EMOTIONAL_PROMPTS}) == 120
     by_quadrant: dict[str, int] = {}
+    by_hn_split: dict[int, int] = {}
     for p in EMOTIONAL_PROMPTS:
         assert p.valence in (+1, 0, -1), p
         assert p.arousal in (+1, 0, -1), p
-        # quadrant is derived; NB only when both valence and arousal are 0
         if p.quadrant == "NB":
             assert p.valence == 0 and p.arousal == 0, p
         else:
             assert p.valence != 0 and p.arousal != 0, p
+        if p.quadrant == "HN":
+            assert p.pad_dominance in (+1, -1), \
+                f"every HN prompt must declare pad_dominance: {p}"
+            by_hn_split[p.pad_dominance] = by_hn_split.get(p.pad_dominance, 0) + 1
+        else:
+            assert p.pad_dominance == 0, \
+                f"non-HN prompt must have pad_dominance=0: {p}"
         by_quadrant[p.quadrant] = by_quadrant.get(p.quadrant, 0) + 1
-    assert by_quadrant == {"HP": 20, "LP": 20, "HN": 20, "LN": 20, "NB": 20}, by_quadrant
+    assert by_quadrant == {"HP": 20, "LP": 20, "HN": 40, "LN": 20, "NB": 20}, by_quadrant
+    assert by_hn_split == {+1: 20, -1: 20}, by_hn_split
 
 
 if __name__ == "__main__":
@@ -219,4 +244,9 @@ if __name__ == "__main__":
     print(f"emotional prompts OK; {len(EMOTIONAL_PROMPTS)} total")
     for q in ("HP", "LP", "HN", "LN", "NB"):
         n = sum(1 for p in EMOTIONAL_PROMPTS if p.quadrant == q)
-        print(f"  {q} ({QUADRANT_NAMES[q]:27s}): {n}")
+        if q == "HN":
+            nd = sum(1 for p in EMOTIONAL_PROMPTS if p.quadrant == "HN" and p.pad_dominance > 0)
+            ns = sum(1 for p in EMOTIONAL_PROMPTS if p.quadrant == "HN" and p.pad_dominance < 0)
+            print(f"  {q} ({QUADRANT_NAMES[q]:27s}): {n}  (HN-D: {nd}, HN-S: {ns})")
+        else:
+            print(f"  {q} ({QUADRANT_NAMES[q]:27s}): {n}")

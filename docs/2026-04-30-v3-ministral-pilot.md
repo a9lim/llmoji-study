@@ -1,8 +1,9 @@
 # v3 ministral pilot
 
-**Status:** plan, pre-registered. Not yet executing — gated on a9
-sign-off and a smoke-test confirming `LLMOJI_MODEL=ministral` wires
-end-to-end.
+**Status:** EXECUTED 2026-04-30 — pilot landed (n=100), all gating
+rules passed; main run (N=800) followed same day with the
+saklas tokenizer fix active. Findings folded into CLAUDE.md +
+findings.md. Kept as historical design record.
 
 **Date:** 2026-04-30.
 

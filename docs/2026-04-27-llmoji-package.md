@@ -1,7 +1,9 @@
 # llmoji package + repo split
 
-**Status:** plan, pre-registered. Not yet executing — gated on
-canonicalization re-synthesis (see § v1.0 prereqs).
+**Status:** EXECUTED 2026-04-27. The package split shipped as
+designed; current state lives in `../CLAUDE.md`,
+`../llmoji/CLAUDE.md`, and `docs/findings.md`. Kept as historical
+design record.
 
 **Date:** 2026-04-27.
 

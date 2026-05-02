@@ -30,9 +30,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-# Row filter: first character must be one of these opening brackets or
-# common kaomoji-prefix glyphs. Matches the v1/v2 analysis convention.
-KAOMOJI_START_CHARS = set("([（｛ヽ٩ᕕ╰╭╮┐┌＼¯໒＼ヾっ")
+from llmoji.taxonomy import KAOMOJI_START_CHARS
 
 
 # Russell-quadrant palette + ordering. Shared with scripts/17_v3_face_scatters.py
@@ -67,10 +65,6 @@ QUADRANT_COLORS = {
     "HN-D": "#d44a4a",  # red — anger / contempt (high PAD dominance)
     "HN-S": "#9d4ad4",  # magenta-purple — fear / anxiety (low PAD dominance)
 }
-
-# Subset alias for code that wants only the new sub-quadrant pair.
-PAD_SUB_COLORS = {q: QUADRANT_COLORS[q] for q in ("HN-D", "HN-S")}
-
 
 def _palette_for(df: pd.DataFrame) -> tuple[list[str], dict[str, str]]:
     """Return ``(order, colors)`` matching whatever quadrant labels are
@@ -264,24 +258,6 @@ def available_extension_probes(df: pd.DataFrame) -> list[str]:
     return sorted(ext)
 
 
-def load_v1v2_neutral_baseline(path: str) -> pd.DataFrame:
-    """v1/v2 kaomoji_prompted rows with neutral-valence prompts, as
-    probe-column DataFrame. Used by the probe-correlation plots for a
-    cross-experiment neutral comparator."""
-    from .config import PROBES
-    df: pd.DataFrame = pd.read_json(path, lines=True)
-    sub = df[
-        (df["condition"] == "kaomoji_prompted")
-        & (df["prompt_valence"] == 0)
-    ].copy()
-    stacked = np.asarray(sub["probe_scores_t0"].tolist(), dtype=float)
-    for i, probe in enumerate(PROBES):
-        sub[f"t0_{probe}"] = stacked[:, i]
-        sub[f"tlast_{probe}"] = stacked[:, i]
-    sub["quadrant"] = "NB"
-    return sub
-
-
 def load_emotional_features(
     jsonl_path: str | Path,
     data_dir: Path,
@@ -340,60 +316,82 @@ def load_emotional_features(
     df = df.loc[mask].reset_index(drop=True)
     X = X[mask]
     if split_hn:
-        hn_split = _hn_split_map()
-        new_q = df.apply(
-            lambda r: (
-                hn_split.get(r["prompt_id"], None)
-                if r["quadrant"] == "HN"
-                else r["quadrant"]
-            ),
-            axis=1,
-        )
-        keep = new_q.notna().to_numpy()
-        df = df.loc[keep].copy()
-        df["quadrant"] = new_q[keep].to_numpy()
-        X = X[keep]
-        df = df.reset_index(drop=True)
+        df, X = apply_hn_split(df, X)
     return df, X
 
 
-def load_v1v2_neutral_baseline_features(
-    jsonl_path: str | Path,
-    data_dir: Path,
+def load_emotional_features_all_layers(
+    short: str,
     *,
-    experiment: str = "v1v2",
     which: str = "h_first",
-    layer: int | None = None,
-) -> tuple[pd.DataFrame, np.ndarray]:
-    """v1/v2 neutral-valence kaomoji_prompted rows as hidden-state
-    features. Used for adding a cross-experiment neutral baseline to
-    the v3 PCA scatter."""
-    from .hidden_state_analysis import load_hidden_features
-    df, X = load_hidden_features(
-        jsonl_path, data_dir, experiment,
-        which=which, layer=layer,
+    kaomoji_filter: bool = True,
+    split_hn: bool = False,
+    rebuild: bool = False,
+) -> tuple[pd.DataFrame, np.ndarray, list[int]]:
+    """Multi-layer counterpart to :func:`load_emotional_features`.
+
+    Loads the v3 all-layers hidden-state tensor for ``short``, applies
+    the standard canonicalize + kaomoji-start row filter, optionally
+    drops untagged HN rows in split mode. Cached at
+    ``data/cache/v3_<short>_h_mean_all_layers.npz`` (legacy filename;
+    contents are whatever ``which`` is set to).
+
+    Returns ``(df, X3, layer_idxs)`` where ``X3.shape == (n, n_layers,
+    hidden_dim)``. ``df`` row order matches ``X3``.
+
+    The ``$LLMOJI_WHICH`` environment variable overrides ``which`` and
+    auto-renames the cache so each aggregate gets its own file.
+    """
+    from .config import DATA_DIR, MODEL_REGISTRY
+    from .hidden_state_analysis import load_hidden_features_all_layers
+    from llmoji.taxonomy import canonicalize_kaomoji
+
+    M = MODEL_REGISTRY[short]
+    if not M.emotional_data_path.exists():
+        raise FileNotFoundError(
+            f"no v3 data at {M.emotional_data_path}; "
+            f"run LLMOJI_MODEL={short} python scripts/local/03_emotional_run.py"
+        )
+
+    cache_path = DATA_DIR / "cache" / f"v3_{short}_h_mean_all_layers.npz"
+    if rebuild and cache_path.exists():
+        cache_path.unlink()
+        meta = cache_path.with_suffix(".meta.jsonl")
+        if meta.exists():
+            meta.unlink()
+
+    df, X3, layer_idxs = load_hidden_features_all_layers(
+        M.emotional_data_path, DATA_DIR, M.experiment,
+        which=which, cache_path=cache_path,
     )
     if len(df) == 0:
-        return df, X
-    from llmoji.taxonomy import canonicalize_kaomoji
-    mask = (
-        (df["condition"] == "kaomoji_prompted")
-        & (df["prompt_valence"] == 0)
-    ).to_numpy()
-    df_nb = df.loc[mask].assign(quadrant="NB").reset_index(drop=True)
-    df_nb = df_nb.assign(
-        first_word_raw=df_nb["first_word"],
-        first_word=df_nb["first_word"].map(
+        return df, X3, layer_idxs
+
+    df = df.assign(
+        quadrant=df["prompt_id"].str[:2].str.upper(),
+        first_word_raw=df["first_word"],
+        first_word=df["first_word"].map(
             lambda s: canonicalize_kaomoji(s) if isinstance(s, str) else s,
         ),
     )
-    X_nb = X[mask]
-    # Also apply the kaomoji first-char filter for consistency with v3.
-    kao_mask = np.asarray([
-        isinstance(s, str) and len(s) > 0 and s[0] in KAOMOJI_START_CHARS
-        for s in df_nb["first_word"]
-    ])
-    return df_nb.loc[kao_mask].reset_index(drop=True), X_nb[kao_mask]
+
+    if kaomoji_filter:
+        mask = np.asarray([
+            isinstance(s, str) and len(s) > 0 and s[0] in KAOMOJI_START_CHARS
+            for s in df["first_word"]
+        ])
+        df = df.loc[mask].reset_index(drop=True)
+        X3 = X3[mask]
+
+    if split_hn:
+        n_before = len(df)
+        df, X3_split = apply_hn_split(df, X3)
+        assert X3_split is not None
+        X3 = X3_split
+        if len(df) < n_before:
+            print(f"  [{short}] dropped {n_before - len(df)} HN-untagged rows for split-mode")
+
+    return df, X3, layer_idxs
 
 
 # ---------------------------------------------------------------------------
@@ -779,146 +777,83 @@ def plot_kaomoji_quadrant_alignment(
 
 
 # ---------------------------------------------------------------------------
-# v3 PCA scatter with Russell-quadrant coloring (hidden-state)
+# Per-face cosine heatmap (descriptive, sorted by dominant quadrant)
 # ---------------------------------------------------------------------------
 
 
-def plot_v3_pca_valence_arousal(
+def plot_face_cosine_heatmap(
     df: pd.DataFrame,
     X: np.ndarray,
-    out_path: str,
-    *,
-    min_per_cell: int = 2,
-    baseline_df: "pd.DataFrame | None" = None,
-    baseline_X: "np.ndarray | None" = None,
+    out_path: str | Path,
 ) -> dict[str, Any]:
-    """PCA on v3 row-level hidden-state vectors; project per-(kaomoji,
-    quadrant) means through the fitted axes; scatter with Russell-
-    circumplex palette (HP orange, LP green, HN red, LN blue, NB gray).
-
-    Fit on combined pool (v3 + optional baseline) so axes reflect all
-    plotted data."""
+    """Pairwise cosine similarity between per-face mean hidden-state
+    vectors, grand-mean centered, rows/cols sorted by dominant quadrant
+    with quadrant boundaries drawn. Tick colors are per-face RGB blends
+    of QUADRANT_COLORS, weighted by per-quadrant emission counts.
+    """
     import matplotlib.pyplot as plt
-    from matplotlib.patches import Patch
-    from sklearn.decomposition import PCA
+
+    df = df.reset_index(drop=True)
+    rows: list[dict[str, Any]] = []
+    means: list[np.ndarray] = []
+    for fw, sub in df.groupby("first_word"):
+        idxs = sub.index.to_numpy()
+        rows.append({"first_word": fw, "n": len(sub)})
+        means.append(X[idxs].mean(axis=0))
+    fdf = pd.DataFrame(rows)
+    M = np.asarray(means)
+
+    order, _ = _palette_for(df)
+    quadrant = per_face_dominant_quadrant(df)
+    fdf["quadrant"] = [quadrant[fw] for fw in fdf["first_word"]]
+    fdf["q_order"] = fdf["quadrant"].map({q: i for i, q in enumerate(order)})
+    sort_idx = fdf.sort_values(["q_order", "n"],
+                               ascending=[True, False]).index.to_numpy()
+    M_sorted = M[sort_idx]
+    fdf_sorted = fdf.iloc[sort_idx].reset_index(drop=True)
+
+    grand_mean = M_sorted.mean(axis=0, keepdims=True)
+    M_centered = M_sorted - grand_mean
+    norms = np.linalg.norm(M_centered, axis=1, keepdims=True)
+    norms[norms == 0] = 1.0
+    M_n = M_centered / norms
+    C = M_n @ M_n.T
+
+    q_changes = [
+        i for i in range(1, len(fdf_sorted))
+        if fdf_sorted.iloc[i]["quadrant"] != fdf_sorted.iloc[i - 1]["quadrant"]
+    ]
 
     _use_cjk_font()
+    fig, ax = plt.subplots(figsize=(13, 12))
+    vabs = float(max(abs(C.min()), abs(C.max())))
+    im = ax.imshow(C, cmap="RdBu_r", vmin=-vabs, vmax=vabs, aspect="auto")
+    ax.set_xticks(range(len(fdf_sorted)))
+    ax.set_yticks(range(len(fdf_sorted)))
+    ax.set_xticklabels(fdf_sorted["first_word"], rotation=90, fontsize=8)
+    ax.set_yticklabels(fdf_sorted["first_word"], fontsize=8)
 
-    if len(df) == 0:
-        print("  [v3 PCA] no rows; skipping")
-        return {}
+    weights = per_face_quadrant_weights(df)
+    for ticks in (ax.get_yticklabels(), ax.get_xticklabels()):
+        for tick, fw in zip(ticks, fdf_sorted["first_word"]):
+            tick.set_color(mix_quadrant_color(
+                weights.get(fw, {q: 0.0 for q in order})
+            ))
 
-    # Combine with baseline if provided.
-    if baseline_df is not None and baseline_X is not None and len(baseline_df) > 0:
-        common_cols = [c for c in df.columns if c in baseline_df.columns]
-        df_all = pd.concat(
-            [df[common_cols], baseline_df[common_cols]], ignore_index=True,
-        )
-        X_all = np.concatenate([X, baseline_X], axis=0)
-    else:
-        df_all = df
-        X_all = X
+    for i in q_changes:
+        ax.axhline(i - 0.5, color="black", linewidth=0.6, alpha=0.7)
+        ax.axvline(i - 0.5, color="black", linewidth=0.6, alpha=0.7)
 
-    # Fit PCA on row-level hidden states.
-    n_comp = min(5, X_all.shape[0], X_all.shape[1])
-    pca = PCA(n_components=n_comp)
-    pca.fit(X_all)
-    var = pca.explained_variance_ratio_
-
-    # Per-(kaomoji, quadrant) means, projected.
-    groups: list[tuple[str, str, int]] = []
-    group_vecs: list[np.ndarray] = []
-    for key, g in df_all.groupby(["first_word", "quadrant"]):
-        km, q = key  # type: ignore[misc]
-        if len(g) < min_per_cell:
-            continue
-        idxs = g.index.to_numpy()
-        groups.append((str(km), str(q), int(len(g))))
-        group_vecs.append(X_all[idxs].mean(axis=0))
-    if len(groups) < 3:
-        print(f"  [v3 PCA] only {len(groups)} cells with n≥{min_per_cell}; skipping")
-        return {}
-
-    coords = pca.transform(np.asarray(group_vecs, dtype=np.float32))
-
-    # Use the global QUADRANT_COLORS (canonical Russell palette).
-
-    fig, ax = plt.subplots(figsize=(11, 9))
-
-    for (km, q, n), pt in zip(groups, coords):
-        c = QUADRANT_COLORS.get(q, "#666")
-        ax.scatter(pt[0], pt[1], c=c, s=40 + n * 4,
-                   edgecolor="black", linewidth=0.4, alpha=0.78, zorder=3)
-        if n >= 3:
-            ax.annotate(km, (pt[0], pt[1]), fontsize=6, alpha=0.85,
-                        xytext=(5, 5), textcoords="offset points", zorder=4)
-
-    # Per-quadrant centroid stars + within-quadrant / between-centroid stats.
-    centroids: dict[str, list[float]] = {}
-    within_std: dict[str, list[float]] = {}
-    all_quads = sorted({g[1] for g in groups})
-    for q_name in all_quads:
-        mask = np.array([g[1] == q_name for g in groups])
-        if not mask.any():
-            continue
-        sub_coords = coords[mask][:, :2]
-        centroid = sub_coords.mean(axis=0)
-        centroids[q_name] = centroid.tolist()
-        within_std[q_name] = (
-            sub_coords.std(axis=0, ddof=0).tolist()
-            if mask.sum() > 1 else [0.0, 0.0]
-        )
-        c = QUADRANT_COLORS.get(q_name, "#666")
-        ax.plot(centroid[0], centroid[1], marker="*", markersize=28,
-                color=c, markeredgecolor="black", markeredgewidth=1.6, zorder=5)
-        ax.annotate(f"  {q_name}", (centroid[0], centroid[1]),
-                    fontsize=10, fontweight="bold", zorder=6,
-                    xytext=(12, 0), textcoords="offset points", va="center")
-
-    ax.axhline(0, color="#ccc", linewidth=0.6, zorder=0)
-    ax.axvline(0, color="#ccc", linewidth=0.6, zorder=0)
-    ax.set_xlabel(f"PC1  ({var[0] * 100:.1f}% var)")
-    ax.set_ylabel(f"PC2  ({var[1] * 100:.1f}% var)")
+    fig.colorbar(im, ax=ax, shrink=0.7, label="centered cosine similarity")
     ax.set_title(
-        f"v3 HIDDEN-STATE PCA — {len(df_all)} rows, {len(groups)} "
-        f"(kaomoji, quadrant) cells projected (n ≥ {min_per_cell})"
+        f"v3 per-kaomoji hidden-state cosine similarity  ({len(fdf_sorted)} kaomoji)\n"
+        "rows/cols sorted by dominant quadrant; grand-mean centered; "
+        "tick colors = quadrant"
     )
-
-    order_qs, palette = _palette_for(df_all)
-    label_text = {
-        "HP": "HP (high arousal, positive)",
-        "LP": "LP (low arousal, positive)",
-        "HN": "HN (high arousal, negative)",
-        "LN": "LN (low arousal, negative)",
-        "NB": "NB (neutral baseline)",
-        "HN-D": "HN-D (anger / contempt)",
-        "HN-S": "HN-S (fear / anxiety)",
-    }
-    legend_handles = [
-        Patch(color=palette[k], label=label_text.get(k, k))
-        for k in order_qs if k in palette
-    ]
-    ax.legend(handles=legend_handles, loc="best", frameon=False,
-              fontsize=9, title="Russell quadrant")
     fig.tight_layout()
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
-
-    # Separation diagnostics.
-    centroid_arr = np.array([centroids[q] for q in centroids])
-    between_pc1 = float(centroid_arr[:, 0].std(ddof=0)) if len(centroid_arr) else 0.0
-    between_pc2 = float(centroid_arr[:, 1].std(ddof=0)) if len(centroid_arr) else 0.0
-
-    return {
-        "n_rows_fit": int(len(df_all)),
-        "n_cells_plotted": len(groups),
-        "explained_variance_ratio": var.tolist(),
-        "components": pca.components_[:2].tolist(),
-        "quadrant_centroids_pc12": centroids,
-        "within_quadrant_std_pc12": within_std,
-        "between_centroid_std_pc1": between_pc1,
-        "between_centroid_std_pc2": between_pc2,
-    }
+    return {"n_faces": len(fdf_sorted)}
 
 
 # ---------------------------------------------------------------------------

@@ -1,8 +1,7 @@
 # pyright: reportArgumentType=false, reportAttributeAccessIssue=false, reportCallIssue=false, reportReturnType=false
 """Analysis over saved hidden states: feature loading, group-mean
 aggregation, cosine heatmaps, PCA scatters, and per-(kaomoji, source)
-primitives used by analysis.py / emotional_analysis.py /
-cross_pilot_analysis.py.
+primitives used by analysis.py / emotional_analysis.py.
 
 Motivating argument for the whole refactor: saklas's 5 bipolar probes
 collapse to ~1 valence direction (PC1 = 89-95% of variance across
@@ -43,23 +42,6 @@ WHICH_SNAPSHOTS = ("h_first", "h_last", "h_mean")
 # ---------------------------------------------------------------------------
 # Loading
 # ---------------------------------------------------------------------------
-
-
-def load_row_hidden(
-    row: dict[str, Any],
-    data_dir: Path,
-    experiment: str,
-    *,
-    full_trace: bool = True,
-) -> FullSequenceCapture:
-    """Load hidden-state sidecar for one JSONL row."""
-    uuid = row.get("row_uuid")
-    if not uuid:
-        raise KeyError("row has no row_uuid; pre-refactor data")
-    path = hidden_state_path(data_dir, experiment, uuid)
-    if not path.exists():
-        raise FileNotFoundError(f"no sidecar at {path}")
-    return load_hidden_states(path, full_trace=full_trace)
 
 
 def load_hidden_features(
@@ -275,28 +257,6 @@ def recompute_probe_scores(
     monitor = session._monitor
     scores = monitor.score_single_token(hidden_dict)
     return {str(name): float(v) for name, v in scores.items()}
-
-
-def stack_snapshot(
-    captures: list[FullSequenceCapture],
-    *,
-    which: str = "h_first",
-    layer: int | None = None,
-) -> np.ndarray:
-    """Stack one snapshot across captures into (n, hidden_dim)."""
-    if not captures:
-        return np.zeros((0, 0), dtype=np.float32)
-    if layer is None:
-        layer = max(captures[0].layers.keys())
-    out = []
-    for cap in captures:
-        if layer not in cap.layers:
-            raise KeyError(
-                f"layer {layer} missing from a capture; "
-                f"available: {sorted(cap.layers.keys())}"
-            )
-        out.append(getattr(cap.layers[layer], which))
-    return np.asarray(out, dtype=np.float32)
 
 
 # ---------------------------------------------------------------------------

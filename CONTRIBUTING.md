@@ -94,7 +94,7 @@ You need:
    Add `your_short_name` to the `LLMOJI_MODEL` env-var docstring.
 2. **Smoke test.** Verifies the wiring:
    ```
-   LLMOJI_MODEL=your_short_name python scripts/99_hidden_state_smoke.py
+   LLMOJI_MODEL=your_short_name python scripts/local/99_hidden_state_smoke.py
    ```
    Generates 5 samples across quadrants, checks probe round-trip to
    ~1e-7 tolerance, validates sidecar shapes. ~5 min.
@@ -107,22 +107,22 @@ You need:
    models for cross-model CKA:
    ```
    LLMOJI_MODEL=your_short_name LLMOJI_PILOT_GENS=1 \
-     python scripts/03_emotional_run.py
+     python scripts/local/03_emotional_run.py
    ```
    ~25 minutes on M5 Max-class hardware for a 14B model.
 5. **Pilot analysis.** The chain auto-discovers any model with v3
    data on disk:
    ```
-   python scripts/21_v3_layerwise_emergence.py    # silhouette → identify preferred_layer
-   python scripts/23_v3_cross_model_alignment.py  # gemma↔qwen↔your_model CKA
-   python scripts/30_rule3_dominance_check.py     # rule 3b verdict
+   python scripts/local/21_v3_layerwise_emergence.py    # silhouette → identify preferred_layer
+   python scripts/local/23_v3_cross_model_alignment.py  # gemma↔qwen↔your_model CKA
+   python scripts/local/30_rule3_dominance_check.py     # rule 3b verdict
    ```
    Update `preferred_layer` in your `ModelPaths` entry from the
    layer-sweep peak.
 6. **Gating.** Apply your pre-registered thresholds. If pass, write
    the supplementary design doc and run main (N=800):
    ```
-   LLMOJI_MODEL=your_short_name python scripts/03_emotional_run.py
+   LLMOJI_MODEL=your_short_name python scripts/local/03_emotional_run.py
    ```
    ~3 hours for a 14B model. Resumable — if it dies, just rerun.
 7. **Document.** Add a "Pilot v3 — your-model" section to
@@ -145,9 +145,11 @@ If you want to add a new figure, decision rule, or cross-cut:
    even half a page — before implementing. The discipline of
    pre-registering the rule (vs. reading the data and writing the
    conclusion afterward) is most of the value.
-2. **Follow the script numbering.** Scripts are roughly
-   chronologically numbered. Pick the next free integer (currently
-   31+) and a descriptive name: `scripts/31_your_thing.py`.
+2. **Follow the script numbering.** Scripts are split into
+   `scripts/local/` (probes, hidden state, v3 follow-ons, blog regen,
+   smoke) and `scripts/harness/` (contributor corpus). Pick the next
+   free integer (currently 36+) and a descriptive name, e.g.
+   `scripts/local/36_your_thing.py`.
 3. **Keep it data-light by default.** If your analysis can read
    from existing sidecars or JSONLs without new generations, do
    that — `data/cache/v3_<short>_h_mean_all_layers.npz` has the

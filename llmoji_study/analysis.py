@@ -68,10 +68,6 @@ class AxisVerdict:
         return "\n".join(lines)
 
 
-# Back-compat alias so older scripts importing PilotVerdict still work.
-PilotVerdict = AxisVerdict
-
-
 def load_rows(path: str) -> pd.DataFrame:
     """Load the JSONL pilot output into a DataFrame, exploding the
     probe_scores_t0 list into per-probe columns."""
@@ -226,46 +222,9 @@ def evaluate_axis(df: pd.DataFrame, axis: str) -> AxisVerdict:
     )
 
 
-def evaluate(df: pd.DataFrame) -> AxisVerdict:
-    """Back-compat single-axis evaluation — always happy.sad."""
-    return evaluate_axis(df, "happy.sad")
-
-
 # ---------------------------------------------------------------------
 # Figures
 # ---------------------------------------------------------------------
-
-def _use_cjk_font() -> None:
-    """Configure a matplotlib font fallback chain that covers ~100% of
-    observed kaomoji characters. matplotlib 3.6+ falls back per-glyph
-    through this list. See emotional_analysis._use_cjk_font for the
-    character-coverage rationale.
-
-    Also registers the project-local `data/fonts/NotoEmoji-Regular.ttf`
-    (monochrome) so SMP emoji glyphs that appear inside some
-    Qwen-emitted forms render instead of showing as missing-glyph
-    rectangles."""
-    import matplotlib
-    import matplotlib.font_manager as fm
-    from pathlib import Path
-    repo_root = Path(__file__).resolve().parent.parent
-    emoji_font = repo_root / "data" / "fonts" / "NotoEmoji-Regular.ttf"
-    if emoji_font.exists() and "Noto Emoji" not in {f.name for f in fm.fontManager.ttflist}:
-        try:
-            fm.fontManager.addfont(str(emoji_font))
-        except Exception:
-            pass
-    chain = [
-        "Noto Sans CJK JP", "Arial Unicode MS", "DejaVu Sans", "DejaVu Serif",
-        "Tahoma", "Noto Sans Canadian Aboriginal", "Heiti TC",
-        "Hiragino Sans", "Apple Symbols", "Noto Emoji", "Helvetica Neue",
-    ]
-    available = {f.name for f in fm.fontManager.ttflist}
-    chain = [n for n in chain if n in available]
-    if chain:
-        matplotlib.rcParams["font.family"] = chain
-        matplotlib.rcParams["axes.unicode_minus"] = False
-
 
 def _setup_axes(ax: Any, title: str, xlabel: str, ylabel: str) -> None:
     ax.set_title(title)
@@ -408,9 +367,9 @@ def plot_kaomoji_heatmap(
     # summary, not a condition-stratified one.
     # keep first_words that look like kaomoji: start with an opening
     # bracket or one of the common kaomoji-prefix glyphs.
-    kaomoji_starts = set("([（｛ヽ٩ᕕ╰╭╮┐┌＼¯໒＼ヾっ")
+    from llmoji.taxonomy import KAOMOJI_START_CHARS
     keep_mask = np.asarray([
-        isinstance(s, str) and len(s) > 0 and s[0] in kaomoji_starts
+        isinstance(s, str) and len(s) > 0 and s[0] in KAOMOJI_START_CHARS
         for s in df["first_word"]
     ])
     if not keep_mask.any():
@@ -518,6 +477,7 @@ def all_figures(df: pd.DataFrame, X: np.ndarray, figures_dir: str) -> None:
     k-means confusion.
     Hidden-state-based (use X): Fig 1b PCA, Fig 3 per-kaomoji cosine."""
     import os
+    from .emotional_analysis import _use_cjk_font
     _use_cjk_font()
     os.makedirs(figures_dir, exist_ok=True)
     plot_axis_scatter(df, os.path.join(figures_dir, "fig1a_axis_scatter.png"))

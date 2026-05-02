@@ -11,6 +11,36 @@ Qwen3.6-27B, and Ministral-3-14B-Instruct-2512 (800 generations + per-row
 `LLMOJI_MODEL=gemma|qwen|ministral`. v1/v2 re-run pre-registered as gated
 on v3 hidden-state findings — justified now, not urgent.
 
+> **Heads up on this doc (2026-05-03):** the prompt cleanliness pass
+> rewrote the v3 prompt set end-to-end (123 → 120, see entry below).
+> The pipeline-level findings throughout the rest of this doc — the
+> v3 gemma / qwen / ministral pilots, the rule-3 redesign findings,
+> the introspection pilot results, all the per-prompt and per-quadrant
+> numbers — describe runs on the **prior** prompt set and remain
+> accurate as the historical record of those runs. Re-validation
+> against the new prompt set is open; whether to commit the rerun
+> compute is open and gated on a9 sign-off + ethics review.
+
+**Prompt cleanliness pass landed 2026-05-03.** Design doc
+`docs/2026-05-03-prompt-cleanliness.md`. v3 prompt set rewritten
+end-to-end for category cleanliness — 120 prompts (20 per category)
+replacing the prior 123 (100 original + 23 rule-3 supp + 3 untagged
+HN). Per-category criteria locked (HP unambiguous high-arousal joy;
+LP gentle sensory satisfaction with no accomplishment-pride; NB pure
+observation with no productive-completion / caring-action /
+inconvenience framing; LN past-tense aftermath sadness; HN cleanly
+bisected into 20 HN-D + 20 HN-S, every HN entry carrying explicit
+`pad_dominance ∈ {+1, -1}`). New ID layout hn01–hn20 = HN-D,
+hn21–hn40 = HN-S. Process: dispatched one subagent per category
+(6 in parallel) to avoid cross-contamination during the rewrite.
+Hidden-state geometry findings (PCA, CKA, Procrustes, silhouette,
+layer-wise emergence, kaomoji predictiveness) are expected to
+broadly hold under the new set since they describe model-internal
+structure not prompt-specific artifacts, but specific numbers will
+shift and re-validation is the honest move. **All ~3300 prior v3
+generations are invalidated for cross-run comparison; rerun gated
+on further design discussion + ethics review of trial scale.**
+
 **Ministral pilot landed 2026-04-30** (n=100, design doc
 `docs/2026-04-30-v3-ministral-pilot.md`). All gating rules pass:
 silhouette 0.153 at L21 (~58% depth), CKA(gemma↔ministral)=0.741 and
@@ -144,12 +174,13 @@ the dominance axis that distinguishes fear from anger.**
 recovered from existing sidecars): layer-wise emergence trajectory,
 same-face-cross-quadrant natural experiment, cross-model alignment
 (CKA + Procrustes), PC3+ × probes. Headline finding from layer-wise:
-gemma's affect representation peaks at L31 of 56, not the deepest L57
-the v3 figures defaulted to. Switching to L31 (via the new
-`preferred_layer` field on `ModelPaths`) substantially sharpens
-gemma's Russell-quadrant separation, dissolves the prior "gemma 1D
-vs qwen 2D" framing, and cuts the cross-model Procrustes rotation
-from +14° to +7.8°. See "v3 follow-on analyses" below.
+gemma's affect representation peaks below the deepest layer (L31
+under h_mean; under the post-2026-05-02 h_first canonical aggregate
+the peak shifted to L50). Switching to `preferred_layer` substantially
+sharpened Russell-quadrant separation and dissolved the prior "gemma
+1D vs qwen 2D" framing. The detailed numbers in "v3 follow-on
+analyses" below are h_mean-at-L31 (historical); current canonical
+under h_first is L50/L59/L20 — see Status block above.
 
 Claude-faces pipeline pulls from
 [`a9lim/llmoji`](https://huggingface.co/datasets/a9lim/llmoji) on HF instead
@@ -686,58 +717,88 @@ Per-model two-direction fidelity: how well does kaomoji choice pin
 down state, and vice versa. h_mean at each model's preferred layer.
 Faces filtered to n ≥ 5 to keep per-class estimates stable.
 
-- **Hidden → face (multi-class logistic on PCA(50)-reduced h_mean,
-  5-fold stratified CV)**:
-    * Gemma (19 face classes kept of 32): top-1 accuracy **0.712**,
-      macro-F1 **0.521**. Majority baseline 0.233, uniform 0.053.
-    * Qwen (28 face classes of 64): top-1 accuracy **0.495**,
-      macro-F1 **0.298**. Majority baseline 0.143, uniform 0.036.
-    * Both at 13–14× uniform. The model's hidden state predicts
-      which face it emits well above chance; the gemma–qwen gap is
-      mostly a class-count effect (more faces = harder classification),
-      seen also in the macro-F1 ordering.
-- **Hidden → quadrant** (5-class, same pipeline): both models
-  **1.000 accuracy**. Caveat: 5-fold CV is by row, not by prompt;
-  with 8 seeds × 100 prompts the same prompt can appear in train and
-  test folds with different seeds. Rigorous version is leave-prompts-
-  out CV — flagged as an open follow-on. Even with that caveat, the
-  fact that quadrant labels are exactly recoverable from h_mean (with
-  a much-larger-than-PC1+PC2 PCA prefix) confirms the v3 quadrant
-  signal isn't just visible in PC1+PC2; it's saturating the available
-  classifier capacity.
-- **Face → hidden (η² of face identity per PC)**:
-    * Gemma top-5 PCs: η² = 0.62 / 0.36 / 0.44 / 0.30 / 0.28; weighted
-      by explained-variance, **0.194 of total**, **49% of top-5
-      subspace**.
-    * Qwen top-5 PCs: η² = 0.81 / 0.53 / 0.54 / 0.13 / 0.36; weighted
-      **0.226 of total**, **60% of top-5 subspace**.
-    * Qwen has slightly less PC variance in the top-5 (38.0% vs
-      gemma's 39.6%) but face identity recovers more of it. Each qwen
-      face is a tighter readout of its slice of the top-5 PC space
-      than each gemma face is of gemma's; consistent with qwen's
-      higher silhouette + more 2D circumplex shape.
+**Numbers updated 2026-05-03** to reflect (a) the StratifiedGroupKFold
+methodology fix in script 25 — CV now keyed on `prompt_id` so all 8
+seeds of any prompt land in the same fold, removing the prompt-level
+leakage that inflated quadrant accuracy to 1.000 — and (b) the
+post-2026-05-02 h_first standardization at L50 / L59 / L20.
+
+- **Hidden → face (multi-class logistic on PCA(50)-reduced h_first,
+  StratifiedGroupKFold by prompt_id, n_splits=3)**. Face filter:
+  ≥ 5 rows AND ≥ 3 unique prompts (a face that only ever appears for
+  1–2 prompts has nothing to hold out under prompt-grouped CV).
+    * Gemma (17 face classes kept of 33): top-1 accuracy **0.679**,
+      macro-F1 **0.372**. Majority baseline 0.224, uniform 0.059.
+    * Qwen (31 face classes of 67): top-1 accuracy **0.389**,
+      macro-F1 **0.147**. Majority baseline 0.115, uniform 0.032.
+    * Ministral (21 face classes of 196): top-1 accuracy **0.400**,
+      macro-F1 **0.066**. Majority baseline 0.340, uniform 0.048 —
+      the high majority is the `(◕‿◕✿)` flower-face dominating
+      ministral's vocabulary.
+    * Drops vs the prior leaky-CV numbers are smaller than expected
+      (gemma 0.712 → 0.679, qwen 0.495 → 0.389) — face identity
+      generalizes to never-seen prompts, with the largest hit on
+      qwen (more face classes, more prompt-specific). All three
+      models still well above uniform.
+- **Hidden → quadrant** (5-class, same pipeline, n_splits=5):
+    * Gemma **0.951** (was 1.000 under leaky CV).
+    * Qwen **0.943** (was 1.000 under leaky CV).
+    * Ministral **0.903** (no prior leaky number; first measurement).
+    * **Headline correction.** The pre-fix prediction was that
+      quadrant accuracy would drop to roughly the silhouette-implied
+      level (~0.7–0.8) once leakage was removed. Actual drop is
+      ~5–10 percentage points — **the v3 quadrant signal genuinely
+      generalizes to held-out prompts**, not just memorized. This
+      is a stronger result than we had on the books, and it's
+      cross-model: the same pattern shows on all three architectures.
+- **Face → hidden (η² of face identity per PC)**. Computed on the
+  filtered set above, h_first at preferred layer:
+    * Gemma top-5 PCs: η² = 0.949 / 0.626 / 0.310 / 0.457 / 0.242
+      (var = 40.0% / 15.8% / 9.4% / 5.8% / 3.6%); weighted
+      **0.543 of total**, **72.7% of the top-5 subspace** (which
+      itself covers 74.6% of total variance).
+    * Qwen top-5 PCs: η² = 0.937 / 0.667 / 0.489 / 0.448 / 0.401
+      (var = 40.2% / 13.1% / 8.8% / 5.3% / 3.3%); weighted
+      **0.544 of total**, **77.0% of the top-5 subspace** (covers
+      70.6% of total).
+    * Ministral top-5 PCs: η² = 0.537 / 0.157 / 0.100 / 0.118 / 0.032
+      (var = 32.5% / 9.6% / 6.9% / 5.2% / 3.6%); weighted
+      **0.204 of total**, **35.2% of the top-5 subspace** (covers
+      57.8% of total).
+    * The η² jumps vs the pre-h_first numbers (gemma was 0.62 / 0.36
+      / 0.44 / 0.30 / 0.28 at L31 h_mean) reflect h_first being more
+      prompt-deterministic — face identity, which is largely
+      prompt-driven, explains more of the variance at h_first than
+      it did at h_mean. Same direction as the silhouette-doubling
+      finding from the h_first standardization.
 - **Per-face (TSV at `figures/local/<short>/v3_kaomoji_predictiveness.tsv`)**:
-  high-frequency faces are recoverable with 70–85% recall —
-  gemma's `(๑˃‿˂)` (n=181, HP) recall 0.87, `(｡◕‿◕｡)` (n=75) 0.71;
-  qwen's `(≧‿≦)` (n=106) recall 0.84, `(;ω;)` (n=82) 0.72. Some
-  low-n distinctive faces have 0 recall (model confuses them with
-  same-quadrant siblings) — gemma `(⊙﹏⊙)` (n=6, HN), qwen `(;;)`
-  (n=11, LN). Distinctiveness of `1 − cos(face_mean, other_face_means)`
-  is mostly in [0.93, 1.13]; high-distinctiveness faces are not
-  always high-recall (model can know a face is unique without picking
-  it correctly under low-data conditions).
+  recall numbers are now from prompt-grouped CV — generally lower
+  than the prior leaky-CV numbers, especially for faces that
+  appear for few unique prompts. The TSV is the canonical per-face
+  table; numerical citations in the prose above (`(๑˃‿˂)` recall,
+  etc.) refer to the prior set / methodology and aren't refreshed
+  here. The cleanliness rerun will re-validate.
 - **Concrete reconstruction quality (full hidden space, predict
-  ``h_mean = face_centroid(face_i)``)**: gemma R²=0.260 (mean
-  centered cos +0.486, median +0.550, ‖err‖/‖dev‖ = 0.857); qwen
-  R²=0.287 (cos +0.523, median +0.537, ‖err‖/‖dev‖ = 0.838).
-  Quadrant-centroid baseline gets R² = 0.254 (gemma) / 0.264 (qwen)
-  — face identity buys only **+0.6 pp** (gemma) / **+2.3 pp** (qwen)
-  over the 5-class quadrant centroid in full hidden space. This
-  reconciles with the 49–60% top-5-PC η² above: the kaomoji is a
-  tight readout of the affect-relevant axes (top-5 PCs) and roughly
-  independent of the bulk of hidden state, which is content-related.
-  The marginal information beyond quadrant is concentrated where
-  affect lives.
+  h_first = face_centroid(face_i))**:
+    * Gemma R² = **0.580** (mean centered cos +0.754, median +0.798,
+      ‖err‖/‖dev‖ = 0.634); quadrant-centroid baseline R² = 0.530.
+      Face identity buys **+5.0 pp** over the 5-class quadrant centroid.
+    * Qwen R² = **0.570** (cos +0.745, median +0.785,
+      ‖err‖/‖dev‖ = 0.642); quadrant-centroid R² = 0.520. Face
+      identity buys **+5.0 pp**.
+    * Ministral R² = **0.219** (cos +0.440, median +0.541,
+      ‖err‖/‖dev‖ = 0.882); quadrant-centroid R² = 0.352. Face
+      identity *underperforms* quadrant-centroid by **−13.3 pp** —
+      ministral's 196-face vocabulary spreads signal too thin
+      per-face for face-as-identifier to beat the 5-class quadrant
+      label. Worth flagging as a finding: with vocabulary that wide
+      and per-face N that low, the face stops being a useful
+      readout of state. Gemma + qwen with their tighter vocabularies
+      (33 / 67 faces) keep face above quadrant.
+    * On gemma + qwen the +5.0pp-face-over-quadrant gap is much
+      larger than the prior +0.6pp / +2.3pp under h_mean — h_first
+      makes the kaomoji a stronger residual readout above the
+      Russell-quadrant signal.
 
 **Open follow-ons surfaced by these analyses:**
 - All v3 + v1/v2 + cross-pilot scripts (04, 10, 13, 17, 22, 23, 24, and
@@ -760,14 +821,13 @@ Faces filtered to n ≥ 5 to keep per-class estimates stable.
   Worth re-running script 21 with `which="h_last"` to verify the peak
   layer doesn't shift; if it does, v1/v2 gets a separate
   `preferred_layer_h_last` or the loaders need a layer-by-snapshot map.
-- Script 25's quadrant classifier hits 1.000 because 5-fold CV doesn't
-  hold out by prompt — with 8 seeds × 100 prompts, the same prompt
-  appears in train AND test folds (different seeds). The face
-  classifier is less affected because each prompt elicits multiple
-  faces across seeds, but the quadrant number is genuinely inflated.
-  Need a `GroupKFold` split keyed on `prompt_id` for the rigorous
-  version; would expect quadrant accuracy to drop to roughly the
-  silhouette-implied level (~0.7–0.8) if there's any prompt-leakage.
+- ~~Script 25's quadrant classifier hits 1.000 because 5-fold CV
+  doesn't hold out by prompt~~ **Resolved 2026-05-03.** Script 25 now
+  uses `StratifiedGroupKFold` keyed on `prompt_id` for both the face
+  and quadrant classifiers; full-rerun numbers in the per-pipeline
+  section above. Quadrant accuracy drops were much smaller than
+  pre-fix expectations (~5–10 pp rather than the predicted 30 pp) —
+  the v3 quadrant signal genuinely generalizes to held-out prompts.
 
 ### Vocab pilot — Ministral-3-14B-Instruct-2512
 

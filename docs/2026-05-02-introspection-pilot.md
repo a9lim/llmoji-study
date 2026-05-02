@@ -1,9 +1,22 @@
 # v3 introspection-prompt pilot
 
-**Status:** plan, pre-registered. Not yet executing — gated on a9
-sign-off.
+**Status:** EXECUTED 2026-05-02 — pilot landed on gemma + ministral
+(3 conditions × 123 prompts × 1 gen each). Headline: introspection
+shifts kaomoji distribution content-specifically, but cross-model
+effect direction differs (gemma vocabulary expands, ministral
+contracts). Cross-model robustness assumption fails; the upstream
+`llmoji` "introspection hook" idea is gated on a follow-up Claude
+pilot. Kept as historical design record.
 
 **Date:** 2026-05-02.
+
+> **Update 2026-05-03:** the 123-prompt set this design references
+> was rewritten in the prompt cleanliness pass
+> (`docs/2026-05-03-prompt-cleanliness.md`) — new total is 120
+> prompts (20 per category). Pilot results reported below were run
+> on the prior set. If/when this pilot is rerun, it would land on
+> the new 120-prompt set; the 369-row design becomes 360 (3
+> conditions × 120 × 1).
 
 ## Goal
 

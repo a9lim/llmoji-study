@@ -30,10 +30,9 @@ lowercase. Keep `MODEL_ID = "google/gemma-4-31b-it"` lowercase.
 ### `preferred_layer` on `ModelPaths` overrides the loader default
 
 Per-model peak-affect layer for v3 hidden-state reads, set on the
-`ModelPaths` dataclass in `llmoji_study.config`. Gemma's is 31 (peak
-silhouette per `scripts/21`); qwen's is None (defaults to deepest L61,
-which is also peak); ministral has no v3 data yet. v3 scripts
-(04, 13, 17, 22, 23, 24) all pass `layer=M.preferred_layer` to
+`ModelPaths` dataclass in `llmoji_study.config`. Under h_first
+(canonical since 2026-05-02): gemma L50, qwen L59, ministral L20.
+v3 scripts pass `layer=M.preferred_layer` to
 `load_emotional_features` so figures get the right snapshot per model.
 
 If you call `load_hidden_features` / `load_emotional_features` directly
@@ -42,21 +41,10 @@ in a notebook or new script, you have to remember the override —
 convention: ``layer=current_model().preferred_layer``.
 
 The cache files at `data/cache/v3_<short>_h_mean_all_layers.npz`
-contain ALL layers, so script 21 (which iterates over layers)
-doesn't depend on `preferred_layer`. Same for the per-layer CKA
-grid in script 23.
-
-### Kaomoji vocabulary differs sharply across model lineages — RESOLVED via TAXONOMY drop
-
-Pre-2026-04-30: gemma-tuned `TAXONOMY` happy/sad labels (in
-`llmoji_study.taxonomy_labels`) didn't cover qwen / claude / ministral
-faces. Vocab-discovery scripts 00 / 19 / 20 were used to identify
-which faces to add per model. The whole machinery is now obsolete:
-v3 analyses key on `first_word` (canonicalized via
-`llmoji.taxonomy.canonicalize_kaomoji`), and v1/v2 pole assignment
-moved to per-face mean `t0_<axis>` probe-score sign in
-`analysis._add_axis_label_column`. No model-specific dictionaries
-needed; everything generalizes by construction.
+(legacy filename; contents reflect the active `which`) contain ALL
+layers, so script 21 (which iterates over layers) doesn't depend on
+`preferred_layer`. Same for the per-layer CKA grid in script 23 and
+the triplet Procrustes in script 31.
 
 ### Re-extracting pilot data after canonicalization rule changes
 
@@ -88,16 +76,17 @@ grand mean so the heatmap shows deviations from the baseline.
 
 At h_first (the state right before the first generated token),
 scalar probe scores are determined by the prompt + model, not the
-sampling seed. Per v3 main run, all 8 seeds × 123 prompts × any
-probe collapse to **123 unique 3-tuples at 4-decimal precision**
-(matches the unique-prompt count). Sampling stochasticity affects
-which token gets drawn FROM the t0 distribution, not the t0 state
-itself.
+sampling seed. Per v3 main run, all 8 seeds × N prompts × any
+probe collapse to **N unique 3-tuples at 4-decimal precision** —
+matches the unique-prompt count exactly (N=123 on the prior prompt
+set; N=120 on the post-2026-05-03 cleanliness-pass set, when
+re-measured). Sampling stochasticity affects which token gets drawn
+FROM the t0 distribution, not the t0 state itself.
 
 Implication for visualizations: 3D probe scatters at t0/h_first
 look sparse because 8 seeds-per-prompt overplot. Visual richness
 from seed-variance lives at h_last/h_mean (response-evolved state).
-3D PCA of the same data also collapses to 123 unique points but
+3D PCA of the same data also collapses to N unique points but
 the 5376-dim → PCA(3) spread makes overplotting less visually
 obvious. Use h_last for probe scatters specifically when
 seed-variance matters; h_first for everything else (cleaner
@@ -140,10 +129,13 @@ generated-token state, and round-trip through saklas's scorer missed by
 Kaomoji span 90+ non-ASCII non-CJK characters plus, on Qwen / Mistral /
 Claude, SMP emoji glyphs (`🌫️`, `🐕`, `✨`, `💧`, …) embedded inside kaomoji
 brackets. No single system font covers them all. matplotlib 3.6+ supports
-per-glyph fallback via `rcParams["font.family"] = [...]`. `_use_cjk_font`
-helpers (in `llmoji_study/{analysis,emotional_analysis,cross_pilot_analysis}.py`,
-`scripts/{16_eriskii_replication,17_v3_face_scatters,18_claude_faces_pca}.py`
-— six copies, **keep in sync**) register a project-local monochrome emoji
+per-glyph fallback via `rcParams["font.family"] = [...]`. The canonical
+`_use_cjk_font` helper lives in `llmoji_study.emotional_analysis`;
+`analysis.py` imports it (single source of truth post-2026-05-04
+dedupe). Scripts that work outside the
+emotional-analysis pipeline (`scripts/harness/16_eriskii_replication.py`,
+`scripts/harness/18_claude_faces_pca.py`) keep local copies for now —
+**keep in sync**. The helper registers a project-local monochrome emoji
 font (`data/fonts/NotoEmoji-Regular.ttf`, 1.9MB, committed) and configure
 the chain `Noto Sans CJK JP → Arial Unicode MS → DejaVu Sans → DejaVu Serif
 → Tahoma → Noto Sans Canadian Aboriginal → Heiti TC → Hiragino Sans → Apple

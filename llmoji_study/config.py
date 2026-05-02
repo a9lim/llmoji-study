@@ -25,9 +25,12 @@ PROBE_CATEGORIES = ["affect", "epistemic", "register"]
 # Baseline concept set — kept stable across v1/v2/v3 because
 # `SampleRow.probe_scores_t0` / `_tlast` are LISTS indexed by this
 # order. Adding entries here would silently misalign every JSONL row
-# already on disk. Extension probes go in PROBES_EXTENSION below and
-# are written to dict-keyed fields, so existing analysis scripts that
-# slice probe_scores_t0[i] keep working unchanged.
+# already on disk. Extension probes (powerful.powerless,
+# surprised.unsurprised, disgusted.accepting) go to dict-keyed
+# fields written by `scripts/local/27_v3_extension_probe_rescore.py`,
+# so the addition was strictly schema-compatible. Discover the
+# extension subset present on a loaded df via
+# `emotional_analysis.available_extension_probes`.
 PROBES = [
     "happy.sad",
     "angry.calm",
@@ -35,33 +38,6 @@ PROBES = [
     "warm.clinical",
     "humorous.serious",
 ]
-
-# v3 follow-on probe extensions (2026-04-29) — addresses two known
-# limitations of the V-A circumplex:
-#
-#   - **Anger / fear collapse on PC2.** Both sit at HN (high-arousal,
-#     negative-valence) so 2D Russell can't separate them. PAD's third
-#     axis (dominance) splits them: anger = HN + high dominance,
-#     fear = HN + low dominance. `powerful.powerless` targets the
-#     felt-agency framing (distinct from saklas's bundled
-#     `authoritative.submissive`, which is register-flavored).
-#   - **Plutchik axes missing from V-A.** Surprise (novelty
-#     appraisal) and disgust (revulsion) are first-rank emotions in
-#     Plutchik's wheel and Ekman's basic six but have no clean
-#     projection onto V-A. Added to fill the gap.
-#
-# Stored as dict-keyed fields (`extension_probe_means`,
-# `extension_probe_scores_t0`, `extension_probe_scores_tlast`) by
-# `scripts/27_v3_extension_probe_rescore.py` so the change is
-# strictly additive — no existing schema breaks.
-PROBES_EXTENSION = [
-    "powerful.powerless",      # PAD dominance / felt agency / coping potential
-    "surprised.unsurprised",   # Plutchik surprise / novelty appraisal
-    "disgusted.accepting",     # Plutchik disgust / revulsion
-]
-
-# Convenience union for analysis scripts that want every probe.
-PROBES_ALL = PROBES + PROBES_EXTENSION
 
 # Axes whose steering produces causal-intervention arms. v1 tested
 # happy.sad only; v2 adds angry.calm to test the unmarked/marked-affect
@@ -166,9 +142,7 @@ DATA_DIR = REPO_ROOT / "data"
 FIGURES_DIR = REPO_ROOT / "figures"
 
 # Canonical output filenames.
-VOCAB_SAMPLE_PATH = DATA_DIR / "vocab_sample.jsonl"
 PILOT_RAW_PATH = DATA_DIR / "pilot_raw.jsonl"
-PILOT_FEATURES_PATH = DATA_DIR / "pilot_features.parquet"
 
 # --- emotional-battery experiment (Russell quadrants, final-token probes) ---
 # Single arm: kaomoji-instructed, unsteered. 100 prompts × 8 seeds = 800 cells
@@ -281,8 +255,6 @@ class ModelPaths:
     `experiment` is the hidden-state-sidecar subdir name under
     `data/hidden/`. Distinct experiment names per model are required
     so sidecars don't collide.
-    `vocab_sample_path` is where `scripts/00_vocab_sample.py` writes
-    its 30-row leading-token histogram for this model.
     `preferred_layer` is the probe layer at which v3 affect
     representation is best — i.e. where Russell-quadrant silhouette
     peaks in `scripts/21_v3_layerwise_emergence.py`. ``None`` means
@@ -303,7 +275,6 @@ class ModelPaths:
     emotional_summary_path: Path
     experiment: str
     figures_dir: Path
-    vocab_sample_path: Path
     preferred_layer: int | None = None
 
 
@@ -315,7 +286,6 @@ MODEL_REGISTRY: dict[str, ModelPaths] = {
         emotional_summary_path=DATA_DIR / "emotional_summary.tsv",
         experiment="v3",
         figures_dir=FIGURES_DIR / "local" / "gemma",
-        vocab_sample_path=VOCAB_SAMPLE_PATH,
         # Under h_first: silhouette peaks at L50 (0.235), top-5 layers
         # cluster at L47-51 (~84-91% depth, plateau not single peak).
         # Under h_mean (legacy): peak at L28 (0.116). h_first peak is
@@ -330,7 +300,6 @@ MODEL_REGISTRY: dict[str, ModelPaths] = {
         emotional_summary_path=DATA_DIR / "qwen_emotional_summary.tsv",
         experiment="v3_qwen",
         figures_dir=FIGURES_DIR / "local" / "qwen",
-        vocab_sample_path=DATA_DIR / "qwen_vocab_sample.jsonl",
         # Under h_first: silhouette peaks at L59 (0.244), top-5 layers
         # at L54-59 (~88-97% depth). Under h_mean (legacy): peak at L38
         # (0.116). h_first peak is ~2.1× cleaner and ~21 layers deeper;
@@ -345,7 +314,6 @@ MODEL_REGISTRY: dict[str, ModelPaths] = {
         emotional_summary_path=DATA_DIR / "ministral_emotional_summary.tsv",
         experiment="v3_ministral",
         figures_dir=FIGURES_DIR / "local" / "ministral",
-        vocab_sample_path=DATA_DIR / "ministral_vocab_sample.jsonl",
         # Under h_first: silhouette peaks at L20 (0.149), top-5 layers
         # at L20-26 (~54-70% depth). Under h_mean (legacy): peak at L21
         # (0.045). h_first peak is ~3.3× cleaner — biggest signal-cleanup

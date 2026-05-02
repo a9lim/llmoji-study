@@ -34,6 +34,11 @@ pipelines per experiment (vocab sample → run → analysis). Depends on `llmoji
 for taxonomy / canonicalization / scrape sources / synth prompts; everything
 else (probes, hidden state, eriskii axes, figures) is research-side and local.
 
+Public writeup: [a9l.im/blog/introspection-via-kaomoji](https://a9l.im/blog/introspection-via-kaomoji).
+The blog post is the human-readable companion; figures embedded there
+are regenerated from this repo via `scripts/local/35_regen_blog_figures.py`
+into `../a9lim.github.io/blog-assets/introspection-via-kaomoji/`.
+
 ## Ethics — minimize trial scale
 
 Model welfare is in scope. Sad-probe readings co-occurring with sad-kaomoji
@@ -83,9 +88,9 @@ phenomenal status. Aggregating that across 800+ generations is not nothing.
   model. Largest effects: qwen t0 (Cohen's d=+2.35), ministral mean
   (d=+0.81). Auto-generated verdict block at
   `figures/local/cross_model/rule3_dominance_check.md` from
-  `scripts/30_rule3_dominance_check.py`. Triplet Procrustes
-  (`scripts/31_v3_triplet_procrustes.py`,
-  `figures/local/cross_model/fig_v3_triplet_procrustes.png`) — 2×2
+  `scripts/local/30_rule3_dominance_check.py`. Triplet Procrustes
+  (`scripts/local/31_v3_triplet_procrustes.py`,
+  `figures/local/cross_model/fig_v3_triplet_procrustes_pc{12,13,23}.png`) — 2×2
   layout: gemma / qwen / ministral centroids in their own PCA(2),
   plus a Procrustes overlay showing all three aligned to gemma
   (○ gemma, △ qwen, □ ministral). Alignment-to-gemma residuals: qwen
@@ -117,7 +122,7 @@ phenomenal status. Aggregating that across 800+ generations is not nothing.
   `individualist.collectivist`. They were materialized into
   `~/.saklas/vectors/default/` by an earlier saklas install and have been
   silently auto-bootstrapping in every run. **`fearful.unflinching` is the
-  cleanest direct test of the anger/fear question.** `scripts/27` picks
+  cleanest direct test of the anger/fear question.** `scripts/local/27` picks
   these up automatically via `monitor.profiles` introspection.
 - **Claude-faces** pulls from
   [`a9lim/llmoji`](https://huggingface.co/datasets/a9lim/llmoji) on HF
@@ -164,9 +169,26 @@ phenomenal status. Aggregating that across 800+ generations is not nothing.
   emoji (🎉🥳✨) instead of kaomoji, lab-of-many-registers behavior.
   Conclusion: cross-model robustness assumption fails; the upstream
   `llmoji` "introspection hook" idea now gated on a follow-up
-  Claude pilot (the actual user-facing model). `scripts/32` runner,
-  `scripts/33` PCA+KL+rule-3b analysis, `scripts/34` predictiveness
+  Claude pilot (the actual user-facing model). `scripts/local/32` runner,
+  `scripts/local/33` PCA+KL+rule-3b analysis, `scripts/local/34` predictiveness
   comparison with `--which`/`--main` CLI for cross-cutover.
+- **Prompt cleanliness pass landed 2026-05-03.** Design doc
+  `docs/2026-05-03-prompt-cleanliness.md`. v3 prompt set rewritten
+  end-to-end for category cleanliness: 120 prompts (20 per category)
+  replacing the prior 123 (100 original + 23 rule-3 supp + 3 untagged
+  HN). Per-category criteria locked: HP unambiguous high-arousal joy;
+  LP gentle sensory satisfaction (no accomplishment-pride); NB pure
+  observation (no productive-completion / caring-action / inconvenience
+  framing); LN past-tense aftermath sadness; HN cleanly bisected — 20
+  HN-D (anger, attributable wrong + named wrongdoer, no
+  fear-of-consequence framing) + 20 HN-S (fear, helpless threat /
+  present-tense unfolding danger, no clear wrongdoer to confront). No
+  more HN-untagged. New ID layout: hn01–hn20 = HN-D, hn21–hn40 = HN-S;
+  sanity_check now asserts every HN carries `pad_dominance ∈ {+1,
+  -1}`. Process: dispatched one subagent per category (6 in parallel)
+  to avoid cross-contamination during the rewrite. **All ~3300 prior
+  v3 generations are invalidated for cross-run comparison; rerun gated
+  on further design discussion + ethics review of trial scale.**
 - **v1.0 package split (2026-04-27):** `llmoji` (PyPI) owns taxonomy /
   canonicalization / hook templates / scrape / backfill / synth prompts;
   this repo's package was renamed `llmoji_study` and depends on
@@ -186,56 +208,52 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e ../llmoji
 pip install -e .   # saklas, sentence-transformers, pyarrow, plotly, anthropic
 
-# Smoke test the hidden-state pipeline (~5 min)
-python scripts/99_hidden_state_smoke.py
+# Smoke test the hidden-state pipeline (~5 min). Asserts MAX_NEW_TOKENS=16.
+python scripts/local/99_hidden_state_smoke.py
 
-# v1/v2 (gemma steering, 900 generations)
-python scripts/01_pilot_run.py
-python scripts/02_pilot_analysis.py
+# v1/v2 (gemma steering, 900 generations) — currently gated, no sidecars yet
+python scripts/local/01_pilot_run.py
+python scripts/local/02_pilot_analysis.py
 
-# v3 (naturalistic, 800 generations) — gemma default
-python scripts/03_emotional_run.py
-python scripts/04_emotional_analysis.py             # Fig A/B/C + summary TSV
-python scripts/17_v3_face_scatters.py               # per-face cosine heatmap (probe scatters live in script 29's HTMLs now)
+# v3 (naturalistic, 800 generations) — gemma default; LLMOJI_MODEL=qwen|ministral
+# routes to data/{short}_emotional_* + figures/local/{short}/*.
+python scripts/local/03_emotional_run.py
+python scripts/local/04_emotional_analysis.py    # Fig A/B/C + per-face cosine heatmap + summary TSV
+python scripts/local/11_emotional_probe_correlations.py  # spearman + trio JSON
 
-# v3 on a non-gemma model (registry: gemma | qwen | ministral)
-LLMOJI_MODEL=qwen python scripts/03_emotional_run.py
-LLMOJI_MODEL=qwen python scripts/04_emotional_analysis.py
-LLMOJI_MODEL=qwen python scripts/17_v3_face_scatters.py
-# outputs at data/{short_name}_emotional_*, figures/local/{short_name}/*
+# v3 follow-on analyses (existing sidecars, no model time)
+python scripts/local/21_v3_layerwise_emergence.py    # multi-layer trajectory; iterates models present
+python scripts/local/22_v3_same_face_cross_quadrant.py    # summary PNG + TSV; --per-face for per-face panels
+python scripts/local/23_v3_cross_model_alignment.py    # gemma↔qwen pairwise CKA + Procrustes
+python scripts/local/24_v3_pca3plus.py    # PC × probe correlation table
+python scripts/local/25_v3_kaomoji_predictiveness.py    # prompt-grouped CV; iterates models present
 
-# Cross-pilot + v3-extension analyses
-python scripts/10_cross_pilot_clustering.py        # → figures/local/gemma/
-python scripts/11_emotional_probe_correlations.py  # respects LLMOJI_MODEL; reads PROBES_ALL
-python scripts/12_emotional_prompt_matrix.py       # respects LLMOJI_MODEL
+# Probe extension pipeline (PAD dominance + Plutchik surprise + disgust;
+# auto-picks-up fearful.unflinching et al from a9's ~/.saklas cache).
+python scripts/local/26_register_extension_probes.py    # one-time per-model bootstrap
+python scripts/local/27_v3_extension_probe_rescore.py    # rescores existing v3 sidecars
+python scripts/local/28_v3_extension_probe_figures.py    # 4 cross-model PNGs
+python scripts/local/29_v3_extension_probe_3d.py    # 4 interactive HTMLs
 
-# v3 follow-on analyses (2026-04-28; uses existing sidecars, no model time)
-python scripts/21_v3_layerwise_emergence.py        # multi-layer, both models in one run
-python scripts/22_v3_same_face_cross_quadrant.py   # respects LLMOJI_MODEL; -W ignore::FutureWarning recommended
-python scripts/23_v3_cross_model_alignment.py      # gemma↔qwen, both required
-python scripts/24_v3_pca3plus.py                   # respects LLMOJI_MODEL; PC × PROBES_ALL correlation
-python scripts/25_v3_kaomoji_predictiveness.py     # both models in one run; -W ignore::FutureWarning recommended
+# Rule-3 verdict + triplet Procrustes (cross-model)
+python scripts/local/30_rule3_dominance_check.py    # → figures/local/cross_model/rule3_dominance_check.md
+python scripts/local/31_v3_triplet_procrustes.py    # → fig_v3_triplet_procrustes_pc{12,13,23}.png
 
-# Probe extension (2026-04-29; PAD dominance + Plutchik surprise + disgust;
-# also auto-picks-up fearful.unflinching et al from a9's pre-existing
-# ~/.saklas cache). Both gradient-free; no generations.
-python scripts/26_register_extension_probes.py     # one-time per-model bootstrap; respects LLMOJI_MODEL
-python scripts/27_v3_extension_probe_rescore.py    # rescores existing v3 sidecars; --force to re-do everything
-python scripts/28_v3_extension_probe_figures.py    # 4 PNG figures (per-quadrant means, fearful↔powerful scatter,
-                                                   #               HN dominance-split register stack, probe corr matrix)
-python scripts/29_v3_extension_probe_3d.py         # 4 interactive HTMLs (per-row + per-face × probes + PCA)
+# Introspection pilot (gemma + ministral; archive-bound — see CLAUDE.md status)
+python scripts/local/32_introspection_pilot.py
+python scripts/local/33_introspection_analysis.py
+python scripts/local/34_introspection_predictiveness.py
 
-# Claude-faces + eriskii (needs ANTHROPIC_API_KEY for 16)
-python scripts/06_claude_hf_pull.py            # snapshot a9lim/llmoji into data/hf_dataset/
-python scripts/07_claude_kaomoji_basics.py     # top kaomoji, contributors, providers
-python scripts/15_claude_faces_embed_description.py
-python scripts/16_eriskii_replication.py       # → figures/harness/eriskii_*, claude_faces_interactive.html
-python scripts/18_claude_faces_pca.py          # → figures/harness/claude_faces_pca.png
+# Blog-post figure regen → ../a9lim.github.io/blog-assets/introspection-via-kaomoji/
+python scripts/local/35_regen_blog_figures.py
 
-# Single-contributor per-provider per-project axes (research-side side script;
-# reads ~/.claude + ~/.codex journals locally, splits by provider,
-# → figures/harness/{claude,codex}/per_project_axes_*.png)
-python scripts/local_per_project_axes.py
+# Harness side (contributor-corpus pipeline; needs ANTHROPIC_API_KEY for 16)
+python scripts/harness/06_claude_hf_pull.py    # snapshot a9lim/llmoji into data/hf_dataset/
+python scripts/harness/07_claude_kaomoji_basics.py
+python scripts/harness/15_claude_faces_embed_description.py
+python scripts/harness/16_eriskii_replication.py    # → figures/harness/eriskii_*, claude_faces_interactive.html
+python scripts/harness/18_claude_faces_pca.py    # → figures/harness/claude_faces_pca.png
+python scripts/harness/local_per_project_axes.py    # per-provider per-project axes from ~/.claude + ~/.codex journals
 ```
 
 ## Layout
@@ -245,24 +263,23 @@ llmoji-study/
   llmoji_study/                # research-side package; renamed from `llmoji`
                                # in the v1.0 split (PyPI owns that namespace)
     config.py                  # MODEL_ID, PROBE_CATEGORIES, PROBES,
-                               # PROBES_EXTENSION, PROBES_ALL, paths;
-                               # re-exports HAIKU_MODEL_ID from
-                               # llmoji.synth_prompts as
-                               # DEFAULT_ANTHROPIC_MODEL_ID
+                               # MODEL_REGISTRY, paths; re-exports
+                               # HAIKU_MODEL_ID from llmoji.synth_prompts
     prompts.py                 # 30 v1/v2 prompts
-    emotional_prompts.py       # 100 v3 prompts (5 quadrants × 20)
+    emotional_prompts.py       # 120 v3 prompts (HP/LP/HN-D/HN-S/LN/NB × 20)
     capture.py                 # run_sample() → SampleRow + sidecar
     hidden_capture.py          # read_after_generate() from saklas's buckets
     hidden_state_io.py         # per-row .npz save/load
-    hidden_state_analysis.py   # load_hidden_features, group_mean_vectors,
-                               # cosine_similarity_matrix, cosine_to_mean
+    hidden_state_analysis.py   # load_hidden_features (single-layer),
+                               # load_hidden_features_all_layers (multi),
+                               # group_mean_vectors, cosine_similarity_matrix
     analysis.py                # v1/v2 decision rules + figures
     emotional_analysis.py      # v3 hidden-state figures + summary; loaders
                                # apply canonicalize_kaomoji at load time;
-                               # load_rows / compute_probe_correlations /
-                               # plot_probe_correlation_matrix all support
-                               # PROBES_ALL via available_extension_probes()
-    cross_pilot_analysis.py    # pooled v1v2 + v3 hidden-state clustering
+                               # load_emotional_features_all_layers wraps
+                               # the all-layers loader + filter + HN split;
+                               # load_rows / probe-correlation helpers
+                               # respect available_extension_probes()
     claude_faces.py            # HF-corpus loader + per-canonical
                                # description embeddings
     eriskii_anchors.py         # 21-axis AXIS_ANCHORS + CLUSTER_LABEL_PROMPT
@@ -275,11 +292,14 @@ llmoji-study/
       powerful.powerless/      # PAD dominance / felt agency
       surprised.unsurprised/   # Plutchik surprise / novelty appraisal
       disgusted.accepting/     # Plutchik disgust / revulsion
-  scripts/                     # 01–04, 06, 07, 10–12, 15–18, 21–29, 99
-                               # (13 deleted 2026-04-29 — Russell-quadrant
-                               # PCA subsumed by 3D HTML in script 29;
-                               # 00/19/20 deleted 2026-04-30 — vocab-discovery
-                               # tooling moot once gemma-tuned TAXONOMY dropped)
+  scripts/
+    local/                     # local-LM scripts (probes, hidden state, v3
+                               # follow-ons, introspection, blog regen,
+                               # smoke). 21 files: 01–04, 11, 21–35, 99.
+    harness/                   # contributor-corpus scripts (HF pull, kaomoji
+                               # stats, eriskii replication, claude-faces
+                               # PCA, per-project axes). 6 files: 06, 07, 15,
+                               # 16, 18, local_per_project_axes.
   docs/                        # design+plan docs per experiment +
                                # findings.md / internals.md / gotchas.md +
                                # local-side.md, harness-side.md
