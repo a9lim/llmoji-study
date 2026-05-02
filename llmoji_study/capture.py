@@ -184,7 +184,24 @@ def install_full_input_cache(
 
     Replaces any prior cache. Call at the top of each prompt's
     seed loop. Degenerate at N=1 — use ``install_prefix_cache``
-    over the prompt set instead."""
+    over the prompt set instead.
+
+    **Qwen bypass (2026-05-03):** on Qwen3.6 the cache_prefix path
+    produces contaminated KV state — every seed 1..N decodes
+    identical off-prompt text (markdown headers, code docs,
+    unrelated content) regardless of the input prompt. Root cause
+    is on the saklas side (qwen-tokenizer / model interaction);
+    pragmatic fix is to skip the cache install for Qwen and pay
+    the ~30-50% per-row prefill cost. Gemma + Mistral are
+    unaffected. See docs/gotchas.md.
+    """
+    model_id = (
+        getattr(session, "model_id", None)
+        or getattr(getattr(session, "config", None), "model_id", "")
+        or ""
+    )
+    if "qwen" in model_id.lower():
+        return 0
     import torch
     msgs = build_messages(
         prompt,

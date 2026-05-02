@@ -44,15 +44,24 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-from llmoji_study.config import MODEL_REGISTRY
+from llmoji_study.config import MODEL_REGISTRY, PROBES as CORE_PROBES
 from llmoji_study.emotional_analysis import _hn_split_map
 
 MODELS = ("gemma", "qwen", "ministral")
 AGGREGATES = ("t0", "tlast", "mean")
-FIELD_BY_AGG = {
+# Schema-spanning field map. Pre-2026-05-03 data stores fearful in
+# the dict-keyed ``extension_probe_scores_*`` fields (lazy rescore).
+# Post-2026-05-03 (3-probe migration) data stores it in the list-indexed
+# ``probe_scores_t0/_tlast`` per ``CORE_PROBES`` order, with the mean
+# under ``probe_means`` keyed by name. ``_value_from_row`` checks both.
+EXT_FIELD_BY_AGG = {
     "t0":    "extension_probe_scores_t0",
     "tlast": "extension_probe_scores_tlast",
     "mean":  "extension_probe_means",
+}
+CORE_LIST_FIELD_BY_AGG = {
+    "t0":    "probe_scores_t0",
+    "tlast": "probe_scores_tlast",
 }
 PROBES = {
     "rule3b": "fearful.unflinching",   # active gating probe
@@ -67,10 +76,33 @@ RNG_SEED = 0
 # -------------------------------------------------------------------------
 
 
+def _value_from_row(r: dict, probe: str, agg: str) -> float | None:
+    """Pull (probe, agg) scalar from either schema. Returns None if
+    not present in either."""
+    # New (3-probe) schema.
+    if probe in CORE_PROBES:
+        idx = CORE_PROBES.index(probe)
+        if agg in CORE_LIST_FIELD_BY_AGG:
+            seq = r.get(CORE_LIST_FIELD_BY_AGG[agg])
+            if seq and len(seq) > idx:
+                return float(seq[idx])
+        elif agg == "mean":
+            means = r.get("probe_means")
+            if isinstance(means, dict) and probe in means:
+                return float(means[probe])
+    # Old extension dict schema (still fallback for legacy data).
+    ext_field = EXT_FIELD_BY_AGG.get(agg)
+    if ext_field:
+        ext = r.get(ext_field)
+        if isinstance(ext, dict) and probe in ext:
+            return float(ext[probe])
+    return None
+
+
 def _load_hn_rows(model: str) -> tuple[list[dict], list[dict]]:
     """Return (HN-D rows, HN-S rows) for a model. Drops untagged-HN
-    (registry pad_dominance == 0) and any rows missing extension scores
-    on the active probes."""
+    (registry pad_dominance == 0) and any rows missing scores on the
+    active probes."""
     M = MODEL_REGISTRY[model]
     if not M.emotional_data_path.exists():
         return [], []
@@ -88,8 +120,8 @@ def _load_hn_rows(model: str) -> tuple[list[dict], list[dict]]:
             continue  # untagged borderline; drop from rule 3
         # Need at least the gating probe on at least one aggregate.
         has_any = any(
-            PROBES["rule3b"] in (r.get(field) or {})
-            for field in FIELD_BY_AGG.values()
+            _value_from_row(r, PROBES["rule3b"], agg) is not None
+            for agg in AGGREGATES
         )
         if not has_any:
             continue
@@ -102,14 +134,13 @@ def _load_hn_rows(model: str) -> tuple[list[dict], list[dict]]:
 
 def _values(rows: list[dict], probe: str, agg: str) -> np.ndarray:
     """Pull the per-row scalar for (probe, aggregate) from a row list,
-    skipping rows missing that field."""
-    field = FIELD_BY_AGG[agg]
+    skipping rows missing that field. Schema-spanning."""
     out: list[float] = []
     for r in rows:
-        v = (r.get(field) or {}).get(probe)
+        v = _value_from_row(r, probe, agg)
         if v is None:
             continue
-        out.append(float(v))
+        out.append(v)
     return np.asarray(out, dtype=np.float64)
 
 
@@ -341,7 +372,7 @@ def _format_markdown(df: pd.DataFrame) -> str:
 
 
 def main() -> None:
-    repo = Path(__file__).resolve().parent.parent
+    repo = Path(__file__).resolve().parent.parent.parent
     print("Rule 3 (revised) — HN-D vs HN-S dominance check\n")
     frames = []
     for m in MODELS:

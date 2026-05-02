@@ -610,49 +610,41 @@ face-space. Different decompositions of the same affect space.
 Per-model fidelity in two directions, h_mean at preferred layer,
 faces filtered to n ≥ 5.
 
-Numbers refreshed 2026-05-03 to reflect (a) the
-`StratifiedGroupKFold` methodology fix in script 25 — CV now keyed
-on `prompt_id` so all 8 seeds of any prompt land in the same fold,
-removing the prompt-level leakage that inflated quadrant accuracy
-to 1.000 — and (b) the post-2026-05-02 h_first standardization at
-L50 / L59 / L20.
+Numbers refreshed 2026-05-03 to reflect the post-cleanliness +
+seed-0-fix data on the 960-row N=8 v3 main runs (was 800 before
+the cleanliness pass; pre-cleanliness data archived at
+`data/archive/2026-05-03_pre_cleanliness/`). CV uses
+`StratifiedGroupKFold` keyed on `prompt_id` so all 8 seeds of any
+prompt land in the same fold, removing the prompt-level leakage
+that inflated quadrant accuracy to 1.000 in pre-fix scripts. h_first
+at preferred layer (gemma L50, qwen L59, ministral L20).
 
 - **Hidden → face** (multi-class logistic on PCA(50)-reduced
   h_first, `StratifiedGroupKFold` by `prompt_id`, n_splits=3):
-  gemma top-1 accuracy 0.68 across 17 face classes (uniform 0.06,
-  majority 0.22, macro-F1 0.37); qwen 0.39 across 31 classes
-  (uniform 0.03, majority 0.12, macro-F1 0.15); ministral 0.40
-  across 21 classes (uniform 0.05, majority 0.34, macro-F1 0.07 —
-  high majority is the `(◕‿◕✿)` flower-face dominating ministral's
-  vocabulary). Drops vs the prior leaky-CV numbers are smaller
-  than expected — face identity generalizes to never-seen prompts.
+  gemma **0.700** across 22 face classes (uniform 0.045, majority
+  0.210, macro-F1 0.27); qwen **0.411** across 33 classes (uniform
+  0.030, majority 0.126, macro-F1 0.14); ministral **0.416**
+  across 23 classes (uniform 0.043, majority 0.346, macro-F1 0.07
+  — high majority is `(◕‿◕✿)` dominating ministral's vocabulary).
 - **Hidden → quadrant** (5-class, same pipeline, n_splits=5):
-  gemma 0.95, qwen 0.94, ministral 0.90. Pre-fix prediction was
-  that quadrant accuracy would drop to ~0.7–0.8 once leakage was
-  removed; actual drop is only 5–10 pp. **The v3 quadrant signal
-  genuinely generalizes to held-out prompts**, not just memorized
-  — a stronger result than pre-fix, cross-model consistent.
-- **Face → hidden** (η² of face identity per PC, summed weighted
-  by explained variance): face identity recovers **73%** of the
-  top-5 PC subspace on gemma, **77%** on qwen, **35%** on
-  ministral. The η² jumps over the pre-h_first numbers (gemma 49%,
-  qwen 60%) reflect h_first being more prompt-deterministic — face
-  identity, which is largely prompt-driven, explains more of the
-  variance at h_first than at h_mean.
-- **Concrete reconstruction**: predict h_first = face_centroid in
-  full hidden space gives R² = **0.580** (gemma) / **0.570** (qwen) /
-  **0.219** (ministral); mean centered cosine 0.75 / 0.74 / 0.44;
-  ‖error‖/‖row deviation‖ 0.63 / 0.64 / 0.88. Quadrant-centroid
-  baseline gets R² 0.530 / 0.520 / 0.352 — on gemma + qwen, face
-  buys +5.0 pp over quadrant alone (much larger than the prior
-  +0.6 / +2.3 pp under h_mean — the kaomoji is a substantially
-  stronger residual readout above the Russell-quadrant signal at
-  h_first). **Ministral inverts the pattern**: face-centroid R²
-  (0.219) is *lower* than quadrant-centroid R² (0.352). Ministral's
-  196-face vocabulary spreads signal too thin per face for
-  face-as-identifier to beat the 5-class quadrant label —
-  vocabulary breadth past some threshold makes the kaomoji stop
-  being a useful readout of state.
+  gemma **1.000**, qwen **0.983**, ministral **0.983**. Russell
+  quadrant signal recoverable from h_first essentially perfectly
+  on all 3 architectures even after the prompt-grouped CV fix.
+- **Face → quadrant** (per-face modal-quadrant predictor, prompt-
+  grouped CV): gemma **0.806**, qwen **0.785**, ministral **0.433**.
+  Asymmetric — gemma + qwen's faces carry ~80% of quadrant info
+  directly, but ministral's heavy reuse of `(◕‿◕✿)` across
+  quadrants makes face a weak proxy.
+- **Face → hidden** (face-centroid R² over full hidden space at
+  h_first / preferred layer): gemma **0.615**, qwen **0.584**,
+  ministral **0.220**. Mean centered cosine(row, face centroid)
+  **0.776 / 0.753 / 0.444**. Quadrant-centroid baseline gets R²
+  0.567 / 0.557 / 0.430 — on gemma + qwen, face buys +3 to +5 pp
+  over quadrant alone (the kaomoji is a stronger residual readout
+  than the Russell-quadrant signal alone). **Ministral inverts**:
+  face-centroid R² (0.220) is *much lower* than quadrant-centroid
+  R² (0.430). Ministral's wider vocabulary spreads signal too thin
+  for face-as-identifier to beat the 5-class quadrant label.
 
 ### Open follow-ons
 
@@ -668,14 +660,29 @@ L50 / L59 / L20.
   prompt-level leakage in the 5-fold CV; needs `GroupKFold` for the
   honest number.~~ **Resolved 2026-05-03.** Now uses
   `StratifiedGroupKFold` keyed on `prompt_id`; numbers in the
-  pipeline section above. Drops were smaller than the predicted
-  ~0.7–0.8 (actual: 0.90–0.95) — the quadrant signal generalizes
-  much better than expected.
-- Qwen has 16 cross-quadrant emitters; gemma has 10. Wider net for
-  natural-experiment work on qwen as the dataset grows.
-- The remaining 7.8° Procrustes rotation between gemma L31 and
-  qwen L61 is non-trivial. Asks whether the two models' quadrant
-  axes are shifted by a consistent affine map.
+  pipeline section above. Quadrant accuracy actually stays at 1.000
+  on gemma and 0.983 on qwen + ministral even with the leak fix —
+  the quadrant signal genuinely generalizes to held-out prompts.
+- ~~Rule 3b PASSES on all 3 models~~ — **superseded 2026-05-03.**
+  Under the cleanliness + seed-0-fix data, rule 3b is WEAK:
+  gemma mid (t0 d=+1.60 PASS but tlast/mean CI ambiguous); qwen
+  fail (t0 d=+2.14 PASS but tlast/mean wrong-direction d≈−0.36);
+  ministral PASS on all 3 aggregates with mean d=+0.55. The earlier
+  "all 3 PASS" headline was inflated by cache-induced noise on
+  qwen seed 0 (37–46% per-row L2 deviation pre-fix).
+- ~~Seed-0 vs seeds-1..7 cache-mode mismatch in the pilot+resume
+  workflow~~ — **resolved 2026-05-03.** Pilot used `install_prefix_cache`
+  (cross-prompt N=1), full rerun used `install_full_input_cache`
+  per-prompt (N=8). The mismatched KV state on the persisted seed-0
+  sidecars showed up as visible PCA scatter offset. Fixed by
+  stripping seed=0 + sidecars then re-running seed 0 only via the
+  resume mechanism. Verified bit-identical to seeds 1..7 post-fix.
+  Backups at `data/*_emotional_raw.jsonl.bak.before_seed0_rerun`.
+- Triplet Procrustes PC1×PC2 residuals (qwen 6.9, ministral 23.0)
+  on the cleanliness + seed-0-fix data. Non-trivial on ministral
+  in particular — asks whether the smaller/different-lab model has
+  a genuinely different quadrant geometry or whether more PCs are
+  needed to capture its layout.
 
 The full version of these findings — including all methodological
 caveats, the kernel-form CKA implementation note, per-face TSV

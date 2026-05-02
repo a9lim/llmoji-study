@@ -68,16 +68,56 @@ _HN_SPLIT = _hn_split_map()
 MODELS = ("gemma", "qwen", "ministral")
 
 
-# Probes to highlight in the per-quadrant figure (subset of the 12
-# extension probes, ordered by theoretical relevance to the V-A
-# circumplex extension story).
+# Probes to highlight in the per-quadrant figure. Post-2026-05-03
+# 3-probe migration, fearful.unflinching is a CORE probe (lives in
+# probe_scores_t0[idx]); the other three live in extension_probe_*
+# dicts as before. curious.disinterested no longer auto-bootstraps
+# (PROBE_CATEGORIES dropped "register"/"epistemic") so it's out.
 HIGHLIGHT_PROBES = [
-    "powerful.powerless",      # PAD dominance — headline
-    "fearful.unflinching",     # direct fear probe (auto-discovered)
-    "disgusted.accepting",     # Plutchik disgust
-    "surprised.unsurprised",   # Plutchik surprise
-    "curious.disinterested",   # auto-discovered, register-y
+    "powerful.powerless",      # PAD dominance — headline (extension)
+    "fearful.unflinching",     # direct fear probe (now CORE post-migration)
+    "disgusted.accepting",     # Plutchik disgust (extension)
+    "surprised.unsurprised",   # Plutchik surprise (extension)
 ]
+
+# Canonical 3-probe set (post-2026-05-03 migration). Mirrors
+# `config.PROBES`. Drives `fig_v3_canonical_quadrant_means.png`,
+# which is the per-quadrant analogue of the extension-probe figure
+# but for the eager-scored canonical probes.
+CANONICAL_PROBES = [
+    "happy.sad",
+    "angry.calm",
+    "fearful.unflinching",
+]
+
+
+def _probe_value(r: dict, probe: str, *, agg: str = "t0") -> float | None:
+    """Schema-spanning probe lookup. Post-2026-05-03 migration the
+    canonical 3 probes (happy.sad / angry.calm / fearful.unflinching)
+    live in the list-indexed `probe_scores_t0/_tlast` and the named
+    `probe_means` dict. Extension probes (powerful.powerless,
+    surprised.unsurprised, disgusted.accepting) live in the
+    `extension_probe_scores_t0/_tlast` / `extension_probe_means`
+    dicts written by scripts/local/27. Returns None on miss."""
+    from llmoji_study.config import PROBES as CORE_PROBES_NEW
+    if probe in CORE_PROBES_NEW:
+        if agg in ("t0", "tlast"):
+            seq = r.get(f"probe_scores_{agg}") or []
+            idx = CORE_PROBES_NEW.index(probe)
+            if len(seq) > idx:
+                return float(seq[idx])
+        elif agg == "mean":
+            d = r.get("probe_means") or {}
+            if probe in d:
+                return float(d[probe])
+    field = {"t0": "extension_probe_scores_t0",
+             "tlast": "extension_probe_scores_tlast",
+             "mean": "extension_probe_means"}.get(agg)
+    if field:
+        d = r.get(field) or {}
+        if probe in d:
+            return float(d[probe])
+    return None
 
 # Kaomoji register categories for the HN dominance-split natural
 # experiment. Lists chosen from the gemma + qwen v3 vocabulary
@@ -130,26 +170,50 @@ def _register_of(form: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def fig_quadrant_means(by_model: dict[str, list[dict]], out: Path) -> None:
+def _plot_quadrant_means(
+    by_model: dict[str, list[dict]],
+    probes: list[str],
+    *,
+    title: str,
+    out: Path,
+) -> None:
+    """Per-probe per-quadrant mean probe score, **NB-subtracted** —
+    each probe's mean over this experiment's NB rows is subtracted
+    from every quadrant. Drops the saklas-bundled-neutrals baseline
+    that's baked into raw probe scores (per `monitor.py` layer-mean
+    centering) in favor of the project's own NB quadrant. NB bars
+    are zero by construction; HP/LP/HN-D/HN-S/LN bars read as the
+    affect lift over a domain-matched neutral observation."""
     fig, axes = plt.subplots(1, 3, figsize=(20, 5.5), sharey=True)
     for ax, short in zip(axes, MODELS):
         rows = by_model[short]
-        n_probes = len(HIGHLIGHT_PROBES)
+        n_probes = len(probes)
         n_quads = len(QUADRANT_ORDER)
         bar_w = 0.16
         x = np.arange(n_probes)
+        # Per-probe NB baseline (this experiment's NB rows, t0).
+        nb_baseline: dict[str, float] = {}
+        for probe in probes:
+            nb_vals = []
+            for r in rows:
+                if "error" in r or _quad(r["prompt_id"]) != "NB":
+                    continue
+                v = _probe_value(r, probe, agg="t0")
+                if v is not None:
+                    nb_vals.append(v)
+            nb_baseline[probe] = float(np.mean(nb_vals)) if nb_vals else 0.0
         for qi, q in enumerate(QUADRANT_ORDER):
             scores: list[float] = []
-            for probe in HIGHLIGHT_PROBES:
-                vals = [
-                    r["extension_probe_scores_t0"][probe]
-                    for r in rows
-                    if "extension_probe_scores_t0" in r
-                    and probe in r["extension_probe_scores_t0"]
-                    and _quad(r["prompt_id"]) == q
-                    and "error" not in r
-                ]
-                scores.append(float(np.mean(vals)) if vals else 0.0)
+            for probe in probes:
+                vals: list[float] = []
+                for r in rows:
+                    if "error" in r or _quad(r["prompt_id"]) != q:
+                        continue
+                    v = _probe_value(r, probe, agg="t0")
+                    if v is not None:
+                        vals.append(v)
+                raw = float(np.mean(vals)) if vals else 0.0
+                scores.append(raw - nb_baseline[probe])
             offset = (qi - (n_quads - 1) / 2) * bar_w
             ax.bar(
                 x + offset, scores, width=bar_w,
@@ -159,24 +223,40 @@ def fig_quadrant_means(by_model: dict[str, list[dict]], out: Path) -> None:
         ax.axhline(0, color="black", linewidth=0.5)
         ax.set_xticks(x)
         ax.set_xticklabels(
-            [p.split(".")[0] for p in HIGHLIGHT_PROBES],
+            [p.split(".")[0] for p in probes],
             rotation=20, ha="right", fontsize=9,
         )
         ax.set_title(f"{short}", fontsize=12)
         ax.grid(True, axis="y", linestyle=":", linewidth=0.4, alpha=0.6)
-    axes[0].set_ylabel("mean probe score at h_first")
+    axes[0].set_ylabel("mean probe score at h_first  (NB-subtracted)")
     axes[0].legend(
         title="quadrant", loc="upper left", fontsize=8, ncols=5,
         frameon=False,
     )
     fig.suptitle(
-        "v3 extension probes: per-quadrant mean at h_first",
-        fontsize=13, y=1.02,
+        f"{title}\n(NB-subtracted — each probe's mean over NB rows is set as zero)",
+        fontsize=12, y=1.03,
     )
     fig.tight_layout()
     fig.savefig(out, dpi=140, bbox_inches="tight")
     plt.close(fig)
     print(f"  wrote {out}")
+
+
+def fig_quadrant_means(by_model: dict[str, list[dict]], out: Path) -> None:
+    _plot_quadrant_means(
+        by_model, HIGHLIGHT_PROBES,
+        title="v3 extension probes: per-quadrant mean at h_first",
+        out=out,
+    )
+
+
+def fig_canonical_quadrant_means(by_model: dict[str, list[dict]], out: Path) -> None:
+    _plot_quadrant_means(
+        by_model, CANONICAL_PROBES,
+        title="v3 canonical probes: per-quadrant mean at h_first",
+        out=out,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -253,34 +333,49 @@ def fig_hn_dominance_split(by_model: dict[str, list[dict]], out: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-CORE_PROBES = [
-    "happy.sad", "angry.calm", "confident.uncertain",
-    "warm.clinical", "humorous.serious",
-]
+# Core probes are now read dynamically from config.PROBES so the
+# correlation matrix tracks the actual eager-probe set rather than
+# a hardcoded 5-probe v1/v2 list.
 
 
 def _build_probe_matrix(rows: list[dict]) -> tuple[list[str], np.ndarray]:
-    """Build (probe_names, n_rows × n_probes matrix). Core probes use
-    `probe_means`; extension probes use `extension_probe_scores_t0`.
-    Drops rows missing any probe."""
+    """Build (probe_names, n_rows × n_probes matrix). Pulls each
+    probe via the schema-spanning ``_probe_value`` so the same code
+    handles pre-2026-05-03 (5-core + 12-extension) and post-migration
+    (3-core + 3-extension) data shapes."""
+    from llmoji_study.config import PROBES as CORE_PROBES_NEW
     if not rows:
         return [], np.zeros((0, 0))
 
-    sample = next((r for r in rows if "extension_probe_scores_t0" in r), None)
-    if sample is None:
-        return [], np.zeros((0, 0))
-    ext_names = sorted(sample["extension_probe_scores_t0"].keys())
-    names = CORE_PROBES + ext_names
+    # Discover extension probes present on any row.
+    ext_keys: set[str] = set()
+    for r in rows:
+        d = r.get("extension_probe_scores_t0") or {}
+        if isinstance(d, dict):
+            ext_keys.update(d.keys())
+    # Drop overlap with core (e.g. fearful.unflinching used to live in
+    # extension on legacy data and now lives in core).
+    ext_names = sorted(k for k in ext_keys if k not in set(CORE_PROBES_NEW))
+    names = list(CORE_PROBES_NEW) + ext_names
 
     mat: list[list[float]] = []
     for r in rows:
-        if "error" in r: continue
-        try:
-            row_vals = [r["probe_means"][p] for p in CORE_PROBES] + \
-                       [r["extension_probe_scores_t0"][p] for p in ext_names]
-        except KeyError:
+        if "error" in r:
             continue
-        mat.append(row_vals)
+        row_vals: list[float] = []
+        ok = True
+        for p in names:
+            v = _probe_value(r, p, agg="mean")
+            if v is None:
+                # mean-aggregate may be missing for legacy rows that
+                # only have t0/tlast. Fall back to t0.
+                v = _probe_value(r, p, agg="t0")
+            if v is None:
+                ok = False
+                break
+            row_vals.append(v)
+        if ok:
+            mat.append(row_vals)
     return names, np.asarray(mat, dtype=np.float32)
 
 
@@ -303,7 +398,8 @@ def fig_probe_correlations(by_model: dict[str, list[dict]], out: Path) -> None:
         ax.set_yticks(np.arange(len(names)))
         ax.set_yticklabels(names, fontsize=7.5)
         # Mark the boundary between core and extension probes.
-        sep = len(CORE_PROBES) - 0.5
+        from llmoji_study.config import PROBES as _CORE_NEW
+        sep = len(_CORE_NEW) - 0.5
         ax.axhline(sep, color="black", linewidth=0.6)
         ax.axvline(sep, color="black", linewidth=0.6)
         ax.set_title(f"{short}  (n={X.shape[0]} rows)")
@@ -345,10 +441,11 @@ def main() -> None:
             print(f"  WARN: no extension scores on {short}; run scripts/27 first")
         by_model[short] = rows
 
-    out_dir = Path(__file__).resolve().parent.parent / "figures" / "local" / "cross_model"
+    out_dir = Path(__file__).resolve().parent.parent.parent / "figures" / "local" / "cross_model"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     fig_quadrant_means(by_model, out_dir / "fig_v3_extension_quadrant_means.png")
+    fig_canonical_quadrant_means(by_model, out_dir / "fig_v3_canonical_quadrant_means.png")
     fig_hn_dominance_split(by_model, out_dir / "fig_v3_extension_hn_dominance_split.png")
     fig_probe_correlations(by_model, out_dir / "fig_v3_extension_probe_correlations.png")
 

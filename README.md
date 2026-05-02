@@ -76,23 +76,23 @@ probe set, same analysis chain.
 Canonical hidden-state aggregate is `h_first` (the kaomoji-emission
 state, methodology-invariant across the 2026-05-02 MAX_NEW_TOKENS
 cutover). Russell-quadrant silhouette over PCA(2) coordinates peaks
-at gemma **L50 (0.235)**, qwen **L59 (0.244)**, ministral **L20
-(0.149)** — gemma + qwen sit at the deep half of their networks,
-ministral is mid-depth. Switching from the previous canonical
-`h_mean` aggregate roughly doubled-to-tripled silhouette across all
-three models (gemma 2.0×, qwen 2.1×, ministral 3.3×) and shifted
-gemma + qwen's peaks substantially deeper. The earlier "gemma
-mid-depth, qwen deep" framing dissolved.
+at gemma **L50 (0.413)**, qwen **L59 (0.420)**, ministral **L20
+(0.199)** under the post-2026-05-03 cleanliness + seed-0 cache fix
+data — gemma + qwen sit at the deep half of their networks,
+ministral is mid-depth. The pre-cleanliness numbers (0.235 / 0.244 /
+0.149) were inflated downward by category-bleed in the prompt set
+and (on qwen) by a saklas cache-prefix bug in pilot seed 0.
 
 The three Russell circumplexes are geometrically congruent. Triplet
-Procrustes alignment of per-quadrant PCA(2) centroids onto gemma:
-qwen residual 5.6, ministral residual 6.4 (after a −176° axis flip
-that's PCA sign indeterminacy, not a divergence finding). Pairwise
-CKA at preferred layers: gemma↔qwen 0.795, gemma↔ministral 0.741,
-qwen↔ministral 0.812 — the qwen↔ministral pair actually exceeds the
-gemma↔qwen baseline. A single canonical alignment layer at
-ministral L20 maximizes CKA against either reference model
-regardless of where the partner's affect representation sits.
+Procrustes alignment of per-quadrant PCA(2) centroids onto gemma
+(post-fix): qwen PC1×PC2 residual 6.9, ministral 23.0 (after a
++157° axis flip that's PCA sign indeterminacy, not a divergence
+finding). Pairwise CKA at preferred layers: gemma↔qwen 0.795,
+gemma↔ministral 0.741, qwen↔ministral 0.812 — the qwen↔ministral
+pair actually exceeds the gemma↔qwen baseline. A single canonical
+alignment layer at ministral L20 maximizes CKA against either
+reference model regardless of where the partner's affect
+representation sits.
 Vocabulary diverges sharply (gemma 32 canonical forms, qwen 65,
 ministral 196 with heavy `(◕‿◕✿)` / `(╯°□°)` / emoji-augmented
 variants — a francophone-internet register, possibly), but the
@@ -116,29 +116,32 @@ Rule 3 of the v3 cross-model gating rules (originally a
 because HN aggregates anger (high PAD dominance) with fear (low
 PAD dominance), washing out the within-quadrant mean. New schema:
 HN bisects into HN-D (anger / contempt) and HN-S (fear / anxiety)
-via a `pad_dominance` field on `EmotionalPrompt`. 23 supplementary
-prompts (hn21–hn43) brought the post-supp dataset to 20 D / 20 S
-balanced (160 rows per group per model). On the balanced data,
-**rule 3b (`fearful.unflinching` mean(HN-S) > mean(HN-D))
-PASSES on all three models**: directional + bootstrap 95% CI
-excludes zero on at least 2 of 3 aggregates (t0, tlast, mean). Largest
-effects: qwen t0 Cohen's d = +2.35, ministral mean d = +0.81. Rule
-3a (`powerful.powerless`) was dropped — fails across all three models
-in the wrong direction with CI-excludes-zero on gemma + ministral
-mean-aggregates, so the probe doesn't read PAD dominance in the HN
-context (likely reads "felt agency in achievement contexts" instead).
-Cross-model takeaway: PAD dominance has a real internal
-representation in all three architectures + labs (Google / Alibaba /
-Mistral) and reads cleanly via the fear axis against the registry
-HN-D / HN-S split.
+via a `pad_dominance` field on `EmotionalPrompt`. After the
+2026-05-03 cleanliness pass the prompt set is 20 D / 20 S balanced
+(160 rows per group per model), no untagged-HN. On the
+cleanliness + seed-0-fix data, **rule 3b (`fearful.unflinching`
+mean(HN-S) > mean(HN-D)) is WEAK** — gemma t0 d=+1.60 PASS but
+tlast/mean CI-ambiguous (verdict: mid); qwen t0 d=+2.14 PASS but
+tlast/mean wrong-direction d≈−0.36 with CI excludes 0 (verdict:
+fail); ministral PASS on all 3 aggregates with mean d=+0.55. The
+2026-05-01 "PASS on all 3" headline reflected pre-cleanliness data
+with cache-contaminated qwen seeds; the cleaner data shows the
+cross-model dominance signal is meaningful on ministral and partial
+on gemma but breaks down on qwen at later tokens. Rule 3a
+(`powerful.powerless`) remains dropped — wrong-direction on most
+aggregates × all three models. The fear-axis signal lives at t0
+across all three (where the kaomoji is emitted), where qwen still
+has the largest within-model effect (d=+2.14).
 
 The v3 prompt set was rewritten end-to-end 2026-05-03 in the prompt
 cleanliness pass (`docs/2026-05-03-prompt-cleanliness.md`) — 120
 prompts (20 per category) replacing the prior 123, HN cleanly
 bisected into 20 HN-D + 20 HN-S with no untagged entries, IDs
-renumbered hn01–hn40. The rule 3b PASS verdict above holds for the
-prior set; rerun on the new set is gated on further design
-discussion + ethics review of trial scale.
+renumbered hn01–hn40. Full N=8 rerun (8 seeds × 120 × 3 models =
+2880 generations) landed 2026-05-03 along with a seed-0 cache-mode
+fix that removed pilot-vs-rerun KV-state contamination from
+seed 0 (worst on qwen at 37–46% per-row L2 deviation — see
+`docs/2026-05-03-cleanliness-pilot.md` for the postmortem).
 
 Full setup, decision rules, per-quadrant centroids, all the
 cross-model comparisons, the Ministral pilot + main + rule-3
@@ -232,8 +235,9 @@ python scripts/harness/18_claude_faces_pca.py          # PCA panel
 
 A condensed read of what the local-side experiments have shown so far.
 Numbers cite the v3 follow-on analyses (`scripts/local/21`–`scripts/local/31`)
-run on the 800-generation gemma + qwen + ministral sidecars under
-the post-2026-05-02 `h_first` standardization. Full details and
+run on the 960-generation gemma + qwen + ministral sidecars under
+the post-2026-05-03 cleanliness + seed-0-fix data + `h_first`
+standardization. Full details and
 gotchas live in [`CLAUDE.md`](CLAUDE.md),
 [`docs/findings.md`](docs/findings.md), [`docs/local-side.md`](docs/local-side.md),
 and [`docs/gotchas.md`](docs/gotchas.md); headline figures and
@@ -247,25 +251,27 @@ layer-wise structure is recoverable without re-running the model.
 Russell-quadrant silhouette over PCA(2) at `h_first` (the
 kaomoji-emission state) by probe layer:
 
-- **gemma** (56 layers): silhouette peaks at **L50 (0.235)**, top-5
+- **gemma** (56 layers): silhouette peaks at **L50 (0.413)**, top-5
   layers cluster L47–51 (~84–91% depth, plateau not single peak).
-- **qwen** (60 layers): peaks at **L59 (0.244)**, top-5 layers L54–59
+- **qwen** (60 layers): peaks at **L59 (0.420)**, top-5 layers L54–59
   (~88–97% depth) — explicit near-deepest plateau.
-- **ministral** (37 layers): peaks at **L20 (0.149)**, top-5 layers
+- **ministral** (37 layers): peaks at **L20 (0.199)**, top-5 layers
   L20–26 (~54–70% depth) — the only mid-depth model.
 
 The repo stores `preferred_layer` on `ModelPaths`: gemma 50, qwen
 59, ministral 20. v3 figures default to those layers.
 
-These numbers are the post-2026-05-02 `h_first` cutover; the prior
-canonical aggregate was `h_mean`, under which silhouettes were
-roughly half-to-a-third (gemma 0.116, qwen 0.116, ministral 0.045)
-and gemma's peak sat at L28. `h_first` is methodology-invariant
-across the MAX_NEW_TOKENS=120→16 cutover (the kaomoji-emission
-state doesn't depend on how long the generation runs after it),
-which `h_mean` and `tlast` aren't. The earlier "gemma mid-depth,
-qwen deep" framing dissolved with the cutover — gemma + qwen are
-now both deep, ministral is the only mid-depth model.
+These are the post-2026-05-03 cleanliness + seed-0-fix numbers.
+The pre-cleanliness numbers (gemma 0.235 / qwen 0.244 / ministral
+0.149) were inflated downward by category-bleed in the v3 prompt
+set and (on qwen) by a saklas cache-prefix bug in pilot seed 0.
+The pre-cutover `h_mean` numbers were even smaller (gemma 0.116,
+qwen 0.116, ministral 0.045) under L28 / L38 / L21. `h_first` is
+methodology-invariant across the MAX_NEW_TOKENS=120→16 cutover (the
+kaomoji-emission state doesn't depend on how long generation runs
+after it). The earlier "gemma mid-depth, qwen deep" framing
+dissolved with the cutover — gemma + qwen are now both deep,
+ministral is the only mid-depth model.
 
 ### 2. Kaomoji is a partial readout, not the state itself
 
@@ -315,27 +321,39 @@ per pair of models. Three alignment measurements:
   1.000 because rank ≥ n_samples; the PCA prefix + held-out split
   is what makes the numbers honest.)
 - **Triplet Procrustes** alignment of per-quadrant PCA(2) centroids
-  onto gemma: qwen residual **5.6**, ministral residual **6.4**
-  (after ministral's −176° axis flip — PCA sign indeterminacy, not
-  a divergence finding). Same order of magnitude despite ministral's
-  smaller scale + different lab.
+  onto gemma (post-2026-05-03 cleanliness + seed-0 fix): qwen
+  PC1×PC2 residual **6.9**, ministral residual **23.0** (after
+  ministral's +157° axis flip — PCA sign indeterminacy, not a
+  divergence finding). Ministral's larger residual reflects its
+  smaller scale + the wider face vocabulary spreading per-quadrant
+  centroids on the residual axes.
 
 ### 4. The probe-geometry divergence has a clean PCA explanation
 
-Fit PCA(8) per model, then correlate each PC with each of the five
-core saklas probe scores at h_first:
+Fit PCA(8) per model, then correlate each PC with each canonical
+saklas probe score at h_first (post-2026-05-03 cleanliness +
+seed-0-fix data, 3 canonical probes + 3 extension probes scored
+via script 27):
 
-- **gemma** (L50): PC1 absorbs valence (`happy.sad` r=−0.69,
-  `angry.calm` r=+0.46 — same valence-collapse the v1/v2 probe-space
-  analysis hit). PC2 absorbs a humor + warmth + arousal mix.
-- **qwen** (L59): PC1 absorbs valence + humor jointly (`happy.sad`,
-  `humorous.serious` both load high). PC2 absorbs certainty. PC3
-  absorbs arousal + warmth.
+- **gemma** (L50): PC1 (31.2%) absorbs valence (`happy.sad`
+  r=−0.83) plus a fear-and-disgust sub-axis (`fearful.unflinching`
+  r=+0.56, `disgusted.accepting` r=+0.53, `powerful.powerless`
+  r=−0.46) — the negative-valence subspace projects together onto
+  PC1. PC2 (20.1%) is essentially a clean surprise axis
+  (`surprised.unsurprised` r=+0.86). PC3 (10.4%) absorbs PAD
+  dominance (`powerful.powerless` r=+0.77).
+- **qwen** (L59): PC1 (29.4%) absorbs valence + anger jointly
+  (`happy.sad` r=+0.52, `angry.calm` r=−0.67, both at t0 and tlast).
+  PC2 (16.5%) loads happy.sad NEGATIVELY (r=−0.60) and fearful
+  POSITIVELY (r=+0.51) — a "negative-valence-with-fear" component
+  orthogonal to PC1. Qwen's separate negative-valence dimension
+  doesn't appear on gemma.
 
-The cross-face Pearson r=−0.94 vs r=−0.12 between mean `happy.sad`
-and `angry.calm` reduces to: gemma loads both probes onto PC1+PC2
-together, so they anti-align across faces; qwen loads them onto PC1
-vs PC3, which are nearly orthogonal in face-space. Different
+The cross-face Pearson r=−0.94 (gemma) vs r=−0.12 (qwen) between
+mean `happy.sad` and `angry.calm` reduces to: gemma loads both
+probes onto PC1, so they anti-align across faces; qwen loads them
+onto PC1 + PC2 (anger on PC1, sadness flavor on both), where they
+project quasi-orthogonally on the face-mean projection. Different
 decompositions of the same underlying affect space, not different
 underlying spaces.
 
@@ -346,37 +364,33 @@ the preferred layer (gemma L50, qwen L59, ministral L20; faces
 filtered to n ≥ 5).
 
 - **Hidden → face** (multi-class logistic on PCA(50)-reduced
-  `h_first`, `StratifiedGroupKFold` by `prompt_id`, n_splits=3):
-  gemma top-1 accuracy **0.68** across 17 face classes (uniform
-  0.06, majority 0.22, macro-F1 0.37); Qwen **0.39** across 31
-  classes (uniform 0.03, majority 0.12, macro-F1 0.15); Ministral
-  **0.40** across 21 classes (uniform 0.05, majority 0.34, macro-F1
-  0.07 — the high majority is the `(◕‿◕✿)` flower-face dominating
-  ministral's vocabulary). Drops vs the prior leaky-CV numbers
-  (gemma 0.71, qwen 0.50) are smaller than expected — face identity
-  generalizes to never-seen prompts, with the largest hit on
-  qwen (more face classes, more prompt-specific). The face filter
-  is now stricter (≥5 rows AND ≥3 unique prompts per face, since
-  faces appearing for only 1–2 prompts have nothing to hold out
-  under prompt-grouped CV).
+  `h_first`, `StratifiedGroupKFold` by `prompt_id`, n_splits=3,
+  post-2026-05-03 cleanliness + seed-0 fix data): gemma top-1
+  accuracy **0.700** across 22 face classes (uniform 0.045,
+  majority 0.210, macro-F1 0.27); Qwen **0.411** across 33 classes
+  (uniform 0.030, majority 0.126, macro-F1 0.14); Ministral
+  **0.416** across 23 classes (uniform 0.043, majority 0.346,
+  macro-F1 0.07 — the high majority is the `(◕‿◕✿)` flower-face
+  dominating ministral's vocabulary). The face filter is strict
+  (≥5 rows AND ≥3 unique prompts per face) so faces appearing only
+  for 1–2 prompts don't bias the CV.
 - **Hidden → quadrant** (5-class, same pipeline, n_splits=5): gemma
-  **0.95**, Qwen **0.94**, Ministral **0.90**. Pre-fix prediction
-  was that quadrant accuracy would drop to ~0.7–0.8 once leakage
-  was removed; actual drop is only 5–10 percentage points. **The v3
-  quadrant signal genuinely generalizes to held-out prompts**, not
-  just memorized — a stronger result than pre-fix, and cross-model
-  consistent across all three architectures.
-- **Face → hidden**: η² of face identity across the top-5 PCs at
-  h_first. Gemma per-PC η² 0.95 / 0.63 / 0.31 / 0.46 / 0.24; weighted
-  by explained variance, face identity recovers **73% of the top-5
-  PC subspace**. Qwen 0.94 / 0.67 / 0.49 / 0.45 / 0.40; **77%**.
-  Ministral 0.54 / 0.16 / 0.10 / 0.12 / 0.03; **35%** — much lower
-  because of the 196-face vocabulary spreading signal thin per face.
-  The η² gains over the pre-h_first numbers (gemma was 49%, qwen
-  60%) reflect h_first being more prompt-deterministic — face
-  identity, which is largely prompt-driven, explains more of the
-  variance at h_first than at h_mean. Same direction as the
-  silhouette-doubling finding from h_first standardization.
+  **1.000**, Qwen **0.983**, Ministral **0.983**. The Russell
+  quadrant signal generalizes essentially perfectly to held-out
+  prompts — quadrant labels are recoverable from h_first state with
+  near-perfect accuracy across all 3 architectures.
+- **Face → quadrant** (predict each face's quadrant from train-set
+  modal label, evaluate on held-out rows, prompt-grouped CV): gemma
+  **0.806**, Qwen **0.785**, Ministral **0.433**. The asymmetry
+  matters — gemma + qwen's face vocabulary is sufficient to recover
+  ~80% of the quadrant signal directly, but ministral's heavy
+  `(◕‿◕✿)` reuse across quadrants makes face a weak proxy
+  (~43% vs uniform 0.20).
+- **Face → hidden** (face-centroid R² over full hidden space):
+  Gemma **0.615**, Qwen **0.584**, Ministral **0.220**. Mean centered
+  cosine(row, face centroid) **0.776 / 0.753 / 0.444**. The
+  ministral collapse vs gemma + qwen reflects the same
+  vocabulary-spread effect as the predictiveness asymmetry.
 
 Net read: the kaomoji is a partial-but-substantial readout. Knowing
 the face explains roughly half of the model's top-5 PC structure;
@@ -389,75 +403,72 @@ larger class count makes the per-face classifier harder.
 **In concrete reconstruction terms, full hidden space:** if you see
 a face and predict the row's hidden state as that face's centroid,
 how close do you get? At each model's preferred layer (h_first,
-post-2026-05-02 standardization):
+post-2026-05-03 cleanliness + seed-0 fix):
 
 | metric | gemma (L50) | Qwen (L59) | Ministral (L20) |
 | --- | ---: | ---: | ---: |
-| R² of face centroid (full hidden space) | 0.580 | 0.570 | 0.219 |
-| mean centered cosine(row, face centroid) | +0.754 | +0.745 | +0.440 |
-| median centered cosine | +0.798 | +0.785 | +0.541 |
-| ‖error‖ / ‖row deviation‖ | 0.634 | 0.642 | 0.882 |
-| R² of quadrant centroid (5-class) | 0.530 | 0.520 | 0.352 |
-| face improvement over quadrant (R² gain) | +5.0 pp | +5.0 pp | **−13.3 pp** |
+| R² of face centroid (full hidden space) | 0.615 | 0.584 | 0.220 |
+| mean centered cosine(row, face centroid) | +0.776 | +0.753 | +0.444 |
+| median centered cosine | +0.840 | +0.785 | +0.541 |
+| ‖error‖ / ‖row deviation‖ | 0.594 | 0.622 | 0.876 |
+| R² of quadrant centroid (5-class) | 0.567 | 0.557 | 0.430 |
+| face improvement over quadrant (R² gain) | +4.8 pp | +2.7 pp | **−21.0 pp** |
 
-The pre-h_first numbers (gemma R² 0.260, qwen 0.287, +0.6 / +2.3 pp
-face-over-quadrant gain) are several times smaller — h_first makes
-the kaomoji a substantially stronger residual readout above the
-Russell-quadrant signal. On gemma + qwen, knowing the face captures
-~57–58% of the row's deviation from the grand mean and beats the
-5-class quadrant centroid by 5 percentage points.
+On gemma + qwen, knowing the face captures ~58–62% of the row's
+deviation from the grand mean and beats the 5-class quadrant
+centroid by ~3–5 percentage points.
 
 **Ministral inverts the gemma + qwen pattern**: face-centroid R²
-(0.219) is *lower* than quadrant-centroid R² (0.352). With
+(0.220) is *much lower* than quadrant-centroid R² (0.430). With
 ministral's 196-face vocabulary spreading signal too thin per face,
 the 5-class quadrant label is a stronger predictor than the
 face-as-identifier. Vocabulary breadth past some threshold makes
 the kaomoji stop being a useful readout of state — gemma + qwen
-with their tighter 33 / 67 vocabularies keep face above quadrant.
+with their tighter ~30-face vocabularies keep face above quadrant.
 
-### 6. Anger and fear separate when you add the right probe (2026-04-29)
+### 6. Anger and fear separate when you split HN by PAD dominance (2026-04-29)
 
 V-A circumplex collapses anger and fear into HN. PAD's third axis
-(dominance) splits them: anger = HN + high dominance, fear = HN +
-low dominance. Three new contrastive packs registered into saklas
-via `scripts/local/26`: `powerful.powerless` (PAD dominance as felt
-agency), `surprised.unsurprised` (Plutchik surprise),
-`disgusted.accepting` (Plutchik disgust); `scripts/local/27` re-scores
-the existing v3 sidecars against these plus auto-discovers
-`fearful.unflinching`, `curious.disinterested`, and several
-register probes from a working-saklas-repo install — total
-12 extension probes per row at h_first / h_last / h_mean
-snapshots, no new generations.
+(dominance) splits them: anger = HN + high dominance (HN-D), fear
+= HN + low dominance (HN-S). The 2026-05-01 rule-3 redesign added
+a `pad_dominance` field on `EmotionalPrompt` to bisect HN at the
+prompt level; the 2026-05-03 cleanliness pass locked the post-supp
+prompt set at 20 D + 20 S with no untagged-HN rows. Two probe
+groups score each row: the canonical 3 probes (`happy.sad`,
+`angry.calm`, `fearful.unflinching`) eagerly at gen time, and 3
+extension probes (`powerful.powerless`, `surprised.unsurprised`,
+`disgusted.accepting`) lazily via `scripts/local/27`. The cleanliness
+pass moved `fearful.unflinching` from extension to core since
+it's the active rule-3b discriminator.
 
-- **gemma** at h_last: `fearful.unflinching ↔ powerful.powerless`
-  per-row r = **−0.936** — the dominance and fear directions
-  collapse onto one axis in gemma's deep representation, sign-flipped.
-  `fearful.unflinching ↔ angry.calm` r = **−0.848** — the model
-  picks anger OR fear per HN row, not both. Per-quadrant means at
-  h_last separate cleanly: HN powerful −0.10, HP/LP/NB hover at
-  zero; HN fearful +0.22, HP/LP/NB ~+0.13.
-- **qwen** at h_last: extension probes are nearly flat across
-  quadrants (range ~0.013 on `powerful.powerless`, ~0.019 on
-  `fearful.unflinching`). `fearful ↔ powerful` r = +0.008.
-  Two interpretations both possible: qwen's hidden states are
-  genuinely orthogonal to the contrastive directions saklas
-  extracted from these statement sets, or h_last is the wrong
-  snapshot for qwen even though it's the deepest layer.
-- **HN dominance-split natural experiment on gemma**: split HN
-  rows into thirds by `powerful.powerless` and tally kaomoji
-  register. Bottom-third (most powerless / fearful): 25 shocked-
-  register `(╯°□°)/(⊙_⊙)/(>_<)` faces, 25 sad-teary
-  `(｡•́︿•̀｡)`. Top-third (most powerful / non-fear): 22 shocked,
-  29 sad-teary. Within-HN, kaomoji vocabulary is roughly stable
-  across the dominance split — same "kaomoji finer than vocabulary
-  in some axes, coarser in others" pattern as finding 2.
+**Rule 3b on cleanliness + seed-0-fix data** (HN-S − HN-D mean of
+`fearful.unflinching`, expected positive sign):
 
-Static figures: `figures/local/cross_model/fig_v3_extension_*.png`
-(per-quadrant means, fearful↔powerful scatter, HN dominance
-register stack, probe correlation matrix). Interactive 3D HTMLs:
-`fig_v3_extension_3d_{probes,pca}{,_per_face}.html` covering
-fearful × happy × angry and PC1 × PC2 × PC3 in both per-row and
-per-face aggregated forms, side-by-side gemma | qwen scenes.
+- **gemma**: t0 d=+1.60 (CI excludes 0); tlast/mean directional
+  but CI ambiguous. Verdict **mid**.
+- **qwen**: t0 d=+2.14 (CI excludes 0); tlast/mean wrong-direction
+  d≈−0.36 (CI also excludes 0 — qwen flips sign at later tokens
+  on HN-S, plausibly safety-prior interaction). Verdict **fail**.
+- **ministral**: PASS on all 3 aggregates with mean d=+0.55.
+  Verdict **PASS** — the only model that cleanly separates HN-D
+  vs HN-S on the dominance-fear axis under cleaner prompts.
+
+Composite: **RULE 3b WEAK** (1 PASS / 1 mid / 1 fail). The earlier
+"PASS on all 3" headline was inflated by cache-induced noise on
+qwen seed 0 (37–46% per-row deviation pre-fix); the cleaner data
+shows the cross-model dominance signal lives most strongly on
+ministral.
+
+Static figures: `figures/local/cross_model/fig_v3_canonical_quadrant_means.png`
+(canonical-3-probe per-quadrant means, NB-subtracted) and the
+parallel `fig_v3_extension_quadrant_means.png` (3 extension probes,
+also NB-subtracted). Both show NB at zero by construction with the
+other quadrants reading as project-relative affect lift over a
+domain-matched neutral observation. `fig_v3_extension_hn_dominance_split.png`
+shows HN-D vs HN-S kaomoji register counts directly. Interactive
+3D HTMLs: `fig_v3_extension_3d_{probes,pca}{,_per_face}.html`
+covering fearful × happy × angry and PC1 × PC2 × PC3, gemma |
+qwen | ministral side-by-side.
 
 ### Open follow-ons
 
@@ -465,18 +476,20 @@ per-face aggregated forms, side-by-side gemma | qwen scenes.
   layer (no v1/v2 sidecars exist yet — the rerun is gated on v3
   findings). When they land, the loaders should pass each model's
   `preferred_layer` instead.
-- Triplet Procrustes residuals (qwen 5.6, ministral 6.4) are
-  small-but-non-zero. Asks whether the three models' quadrant axes
-  are shifted by consistent affine maps (testable by Procrustes-
-  aligning per-row centroids for each kaomoji emitted by all three
-  models, not just the quadrant centroids).
+- Triplet Procrustes PC1×PC2 residuals (qwen 6.9, ministral 23.0)
+  are small-but-non-zero on qwen, larger on ministral. Asks whether
+  the three models' quadrant axes are shifted by consistent affine
+  maps (testable by Procrustes-aligning per-row centroids for each
+  kaomoji emitted by all three models, not just the quadrant
+  centroids).
 - The 2026-05-03 prompt-cleanliness rewrite (120 prompts, 20 per
-  category, HN cleanly bisected into HN-D + HN-S) invalidates the
-  ~3300 prior v3 generations for cross-run comparison. Rerun is
-  gated on further design discussion + ethics review of trial scale.
-  Findings #1–6 hold under the prior (123-prompt) set; rule-3b
-  re-validation under the new set is the most consequential pending
-  check.
+  category, HN cleanly bisected into HN-D + HN-S) + full N=8 rerun
+  + seed-0 cache fix landed in the same window. Findings #1–5 above
+  hold qualitatively and have been re-validated with cleaner numbers;
+  finding 6 (rule 3b) shifted from "PASS on all 3" to weak (1 PASS /
+  1 mid / 1 fail) — a meaningful update, see body. The
+  ~3300 pre-cleanliness generations are archived at
+  `data/archive/2026-05-03_pre_cleanliness/` rather than deleted.
 
 ## License
 

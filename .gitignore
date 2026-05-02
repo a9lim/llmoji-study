@@ -36,3 +36,13 @@ data/hf_dataset/
 # data/hidden/<experiment>/*.npz sidecars via the loader's
 # cache_path arg.
 data/cache/
+
+# Pre-cleanliness archive of v3 main-run sidecars + JSONLs
+# (~130 GB). Same reason as data/hidden/ — too big for git, only
+# needed for gate-check / face-PCA pre-vs-post comparison scripts.
+data/archive/
+
+# Working backups of JSONLs from the seed-0 cache-mode-mismatch
+# fix (2026-05-03). Kept locally during the fix verification, not
+# part of the experimental record.
+data/*.bak.*

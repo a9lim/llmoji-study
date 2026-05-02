@@ -35,7 +35,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt  # noqa: E402
 import pandas as pd  # noqa: E402
 
-STUDY_ROOT = Path(__file__).resolve().parent.parent
+STUDY_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(STUDY_ROOT))
 
 from llmoji_study.config import MODEL_REGISTRY  # noqa: E402

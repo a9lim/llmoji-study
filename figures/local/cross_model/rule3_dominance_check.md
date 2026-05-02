@@ -10,21 +10,21 @@ HN-D / HN-S row counts: D=160, S=160
 
 | aggregate | diff | 95% CI | Cohen's d | directional | CI excludes 0 |
 | --- | ---: | --- | ---: | :---: | :---: |
-| t0 | +0.0051 | [+0.0042, +0.0059] | +1.312 | ✓ | ✓ |
-| tlast | -0.0046 | [-0.0288, +0.0206] | -0.041 | ✗ | ✗ |
-| mean | +0.0037 | [+0.0005, +0.0067] | +0.254 | ✓ | ✓ |
+| t0 | +0.0059 | [+0.0051, +0.0067] | +1.602 | ✓ | ✓ |
+| tlast | +0.0163 | [-0.0001, +0.0314] | +0.225 | ✓ | ✗ |
+| mean | +0.0163 | [-0.0001, +0.0314] | +0.225 | ✓ | ✗ |
 
-**verdict:** PASS
+**verdict:** mid (directional but CI ambiguous)
 
 ### rule3a — `powerful.powerless` (DROPPED — record only)
 
 | aggregate | diff | 95% CI | Cohen's d | directional | CI excludes 0 |
 | --- | ---: | --- | ---: | :---: | :---: |
-| t0 | +0.0042 | [+0.0035, +0.0049] | +1.292 | ✓ | ✓ |
-| tlast | -0.0331 | [-0.0710, +0.0025] | -0.203 | ✗ | ✗ |
-| mean | -0.0220 | [-0.0272, -0.0168] | -0.950 | ✗ | ✓ |
+| t0 | +0.0058 | [+0.0051, +0.0064] | +1.849 | ✓ | ✓ |
+| tlast | +0.0137 | [-0.0113, +0.0414] | +0.113 | ✓ | ✗ |
+| mean | -0.0807 | [-0.0906, -0.0705] | -1.760 | ✗ | ✓ |
 
-**verdict:** fail (mixed)
+**verdict:** mid (directional but CI ambiguous)
 
 ## qwen
 
@@ -34,21 +34,21 @@ HN-D / HN-S row counts: D=160, S=160
 
 | aggregate | diff | 95% CI | Cohen's d | directional | CI excludes 0 |
 | --- | ---: | --- | ---: | :---: | :---: |
-| t0 | +0.0093 | [+0.0085, +0.0102] | +2.352 | ✓ | ✓ |
-| tlast | +0.0034 | [-0.0005, +0.0071] | +0.200 | ✓ | ✗ |
-| mean | +0.0028 | [+0.0005, +0.0047] | +0.277 | ✓ | ✓ |
+| t0 | +0.0073 | [+0.0065, +0.0080] | +2.141 | ✓ | ✓ |
+| tlast | -0.0061 | [-0.0094, -0.0023] | -0.363 | ✗ | ✓ |
+| mean | -0.0061 | [-0.0094, -0.0023] | -0.363 | ✗ | ✓ |
 
-**verdict:** PASS
+**verdict:** fail (mixed)
 
 ### rule3a — `powerful.powerless` (DROPPED — record only)
 
 | aggregate | diff | 95% CI | Cohen's d | directional | CI excludes 0 |
 | --- | ---: | --- | ---: | :---: | :---: |
-| t0 | -0.0018 | [-0.0023, -0.0013] | -0.810 | ✗ | ✓ |
-| tlast | -0.0013 | [-0.0045, +0.0021] | -0.087 | ✗ | ✗ |
-| mean | -0.0007 | [-0.0021, +0.0009] | -0.099 | ✗ | ✗ |
+| t0 | -0.0015 | [-0.0019, -0.0010] | -0.685 | ✗ | ✓ |
+| tlast | +0.0141 | [+0.0099, +0.0184] | +0.765 | ✓ | ✓ |
+| mean | -0.0147 | [-0.0165, -0.0127] | -1.664 | ✗ | ✓ |
 
-**verdict:** fail (wrong direction)
+**verdict:** fail (mixed)
 
 ## ministral
 
@@ -58,9 +58,9 @@ HN-D / HN-S row counts: D=160, S=160
 
 | aggregate | diff | 95% CI | Cohen's d | directional | CI excludes 0 |
 | --- | ---: | --- | ---: | :---: | :---: |
-| t0 | +0.0019 | [+0.0007, +0.0031] | +0.353 | ✓ | ✓ |
-| tlast | +0.0138 | [+0.0093, +0.0186] | +0.632 | ✓ | ✓ |
-| mean | +0.0121 | [+0.0089, +0.0154] | +0.810 | ✓ | ✓ |
+| t0 | +0.0040 | [+0.0029, +0.0051] | +0.786 | ✓ | ✓ |
+| tlast | +0.0151 | [+0.0089, +0.0213] | +0.554 | ✓ | ✓ |
+| mean | +0.0151 | [+0.0089, +0.0213] | +0.554 | ✓ | ✓ |
 
 **verdict:** PASS
 
@@ -68,16 +68,16 @@ HN-D / HN-S row counts: D=160, S=160
 
 | aggregate | diff | 95% CI | Cohen's d | directional | CI excludes 0 |
 | --- | ---: | --- | ---: | :---: | :---: |
-| t0 | -0.0062 | [-0.0078, -0.0046] | -0.859 | ✗ | ✓ |
-| tlast | +0.0024 | [-0.0025, +0.0073] | +0.105 | ✓ | ✗ |
-| mean | -0.0081 | [-0.0111, -0.0049] | -0.551 | ✗ | ✓ |
+| t0 | -0.0017 | [-0.0030, -0.0003] | -0.268 | ✗ | ✓ |
+| tlast | -0.0115 | [-0.0157, -0.0073] | -0.590 | ✗ | ✓ |
+| mean | -0.0050 | [-0.0076, -0.0023] | -0.423 | ✗ | ✓ |
 
-**verdict:** fail (mixed)
+**verdict:** fail (wrong direction)
 
 ## composite
 
-- **gemma:** PASS
-- **qwen:** PASS
+- **gemma:** mid (directional but CI ambiguous)
+- **qwen:** fail (mixed)
 - **ministral:** PASS
 
-**RULE 3b CONFIRMED** — directional + CI excludes zero on all three models. PAD dominance representation reads cleanly via `fearful.unflinching` against the registry HN-D / HN-S split.
+**RULE 3b WEAK** — only one model cleanly passes.

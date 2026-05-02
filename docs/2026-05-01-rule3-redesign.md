@@ -1,28 +1,36 @@
 # Rule 3 redesign: HN dominance split
 
-**Status:** EXECUTED 2026-05-01 — rule 3a dropped (probe doesn't
-read PAD dominance); rule 3b CONFIRMED on the balanced 20/20 data
-across all three models. The HN-D / HN-S split framework is now
-canonical (`apply_hn_split`, `_hn_split_map`); the 20/20 prompt set
-this doc references was rewritten in the 2026-05-03 cleanliness
-pass — see § Update 2026-05-03 below. Kept as historical design
-record.
+**Status:** EXECUTED 2026-05-01 framework + headline; **headline
+revised 2026-05-03 by cleanliness + seed-0-fix data**. Rule 3a
+remains dropped (probe doesn't read PAD dominance — invariant under
+the cleaner data). Rule 3b is now WEAK: gemma mid (t0 d=+1.60 PASS,
+tlast/mean CI ambiguous), qwen fail (t0 d=+2.14 PASS but tlast/mean
+wrong-direction d≈−0.36 with CI excludes 0), ministral PASS on all
+3 aggregates (mean d=+0.55). Composite: 1 PASS / 1 mid / 1 fail.
+The HN-D / HN-S split framework is unchanged and remains canonical
+(`apply_hn_split`, `_hn_split_map`); only the rule-3b cross-model
+verdict shifted. Kept as historical design record.
 
 **Date:** 2026-05-01.
 
-> **Update 2026-05-03 — partially superseded by the prompt
-> cleanliness pass.** The HN-D / HN-S split designed here is the
-> right framework and remains canonical. The *specific 20/20 prompt
-> set* this doc references (hn01–hn20 retroactive tags + hn21–hn43
+> **Update 2026-05-03 — superseded by cleanliness pass + seed-0
+> fix.** The HN-D / HN-S split framework is the right framework
+> and remains canonical. (1) The *specific 20/20 prompt set* this
+> doc references (hn01–hn20 retroactive tags + hn21–hn43
 > supplementary) was rewritten end-to-end in
 > `docs/2026-05-03-prompt-cleanliness.md`: HN-untagged is gone
 > (hn06 / hn15 / hn17 either rewritten or dropped), the supplementary
 > HN-D prompts that bundled fear-of-consequence framing (notably
 > hn26's "client lied AND I'm getting fired") are out, and IDs
-> renumbered to hn01–hn40 (no gaps). The rule-3b PASS verdict tabled
-> below holds for the *prior* prompt set; re-validation under the
-> new set is pending. The rule-3 framework — pad_dominance schema,
-> probe choice, decision rules, threshold revision — is unchanged.
+> renumbered to hn01–hn40 (no gaps). (2) The "rule 3b PASS on all
+> 3" verdict tabled below was inflated by cache-induced noise on
+> qwen seed 0 (37–46% per-row L2 deviation in pre-fix sidecars);
+> on the cleanliness + seed-0-fix data the cross-model verdict
+> drops to weak (1 PASS / 1 mid / 1 fail), with ministral the only
+> clean PASS. See `docs/2026-05-03-cleanliness-pilot.md` postmortem
+> for the seed-0 fix details. The rule-3 framework — pad_dominance
+> schema, probe choice, decision rules, threshold revision — is
+> unchanged; only the cross-model verdict numbers moved.
 
 ## Goal
 

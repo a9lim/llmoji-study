@@ -1,8 +1,11 @@
 # v3 prompt set cleanliness pass
 
-**Status:** schema landed; no rerun yet. Open items: design
-improvements still being discussed; ethics review of the rerun
-trial scale pending.
+**Status:** EXECUTED 2026-05-03 — schema landed, full N=8 rerun
+on all 3 models complete (gemma + qwen + ministral, 960 generations
+each), seed-0 cache-mode-mismatch contamination found and fixed
+during the rerun. See `docs/2026-05-03-cleanliness-pilot.md`
+"Post-rerun verdict" + "Seed-0 cache fix postmortem" for the
+verdict + numbers.
 
 **Date:** 2026-05-03.
 

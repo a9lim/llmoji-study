@@ -5,6 +5,78 @@ Read this before debugging anything that's silently wrong.
 
 ## Gotchas
 
+### saklas `cache_prefix` produces contaminated KV state on Qwen3.6
+
+`session.cache_prefix(full_input[:-1])` followed by `session.generate(...)`
+on the same prompt produces **identical off-prompt text** for every seed
+on Qwen3.6 — markdown headers, code documentation, math answers,
+unrelated content. The byte-equal cache-hit check passes, the suffix
+generation runs, but the cached past_key_values encode a corrupted
+attention state on qwen specifically. Gemma + Mistral are unaffected by
+the same code path.
+
+Discovered 2026-05-03 during the cleanliness-pass full N=8 rerun:
+qwen's seed=0 (no cache, from the 1-seed pilot) was correct, but every
+subsequent seed at every prompt produced
+`"# 1. Introduction\n\n## 1.1. Purpose\n\nThis document"` regardless of
+the actual prompt. 840 generations were lost.
+
+**Workaround**: `llmoji_study/capture.py::install_full_input_cache`
+no-ops when `session.config.model_id` contains `"qwen"`. Qwen runs
+~30-50% slower without the optimization but produces correct output.
+Root cause is on the saklas side (qwen-tokenizer / cache-prefix
+interaction); proper fix is a follow-on task in saklas.
+
+The other prefix-cache helper, `install_prefix_cache` (cross-prompt
+common prefix used by N=1 pilots), works correctly on qwen — only the
+per-prompt full-input variant trips the bug.
+
+### Mixing cache modes across pilot+resume contaminates seed-0 hidden states
+
+If a pilot run uses one cache mode (e.g. `install_prefix_cache` for
+N=1) and the resumed full run uses another (e.g. `install_full_input_cache`
+for N>1), the pilot's seed-0 sidecars persist with KV state from the
+first mode while seeds 1..N get recomputed under the second. Even
+when the suffix decoded by either mode is byte-equal, the saved
+hidden states diverge — `cache_prefix` is not transparent at the
+per-token-hidden-state level (this is true on all 3 models, just
+worst on qwen via the bug above). Per-row L2 deviation at h_first
+@ preferred_layer measured 2026-05-03: gemma ~1%, qwen 37–46%,
+ministral ~0.8%.
+
+Discovered when seed-0 PCA scatter rendered visibly off-cluster from
+seeds 1–7 in the cleanliness rerun. Symptom: per-prompt grouping in
+PCA space shows seed 0 in a different position than seeds 1..N for
+the same prompt, while seeds 1..N are bit-identical.
+
+**Fix**: when resuming a pilot into a full run, delete the pilot's
+seed-0 rows + sidecars and let the resume mechanism regenerate
+seed 0 under the same cache mode as 1..N. Verification: hidden
+states should be bit-identical (|s0 − mean(s1..N)| ≈ 0 at full
+fp32 precision). See `data/*_emotional_raw.jsonl.bak.before_seed0_rerun`
+for the 2026-05-03 incident backups.
+
+### Probe scores are saklas-neutral-centered, not project-NB-centered
+
+`probe_scores_t0` / `probe_scores_tlast` / `probe_means` are
+**mean-centered cosines** — saklas's `TraitMonitor`
+(`saklas/core/monitor.py:147`) subtracts a baked per-layer mean
+before the cosine. The mean is `compute_layer_means` over saklas's
+bundled `neutral_statements.json` (~90 generic neutrals), persisted
+at `~/.saklas/models/<safe_id>/layer_means.safetensors`.
+
+Implication: the centering is global / saklas-bundled, NOT against
+this experiment's NB-quadrant prompts. The NB bar in any
+per-quadrant probe-mean figure is non-zero by default — it's the
+gap between saklas's neutrals and our NB framings. For
+project-relative reads (e.g. "affect lift over a domain-matched
+neutral observation"), subtract the per-probe mean over project NB
+rows before plotting; `_plot_quadrant_means` in
+`scripts/local/28_v3_extension_probe_figures.py` does this. Rule-3b
+diffs are unaffected (the centering shift cancels in HN-S − HN-D).
+Pearson/Spearman correlation matrices are also unaffected (additive
+shift cancels in covariance).
+
 ### `probes=` takes category names, not concept names
 
 `SaklasSession.from_pretrained(..., probes=[...])` expects categories

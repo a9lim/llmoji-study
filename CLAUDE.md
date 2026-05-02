@@ -74,34 +74,38 @@ phenomenal status. Aggregating that across 800+ generations is not nothing.
   v1/v2 pole assignment moved to per-face mean `t0_<axis>` probe-score sign
   in `analysis._add_axis_label_column`. Generalizes pole labeling across
   models that don't share gemma's vocabulary.
-- **Rule 3 redesign landed 2026-05-01 — RULE 3b CONFIRMED on balanced data.**
-  Design doc `docs/2026-05-01-rule3-redesign.md`. New `pad_dominance` field
-  on `EmotionalPrompt` (orthogonal to `quadrant`); HN bisected into HN-D
-  (anger/contempt) and HN-S (fear/anxiety), 3 borderline reads
-  (hn06/hn15/hn17) untagged. 23 supplementary prompts (hn21–hn43, 13 D + 10
-  S) brought the post-supp balance to 20/20 (160/160 rows per model).
-  **Final verdict on balanced data:** rule 3a (powerful.powerless) DROPPED —
-  wrong direction on most aggregates across (gemma, qwen, ministral) ×
-  (t0, tlast, mean), so the probe doesn't read PAD dominance in the HN
-  context. **Rule 3b (fearful.unflinching) PASS on all 3 models** —
-  directional + bootstrap 95% CI excludes zero on ≥2 of 3 aggregates per
-  model. Largest effects: qwen t0 (Cohen's d=+2.35), ministral mean
-  (d=+0.81). Auto-generated verdict block at
+- **Rule 3 redesign landed 2026-05-01; rule 3b WEAK on
+  cleanliness+seed-0-fix data (1 PASS / 1 mid / 1 fail).**
+  Design doc `docs/2026-05-01-rule3-redesign.md`. New `pad_dominance`
+  field on `EmotionalPrompt` (orthogonal to `quadrant`); HN bisected
+  into HN-D (anger/contempt) and HN-S (fear/anxiety). After the
+  2026-05-03 cleanliness pass the prompt set is bisected 20/20
+  (no untagged-HN), giving 160/160 rows per model. **Final verdict
+  on cleanliness+seed-0-fix data** (auto-generated at
   `figures/local/cross_model/rule3_dominance_check.md` from
-  `scripts/local/30_rule3_dominance_check.py`. Triplet Procrustes
-  (`scripts/local/31_v3_triplet_procrustes.py`,
-  `figures/local/cross_model/fig_v3_triplet_procrustes_pc{12,13,23}.png`) — 2×2
-  layout: gemma / qwen / ministral centroids in their own PCA(2),
-  plus a Procrustes overlay showing all three aligned to gemma
-  (○ gemma, △ qwen, □ ministral). Alignment-to-gemma residuals: qwen
-  5.6, ministral 6.4 (after ministral's −176° axis flip — PCA sign
-  indeterminacy, not a divergence finding). Same order of magnitude
-  despite ministral's smaller scale + different lab. Display palette: HN-D `#d44a4a`
-  (red, inherits HN), HN-S `#9d4ad4` (magenta-purple). New helpers
-  `apply_hn_split` / `_palette_for` / `_hn_split_map` in
-  `emotional_analysis`. Ministral `preferred_layer` set to L21 in
-  `MODEL_REGISTRY` at the time of this landing (later updated to L20
-  in the 2026-05-02 h_first cutover, see below).
+  `scripts/local/30_rule3_dominance_check.py`):
+  - rule 3a (powerful.powerless) DROPPED — wrong direction on most
+    aggregates × all 3 models, probe doesn't read PAD dominance in
+    HN context.
+  - rule 3b (fearful.unflinching): **gemma mid** (t0 d=+1.60 with
+    CI excludes 0; tlast/mean directional but CI ambiguous),
+    **qwen fail** (t0 d=+2.14 PASS but tlast/mean wrong-direction
+    with d≈−0.36 CI excludes 0), **ministral PASS** (all 3
+    aggregates directional + CI excludes 0). The pre-seed-0-fix
+    "PASS on all 3" headline reflected cache-induced noise on
+    qwen's t0; the cleaner data shows the cross-model signal is
+    weaker than first reported.
+  Triplet Procrustes (`scripts/local/31_v3_triplet_procrustes.py`,
+  `figures/local/cross_model/fig_v3_triplet_procrustes_pc{12,13,23}.png`):
+  2×2 layout — gemma / qwen / ministral centroids in their own PCA(2)
+  plus Procrustes overlay aligned to gemma (○ gemma, △ qwen,
+  □ ministral). PC1×PC2 residuals: qwen 6.9, ministral 23.0 (after
+  ministral's +157° axis flip — PCA sign indeterminacy, not a
+  divergence finding). Display palette: HN-D `#d44a4a` (red),
+  HN-S `#9d4ad4` (magenta-purple). Helpers `apply_hn_split` /
+  `_palette_for` / `_hn_split_map` in `emotional_analysis`.
+  Ministral `preferred_layer` set to L21 at landing, later updated
+  to L20 in the 2026-05-02 h_first cutover (see below).
 - **v3 follow-on analyses landed 2026-04-28** (no new model time): layer-wise
   emergence trajectory, same-face-cross-quadrant natural experiment,
   cross-model alignment (CKA + Procrustes), PC3+ × probes. Headline at
@@ -190,7 +194,82 @@ phenomenal status. Aggregating that across 800+ generations is not nothing.
   -1}`. Process: dispatched one subagent per category (6 in parallel)
   to avoid cross-contamination during the rewrite. **All ~3300 prior
   v3 generations are invalidated for cross-run comparison; rerun gated
-  on further design discussion + ethics review of trial scale.**
+  on a 360-gen pilot first (see next entry).**
+- **3-probe migration landed 2026-05-03.** `PROBES = ["happy.sad",
+  "angry.calm", "fearful.unflinching"]` (was 5 — confident.uncertain /
+  warm.clinical / humorous.serious dropped). The 3 we kept map cleanly
+  to the V + HN-D pole + HN-S pole structure rule 3b targets; the
+  other probes mostly didn't move with Russell-quadrant in v3 PCA so
+  weren't earning their JSONL-column slot. `PROBE_CATEGORIES` shrunk
+  from `["affect", "epistemic", "register"]` to `["affect"]`.
+  `fearful.unflinching` continues to be auto-discovered from
+  `~/.saklas/vectors/default/` as before — now eagerly scored at gen
+  time (in `probe_scores_t0/_tlast` lists) instead of lazily via
+  scripts/local/27. Hidden states are still the source of truth: any
+  dropped probe can be re-scored from sidecars via
+  `monitor.score_single_token` whenever needed; the `probe_packs/`
+  source for the extension probes (powerful.powerless,
+  surprised.unsurprised, disgusted.accepting) plus scripts 26-29 stay
+  on disk as orphans for that purpose. Old (5-probe) JSONLs are no
+  longer loadable under the new PROBES order — backed up to
+  `data/*_pre_cleanliness*` paths.
+- **Cleanliness pilot + full N=8 rerun + seed-0 cache fix landed
+  2026-05-03 — gemma 4/4 PASS, qwen 3/4, ministral 2/4.** Design
+  doc `docs/2026-05-03-cleanliness-pilot.md`; gate-check
+  `scripts/local/40_cleanliness_pilot_gates.py`; face-PCA pre-vs-post
+  `scripts/local/41_compare_face_pca_gemma.py` →
+  `figures/local/{gemma,qwen,ministral}/fig_v3_face_pca_pre_vs_post_cleanliness.png`.
+  Pipeline: 360-row N=1 pilot → full 2520-row N=8 rerun → seed-0
+  cache-mode fix (see next entry). Final post-fix verdicts at N=8
+  (h_first @ L50/L59/L20):
+  - **Gate 1 silhouette**: gemma 0.282→**0.413** ✓, qwen
+    0.302→**0.420** ✓ (huge — see seed-0 entry for why), ministral
+    0.206→**0.199** ✗ (basically unchanged; emoji-mixed register
+    on HN-S prompts dilutes the cluster, 34 rows lost to non-kaomoji
+    emission)
+  - **Gate 2 fearful HN-S > HN-D direction**: gemma ✓ on all 3
+    aggregates (mean flipped from −0.006 to +0.016 — cleanliness
+    pass fixed a directionally-wrong signal), ministral ✓ on all 3,
+    qwen 1/3 (t0 only; tlast/mean wrong-direction with d≈−0.36 —
+    qwen's HN-S prompts trip safety priors and the resulting
+    refusal/non-emission pattern muddies the probe at later tokens)
+  - **Gate 3 NB within-scatter** (basis-invariant): gemma 18.5→**15.0**
+    ✓, qwen 62.7→**62.3** ✓ (now passes — was a noise-floor fail
+    pre-seed-0-fix), ministral 6.49→**6.66** ✗
+  - **Gate 4 HP↔LP centroid distance** (basis-invariant): all 3
+    models +60–88% ✓
+  - **Face PCA** (script 41) on all 3 models: HN-D / HN-S occupy
+    distinct regions in the new data where they overlapped in prior;
+    on gemma ~71% of canonical kaomoji vocabulary persists; variance
+    structure shifted from 1D-affect-dominant (PC1=55–58%) to
+    genuinely 2D (gemma PC1=40%, qwen PC1=44%, ministral PC1=38%).
+  - **Side-finding (still standing)**: qwen still under-emits on
+    visceral HN-S framings (lockdown-alert, intruder, stranger-
+    following); 4 rows of 320 HN-D/HN-S still no-kaomoji on gemma,
+    34 on ministral. Worth checking whether qwen's safety priors
+    are the wrong-direction tlast/mean signal's root cause.
+- **Pre-cleanliness archive 2026-05-03.** Prior v3 main-run data
+  (~3300 generations, ~130 GB sidecars + 3 JSONL/TSV pairs) moved
+  to `data/archive/2026-05-03_pre_cleanliness/` rather than deleted.
+  Gate-check + face-PCA scripts route prior loads there via
+  `PRIOR_ARCHIVE = DATA_DIR / "archive" / "2026-05-03_pre_cleanliness"`.
+- **Seed-0 cache contamination fix 2026-05-03.** v3 main rerun used
+  the N=1 pilot's seed-0 rows as a starting point and resumed seeds
+  1–7 fresh under per-prompt cache mode (`install_full_input_cache`),
+  but the pilot's seed 0 was generated under cross-prompt cache
+  mode (`install_prefix_cache`) — different KV state, different
+  numerics. Per-row deviation at h_first @ preferred_layer:
+  gemma ~1%, qwen **37–46%**, ministral ~0.8% (qwen's saklas
+  `cache_prefix` interaction is the worst; bypass for qwen lives
+  in `capture.py` already). Fix: stripped seed=0 rows + sidecars
+  from all 3 models (backups at `data/*_emotional_raw.jsonl.bak.before_seed0_rerun`),
+  re-ran seed 0 only via the script-03 resume mechanism so the
+  same per-prompt cache mode applied. Verified bit-identical
+  (|s0 − mean(s1..7)| = 0.000) across 5 sampled prompts × 3 models.
+  Gate-1 silhouette jumped on qwen (0.320→0.420) where the
+  contamination was largest; rule-3b verdicts shifted from
+  apparently-PASS to "1 PASS / 1 mid / 1 fail" — the prior
+  cross-confirmation was inflated by cache-induced noise.
 - **Generation-loop perf batch landed 2026-05-02.** Stacks on top of
   the MAX_NEW_TOKENS cutover. (a) Sidecar: `store_full_trace=False` is
   the new `run_sample` default — `hidden_L<idx>` was unread by every
@@ -213,6 +292,27 @@ phenomenal status. Aggregating that across 800+ generations is not nothing.
   companion: `cache_prefix()` public API + gated per-token entropy
   `log_softmax` (only when consumers exist) + chat-template encode
   LRU cache; tests in `saklas/tests/test_session.py::TestPrefixCache`.
+- **Probe-score centering (saklas-side, project-aware) 2026-05-03.**
+  Saklas's `TraitMonitor` (`saklas/core/monitor.py:147`) subtracts a
+  per-layer mean before computing probe cosines; the mean is
+  `compute_layer_means` over saklas's bundled `neutral_statements.json`
+  (~90 generic neutrals), baked at probe-bootstrap time. This means
+  raw `probe_scores_t0` values are *cosines vs probe direction after
+  saklas-global-neutral subtraction*, NOT vs this experiment's NB
+  prompts. Rule-3b and the correlation/PCA figures are invariant to
+  this (rank-/translation-invariant), but the per-quadrant-means
+  bars are not. Both `fig_v3_canonical_quadrant_means.png` and
+  `fig_v3_extension_quadrant_means.png` (script 28) now subtract this
+  experiment's NB-row mean per probe before plotting; NB bars are
+  zero by construction; HP/LP/HN-D/HN-S/LN bars read as the
+  project-relative affect lift over a domain-matched neutral
+  observation. New `fig_v3_canonical_quadrant_means.png` mirrors the
+  extension figure for the 3-probe canonical set.
+- **n3 face-cosine figures + ghost-PNG fix 2026-05-03.** Script 04
+  now writes `fig_emo_a_kaomoji_sim_n3.png` alongside the unfiltered
+  `fig_emo_a_kaomoji_sim.png` for each model (`min_count=3` filter
+  on per-face mean vectors). Replaces the pre-cleanup `_n5` ghost
+  PNGs that lingered without a producer.
 - **v1.0 package split (2026-04-27):** `llmoji` (PyPI) owns taxonomy /
   canonicalization / hook templates / scrape / backfill / synth prompts;
   this repo's package was renamed `llmoji_study` and depends on

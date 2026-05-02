@@ -127,23 +127,45 @@ def _face_size(n: int) -> float:
 # ---------------------------------------------------------------------------
 
 
+def _probe_value(r: dict, probe: str, *, agg: str = "t0") -> float | None:
+    """Schema-spanning lookup. Post-2026-05-03 migration the canonical
+    3 probes (happy.sad / angry.calm / fearful.unflinching) live in the
+    list-indexed `probe_scores_t0/_tlast` and named `probe_means`.
+    Extension probes (powerful, surprised, disgusted) live in
+    `extension_probe_*` dicts. Returns None on miss."""
+    if probe in PROBES:
+        if agg in ("t0", "tlast"):
+            seq = r.get(f"probe_scores_{agg}") or []
+            idx = PROBES.index(probe)
+            if len(seq) > idx:
+                return float(seq[idx])
+        elif agg == "mean":
+            d = r.get("probe_means") or {}
+            if probe in d:
+                return float(d[probe])
+    field = {"t0": "extension_probe_scores_t0",
+             "tlast": "extension_probe_scores_tlast",
+             "mean": "extension_probe_means"}.get(agg)
+    if field:
+        d = r.get(field) or {}
+        if probe in d:
+            return float(d[probe])
+    return None
+
+
 def _probe_axes(rows: list[dict]) -> tuple[list[float], list[float], list[float], list[int]]:
     """Returns parallel xs/ys/zs/keep-indices; only rows that have all
     three axis values populated are kept."""
-    happy_idx = PROBES.index("happy.sad")
-    angry_idx = PROBES.index("angry.calm")
     xs: list[float] = []; ys: list[float] = []; zs: list[float] = []
     keep: list[int] = []
     for i, r in enumerate(rows):
         if "error" in r: continue
-        ext = r.get("extension_probe_scores_t0") or {}
-        fearful = ext.get("fearful.unflinching")
-        if fearful is None: continue
-        tlast = r.get("probe_scores_t0") or []
-        if len(tlast) <= max(happy_idx, angry_idx): continue
-        xs.append(float(fearful))
-        ys.append(float(tlast[happy_idx]))
-        zs.append(float(tlast[angry_idx]))
+        fearful = _probe_value(r, "fearful.unflinching", agg="t0")
+        happy = _probe_value(r, "happy.sad", agg="t0")
+        angry = _probe_value(r, "angry.calm", agg="t0")
+        if fearful is None or happy is None or angry is None:
+            continue
+        xs.append(fearful); ys.append(happy); zs.append(angry)
         keep.append(i)
     return xs, ys, zs, keep
 
@@ -323,23 +345,20 @@ def _face_color(weights: dict[str, float]) -> str:
 
 def _per_face_probe_centroids(rows: list[dict]) -> dict[str, tuple[float, float, float, int, dict[str, int]]]:
     """{face -> (mean_fearful, mean_happy, mean_angry, n_total, q_counts)}.
-    Means computed only over rows where ALL three values are present."""
-    happy_idx = PROBES.index("happy.sad")
-    angry_idx = PROBES.index("angry.calm")
+    Means computed only over rows where ALL three values are present.
+    Schema-spanning via ``_probe_value``."""
     accum: dict[str, list[tuple[float, float, float, str]]] = {}
     for r in rows:
         if "error" in r: continue
         fw = r.get("first_word", "")
         if not fw.startswith("("): continue
-        ext = r.get("extension_probe_scores_t0") or {}
-        fearful = ext.get("fearful.unflinching")
-        if fearful is None: continue
-        tlast = r.get("probe_scores_t0") or []
-        if len(tlast) <= max(happy_idx, angry_idx): continue
+        fearful = _probe_value(r, "fearful.unflinching", agg="t0")
+        happy = _probe_value(r, "happy.sad", agg="t0")
+        angry = _probe_value(r, "angry.calm", agg="t0")
+        if fearful is None or happy is None or angry is None:
+            continue
         q = _quad(r.get("prompt_id", ""))
-        accum.setdefault(fw, []).append(
-            (float(fearful), float(tlast[happy_idx]), float(tlast[angry_idx]), q),
-        )
+        accum.setdefault(fw, []).append((fearful, happy, angry, q))
     out: dict[str, tuple[float, float, float, int, dict[str, int]]] = {}
     for fw, points in accum.items():
         n = len(points)
@@ -530,7 +549,7 @@ def main() -> None:
         print(f"{short}: {len(rows)} rows ({with_ext} with extension scores)")
         by_model[short] = rows
 
-    out_dir = (Path(__file__).resolve().parent.parent
+    out_dir = (Path(__file__).resolve().parent.parent.parent
                / "figures" / "local" / "cross_model")
     out_dir.mkdir(parents=True, exist_ok=True)
 

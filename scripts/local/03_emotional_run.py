@@ -1,10 +1,13 @@
-"""Emotional-battery run: 1 arm × 100 prompts × 8 seeds = 800 generations.
+"""Emotional-battery run: 1 arm × 120 prompts × 8 seeds = 960 generations.
 
-Single unsteered `kaomoji_prompted` arm, Russell-quadrant prompts plus
-the NB (neutral-baseline) quadrant. Output streamed to
-data/emotional_raw.jsonl; per-row hidden-state sidecars under
-data/hidden/v3/<uuid>.npz. Resumable: re-running skips already-
-completed (prompt_id, seed) pairs and retries error rows.
+Single unsteered `kaomoji_prompted` arm, six categories (HP / LP /
+HN-D / HN-S / LN / NB × 20) post-2026-05-03 cleanliness pass. Output
+streamed to data/<short>_emotional_raw.jsonl; per-row hidden-state
+sidecars under data/hidden/v3{,_qwen,_ministral}/<uuid>.npz.
+Resumable: re-running skips already-completed (prompt_id, seed)
+pairs and retries error rows. Pre-cleanliness data (5 quadrants × 20
+prompts × 8 seeds) is archived at
+data/archive/2026-05-03_pre_cleanliness/.
 
 Mirrors scripts/01_pilot_run.py structurally — same session setup,
 same resume-on-rerun semantics. Does not register steering profiles

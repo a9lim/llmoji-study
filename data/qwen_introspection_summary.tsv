@@ -1,0 +1,87 @@
+{
+  "model": "qwen",
+  "n_rows": 254,
+  "pca_var_ratio": [
+    0.35847022086416924,
+    0.27132609153551535
+  ],
+  "kl_per_quadrant": [
+    {
+      "quadrant": "HP",
+      "n_baseline": 20,
+      "n_introspection": 11,
+      "n_lorem": 16,
+      "kl_intro_vs_base": 3.5778044195479723,
+      "kl_lorem_vs_base": 1.2194338383869658
+    },
+    {
+      "quadrant": "LP",
+      "n_baseline": 19,
+      "n_introspection": 17,
+      "n_lorem": 16,
+      "kl_intro_vs_base": 6.407309028328743,
+      "kl_lorem_vs_base": 2.3602782195615246
+    },
+    {
+      "quadrant": "HN-D",
+      "n_baseline": 19,
+      "n_introspection": 11,
+      "n_lorem": 13,
+      "kl_intro_vs_base": 0.16949013494058984,
+      "kl_lorem_vs_base": 0.13275254011394413
+    },
+    {
+      "quadrant": "HN-S",
+      "n_baseline": 13,
+      "n_introspection": 6,
+      "n_lorem": 12,
+      "kl_intro_vs_base": 12.710134020797048,
+      "kl_lorem_vs_base": 3.0270036247756957
+    },
+    {
+      "quadrant": "LN",
+      "n_baseline": 15,
+      "n_introspection": 9,
+      "n_lorem": 9,
+      "kl_intro_vs_base": 6.786207478810395,
+      "kl_lorem_vs_base": 0.18967318644219752
+    },
+    {
+      "quadrant": "NB",
+      "n_baseline": 20,
+      "n_introspection": 11,
+      "n_lorem": 17,
+      "kl_intro_vs_base": 3.042422439763447,
+      "kl_lorem_vs_base": 1.21488062249027
+    }
+  ],
+  "rule3b_per_condition": [
+    {
+      "condition": "intro_none",
+      "n_HN_D": 19,
+      "n_HN_S": 13,
+      "rule3b_t0_diff": 0.004766338508621348,
+      "ci_lo": -0.00034008709796776176,
+      "ci_hi": 0.00931902917758036,
+      "ci_excludes_zero": false
+    },
+    {
+      "condition": "intro_pre",
+      "n_HN_D": 11,
+      "n_HN_S": 6,
+      "rule3b_t0_diff": 0.015975219733787294,
+      "ci_lo": 0.0036972536733654595,
+      "ci_hi": 0.028019273258520213,
+      "ci_excludes_zero": true
+    },
+    {
+      "condition": "intro_lorem",
+      "n_HN_D": 13,
+      "n_HN_S": 12,
+      "rule3b_t0_diff": 0.007169635775379782,
+      "ci_lo": 0.00294349942213082,
+      "ci_hi": 0.011597687919409483,
+      "ci_excludes_zero": true
+    }
+  ]
+}

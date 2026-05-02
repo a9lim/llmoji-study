@@ -95,6 +95,7 @@ def main() -> None:
 
     M.figures_dir.mkdir(parents=True, exist_ok=True)
     fig_a = M.figures_dir / "fig_emo_a_kaomoji_sim.png"
+    fig_a_n3 = M.figures_dir / "fig_emo_a_kaomoji_sim_n3.png"
     fig_b = M.figures_dir / "fig_emo_b_kaomoji_consistency.png"
     fig_c = M.figures_dir / "fig_emo_c_kaomoji_quadrant.png"
     fig_face = M.figures_dir / "fig_v3_face_cosine_heatmap.png"
@@ -102,6 +103,8 @@ def main() -> None:
     print("\nwriting figures...")
     plot_kaomoji_cosine_heatmap(df, X, str(fig_a))
     print(f"  wrote {fig_a}")
+    plot_kaomoji_cosine_heatmap(df, X, str(fig_a_n3), min_count=3)
+    print(f"  wrote {fig_a_n3}")
     plot_within_kaomoji_consistency(df, X, str(fig_b))
     print(f"  wrote {fig_b}")
     plot_kaomoji_quadrant_alignment(df, X, str(fig_c))

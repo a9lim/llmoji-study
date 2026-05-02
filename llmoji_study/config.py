@@ -14,29 +14,41 @@ MODEL_ID = "google/gemma-4-31b-it"
 # Saklas probe categories to bootstrap. The `probes=` kwarg on
 # `SaklasSession.from_pretrained` takes CATEGORY names, not individual
 # concept names; the library expands a category into its member concepts
-# via the bundled defaults. The `affect` category covers happy.sad and
-# angry.calm out of the box, plus the three extension probes registered
-# via `llmoji_study.probe_extensions` (`powerful.powerless`,
-# `surprised.unsurprised`, `disgusted.accepting`) — those are all
-# tagged `affect` so they auto-pick-up once `register_extension_probes()`
-# has materialized them into `~/.saklas/vectors/default/`.
-PROBE_CATEGORIES = ["affect", "epistemic", "register"]
+# via the bundled defaults. We only need the `affect` category: it
+# covers happy.sad + angry.calm + the auto-discovered fearful.unflinching
+# (materialized into `~/.saklas/vectors/default/` by an earlier saklas
+# install — see CLAUDE.md gotcha). `epistemic` (confident.uncertain) and
+# `register` (warm.clinical, humorous.serious) were dropped 2026-05-03
+# in the 3-probe migration: those probes mostly didn't move with
+# Russell-quadrant in v3 PCA and the v3 design specifically targets
+# valence + the HN-D / HN-S split.
+PROBE_CATEGORIES = ["affect"]
 
-# Baseline concept set — kept stable across v1/v2/v3 because
+# Canonical probe set — 3 probes mapping cleanly onto the 3 distinctions
+# v3 validated empirically:
+#   happy.sad           → valence (PC1 on every model)
+#   angry.calm          → HN-D pole (anger / contempt within HN)
+#   fearful.unflinching → HN-S pole (fear / anxiety within HN)
+#
+# Migration date: 2026-05-03. Pre-migration this list had 5 entries
+# (added confident.uncertain / warm.clinical / humorous.serious from
+# the v1/v2 pilot) and there was a parallel `extension_probe_*` dict-
+# keyed schema for `powerful.powerless` / `surprised.unsurprised` /
+# `disgusted.accepting` populated post-hoc by the now-orphaned
+# `scripts/local/27_v3_extension_probe_rescore.py`. The extension
+# packs still live in `llmoji_study/probe_packs/` and the saklas-side
+# vectors at `~/.saklas/vectors/default/` — they can be re-scored from
+# any sidecar via `monitor.score_single_token` without going through
+# this list. The eager / lazy split was a historical accident; this
+# is the deliberate single-canonical-set replacement.
+#
 # `SampleRow.probe_scores_t0` / `_tlast` are LISTS indexed by this
-# order. Adding entries here would silently misalign every JSONL row
-# already on disk. Extension probes (powerful.powerless,
-# surprised.unsurprised, disgusted.accepting) go to dict-keyed
-# fields written by `scripts/local/27_v3_extension_probe_rescore.py`,
-# so the addition was strictly schema-compatible. Discover the
-# extension subset present on a loaded df via
-# `emotional_analysis.available_extension_probes`.
+# order. Old (5-probe) JSONL rows are no longer loadable under the
+# new PROBES order — see `data/*_pre_cleanliness_*` backups.
 PROBES = [
     "happy.sad",
     "angry.calm",
-    "confident.uncertain",
-    "warm.clinical",
-    "humorous.serious",
+    "fearful.unflinching",
 ]
 
 # Axes whose steering produces causal-intervention arms. v1 tested

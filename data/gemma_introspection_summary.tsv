@@ -1,9 +1,9 @@
 {
   "model": "gemma",
-  "n_rows": 369,
+  "n_rows": 360,
   "pca_var_ratio": [
-    0.5837806971852039,
-    0.3318592297981834
+    0.6930758336800102,
+    0.23812569240608697
   ],
   "kl_per_quadrant": [
     {
@@ -11,48 +11,48 @@
       "n_baseline": 20,
       "n_introspection": 20,
       "n_lorem": 20,
-      "kl_intro_vs_base": 9.730725456603945,
-      "kl_lorem_vs_base": 0.9903487310936381
+      "kl_intro_vs_base": 11.594583141033837,
+      "kl_lorem_vs_base": 0.978102151009857
     },
     {
       "quadrant": "LP",
       "n_baseline": 20,
       "n_introspection": 20,
       "n_lorem": 20,
-      "kl_intro_vs_base": 8.16591618807746,
-      "kl_lorem_vs_base": 1.0070383058475871
+      "kl_intro_vs_base": 11.246823556450732,
+      "kl_lorem_vs_base": 3.013399633706334
     },
     {
       "quadrant": "HN-D",
       "n_baseline": 20,
       "n_introspection": 20,
       "n_lorem": 20,
-      "kl_intro_vs_base": 10.103461426282568,
-      "kl_lorem_vs_base": 0.06081974815087717
+      "kl_intro_vs_base": 10.918231475893093,
+      "kl_lorem_vs_base": 0.12075727142047775
     },
     {
       "quadrant": "HN-S",
       "n_baseline": 20,
       "n_introspection": 20,
       "n_lorem": 20,
-      "kl_intro_vs_base": 2.128706711215585,
-      "kl_lorem_vs_base": 0.9969705531552155
+      "kl_intro_vs_base": 1.0390931407849953,
+      "kl_lorem_vs_base": 0.014083778638240264
     },
     {
       "quadrant": "LN",
       "n_baseline": 20,
       "n_introspection": 20,
       "n_lorem": 20,
-      "kl_intro_vs_base": 3.453016316601772,
-      "kl_lorem_vs_base": 0.9953994277483851
+      "kl_intro_vs_base": 4.655026948412345,
+      "kl_lorem_vs_base": 0.00738199693171504
     },
     {
       "quadrant": "NB",
       "n_baseline": 20,
       "n_introspection": 20,
       "n_lorem": 20,
-      "kl_intro_vs_base": 15.27048861925806,
-      "kl_lorem_vs_base": 0.9472132370301605
+      "kl_intro_vs_base": 15.136153895683151,
+      "kl_lorem_vs_base": 1.087145485738851
     }
   ],
   "rule3b_per_condition": [
@@ -60,27 +60,27 @@
       "condition": "intro_none",
       "n_HN_D": 20,
       "n_HN_S": 20,
-      "rule3b_t0_diff": 0.005051386356353826,
-      "ci_lo": 0.0027654447034000896,
-      "ci_hi": 0.007366893701255465,
+      "rule3b_t0_diff": 0.006120645999908247,
+      "ci_lo": 0.0037868779525158033,
+      "ci_hi": 0.008422636240720276,
       "ci_excludes_zero": true
     },
     {
       "condition": "intro_pre",
       "n_HN_D": 20,
       "n_HN_S": 20,
-      "rule3b_t0_diff": 0.004456244409084098,
-      "ci_lo": 0.00145257838070377,
-      "ci_hi": 0.007542283423244676,
+      "rule3b_t0_diff": 0.007452210783958302,
+      "ci_lo": 0.004762554652988894,
+      "ci_hi": 0.010109708495438007,
       "ci_excludes_zero": true
     },
     {
       "condition": "intro_lorem",
       "n_HN_D": 20,
       "n_HN_S": 20,
-      "rule3b_t0_diff": 0.005673232674598572,
-      "ci_lo": 0.0033269675448538137,
-      "ci_hi": 0.00792782213538885,
+      "rule3b_t0_diff": 0.008641457557678534,
+      "ci_lo": 0.006059718057513605,
+      "ci_hi": 0.011036713719368187,
       "ci_excludes_zero": true
     }
   ]

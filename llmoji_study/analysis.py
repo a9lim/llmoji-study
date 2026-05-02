@@ -82,7 +82,7 @@ def load_rows(path: str) -> pd.DataFrame:
 
 
 def probe_matrix(df: pd.DataFrame) -> np.ndarray:
-    """Extract the 5-axis feature matrix in canonical PROBES order."""
+    """Extract the per-row probe-score feature matrix in canonical PROBES order."""
     from .config import PROBES
     cols = [f"t0_{p}" for p in PROBES]
     return df[cols].to_numpy()
