@@ -18,6 +18,8 @@ lookup, and the filesystem handles the indexing. Uses
 
 from __future__ import annotations
 
+from collections import deque
+from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -95,3 +97,97 @@ def load_hidden_states(
 def hidden_state_path(data_dir: Path, experiment: str, row_uuid: str) -> Path:
     """Canonical sidecar path: ``<data_dir>/hidden/<experiment>/<uuid>.npz``."""
     return data_dir / "hidden" / experiment / f"{row_uuid}.npz"
+
+
+class SidecarWriter:
+    """Single-thread background pool for ``save_hidden_states`` calls.
+
+    ``savez_compressed`` is GIL-releasing CPU work that currently blocks
+    the next row's prefill. Offloading it to one worker overlaps the
+    write of row N with the generation of row N+1; serializing on a
+    single thread avoids contention with main-thread numpy work.
+
+    The capture object handed to ``submit`` is already a self-contained
+    CPU numpy snapshot (``read_after_generate`` finished the device→host
+    transfer before returning), so no GPU state crosses the thread
+    boundary. With ``store_full_trace=False`` (the default), the
+    snapshot is also small.
+
+    Lifecycle: create one ``SidecarWriter`` per run; pass it to
+    ``run_sample(..., sidecar_writer=writer)``; ``writer.close()`` (or
+    use as a context manager) at run end to drain pending writes and
+    re-raise the first exception. Wrap the run loop in ``try/finally``
+    so the writer drains even on SIGINT.
+    """
+
+    def __init__(self, max_pending: int = 0) -> None:
+        # max_workers=1: one worker is enough — savez_compressed is
+        # GIL-releasing for the I/O part, and serializing avoids
+        # contention. max_pending=0 means unbounded; in practice the
+        # runner generates one row at a time so the queue stays small.
+        self._exec = ThreadPoolExecutor(max_workers=1, thread_name_prefix="sidecar")
+        self._pending: deque[Future] = deque()
+        self._max_pending = max_pending
+        self._closed = False
+
+    def submit(
+        self,
+        capture: FullSequenceCapture,
+        out_path: str | Path,
+        *,
+        store_full_trace: bool = True,
+    ) -> Future:
+        """Enqueue a sidecar write. Non-blocking. Returns the Future
+        for callers that want it; otherwise the writer tracks it
+        internally for drain-on-close.
+
+        Periodically drains completed futures so the deque doesn't
+        grow without bound — also surfaces exceptions early instead
+        of holding them all until close().
+        """
+        if self._closed:
+            raise RuntimeError("SidecarWriter is closed")
+
+        # Drain any already-completed futures, raising the first error.
+        # This makes failures visible promptly (next submit) rather
+        # than only at run-end close.
+        while self._pending and self._pending[0].done():
+            f = self._pending.popleft()
+            f.result()  # re-raises if the worker failed
+
+        fut = self._exec.submit(
+            save_hidden_states,
+            capture, out_path,
+            store_full_trace=store_full_trace,
+        )
+        self._pending.append(fut)
+        return fut
+
+    def close(self) -> None:
+        """Drain all pending writes and shut down the executor.
+
+        Re-raises the first exception encountered. Safe to call
+        multiple times; subsequent calls are no-ops.
+        """
+        if self._closed:
+            return
+        self._closed = True
+        first_exc: BaseException | None = None
+        try:
+            while self._pending:
+                f = self._pending.popleft()
+                try:
+                    f.result()
+                except BaseException as e:
+                    if first_exc is None:
+                        first_exc = e
+        finally:
+            self._exec.shutdown(wait=True)
+        if first_exc is not None:
+            raise first_exc
+
+    def __enter__(self) -> "SidecarWriter":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()

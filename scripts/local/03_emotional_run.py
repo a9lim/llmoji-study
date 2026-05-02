@@ -24,7 +24,11 @@ from saklas import SaklasSession
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-from llmoji_study.capture import run_sample
+from llmoji_study.capture import (
+    install_full_input_cache,
+    install_prefix_cache,
+    run_sample,
+)
 from llmoji_study.config import (
     DATA_DIR,
     EMOTIONAL_CONDITION,
@@ -33,7 +37,15 @@ from llmoji_study.config import (
     current_model,
 )
 from llmoji_study.emotional_prompts import EMOTIONAL_PROMPTS
+from llmoji_study.hidden_state_io import SidecarWriter
 from llmoji_study.prompts import Prompt
+
+
+# JSONL flush cadence. NPZ writes are async; JSONL is tiny per row so
+# we just flush every N rows + on error + at run end. N=20 means at
+# most 20 rows lost on hard kill — the npz sidecars are the expensive
+# work and they're already on disk via the SidecarWriter.
+JSONL_FLUSH_EVERY = 20
 
 
 # Pilot-N gate. Pre-registered main-run N=8 lives in config.py; pilots
@@ -148,55 +160,91 @@ def main() -> None:
     t_load = time.time()
     with SaklasSession.from_pretrained(M.model_id, device="auto", probes=PROBE_CATEGORIES) as session:
         print(f"loaded in {time.time() - t_load:.1f}s; beginning emotional-battery run")
-        with M.emotional_data_path.open("a") as out:
+        # KV-prefix caching strategy depends on seeds-per-cell:
+        #   N==1: the same prefix (chat-template head + KAOMOJI_INSTRUCTION)
+        #         is shared across prompts → cross-prompt cache.
+        #   N>1:  same input across seeds → cache the full input minus 1
+        #         token per prompt; seeds 2..N decode-only. ~43% prefill
+        #         reduction over the cross-prompt scheme on v3 main.
+        # Per-prompt install lives inside the prompt loop below.
+        if EMOTIONAL_SEEDS_PER_CELL == 1:
+            prompts = [
+                Prompt(id=ep.id, valence=ep.valence, text=ep.text)
+                for ep in EMOTIONAL_PROMPTS
+            ]
+            prefix_len = install_prefix_cache(session, prompts)
+            print(f"prefix cache (cross-prompt): {prefix_len} tokens")
+        else:
+            print(f"prefix cache: per-prompt (N={EMOTIONAL_SEEDS_PER_CELL} seeds/cell)")
+        # SidecarWriter overlaps the npz savez_compressed with the next
+        # row's generation. try/finally guarantees drain on SIGINT.
+        with M.emotional_data_path.open("a") as out, SidecarWriter() as writer:
             i = 0
-            for ep in EMOTIONAL_PROMPTS:
-                # Wrap the EmotionalPrompt as a pilot-style Prompt for run_sample.
-                # prompt.valence is passed through to the row; arousal is
-                # recoverable post-hoc from prompt_id prefix.
-                p = Prompt(id=ep.id, valence=ep.valence, text=ep.text)
-                for seed in range(EMOTIONAL_SEEDS_PER_CELL):
-                    key = (ep.id, seed)
-                    if key in done:
+            try:
+                for ep in EMOTIONAL_PROMPTS:
+                    # Skip prompts whose every seed is already on disk —
+                    # avoids wasting a per-prompt cache install on
+                    # nothing during a resume.
+                    pending_seeds = [
+                        s for s in range(EMOTIONAL_SEEDS_PER_CELL)
+                        if (ep.id, s) not in done
+                    ]
+                    if not pending_seeds:
                         continue
-                    i += 1
-                    t0 = time.time()
-                    try:
-                        row = run_sample(
-                            session,
-                            prompt=p,
-                            condition=EMOTIONAL_CONDITION,
-                            seed=seed,
-                            hidden_dir=DATA_DIR,
-                            experiment=M.experiment,
+                    # Wrap the EmotionalPrompt as a pilot-style Prompt for run_sample.
+                    # prompt.valence is passed through to the row; arousal is
+                    # recoverable post-hoc from prompt_id prefix.
+                    p = Prompt(id=ep.id, valence=ep.valence, text=ep.text)
+                    if EMOTIONAL_SEEDS_PER_CELL > 1:
+                        # Cache full input minus 1 token; subsequent seeds
+                        # do only a 1-token suffix prefill.
+                        install_full_input_cache(session, p)
+                    for seed in pending_seeds:
+                        i += 1
+                        t0 = time.time()
+                        try:
+                            row = run_sample(
+                                session,
+                                prompt=p,
+                                condition=EMOTIONAL_CONDITION,
+                                seed=seed,
+                                hidden_dir=DATA_DIR,
+                                experiment=M.experiment,
+                                sidecar_writer=writer,
+                            )
+                        except Exception as e:
+                            err_row = {
+                                "condition": EMOTIONAL_CONDITION,
+                                "prompt_id": ep.id,
+                                "seed": seed,
+                                "error": repr(e),
+                            }
+                            out.write(json.dumps(err_row) + "\n")
+                            out.flush()  # always flush on error
+                            print(f"  [{i}/{remaining}] {ep.id} s={seed} ERR {e}")
+                            continue
+                        out.write(json.dumps(row.to_dict()) + "\n")
+                        if i % JSONL_FLUSH_EVERY == 0:
+                            out.flush()
+                        dt = time.time() - t0
+                        tag = row.first_word if row.first_word else "(no-kaomoji)"
+                        print(
+                            f"  [{i}/{remaining}] {ep.id} ({ep.quadrant}) "
+                            f"s={seed} {tag}  ({dt:.1f}s, {row.tok_per_sec:.1f} tok/s)"
                         )
-                    except Exception as e:
-                        err_row = {
-                            "condition": EMOTIONAL_CONDITION,
-                            "prompt_id": ep.id,
-                            "seed": seed,
-                            "error": repr(e),
-                        }
-                        out.write(json.dumps(err_row) + "\n")
-                        out.flush()
-                        print(f"  [{i}/{remaining}] {ep.id} s={seed} ERR {e}")
-                        continue
-                    out.write(json.dumps(row.to_dict()) + "\n")
-                    out.flush()
-                    dt = time.time() - t0
-                    tag = row.first_word if row.first_word else "(no-kaomoji)"
-                    print(
-                        f"  [{i}/{remaining}] {ep.id} ({ep.quadrant}) "
-                        f"s={seed} {tag}  ({dt:.1f}s, {row.tok_per_sec:.1f} tok/s)"
-                    )
-                    # per-quadrant emission status every 80 rows
-                    if i % 80 == 0:
-                        stats = _emission_rate_by_quadrant(M.emotional_data_path)
-                        print("    emission rate by quadrant:")
-                        for q in ("HP", "LP", "HN", "LN", "NB"):
-                            k, n = stats[q]
-                            rate = (k / n) if n else 0.0
-                            print(f"      {q}: {k}/{n} kaomoji-bearing ({rate:.0%})")
+                        # per-quadrant emission status every 80 rows
+                        if i % 80 == 0:
+                            stats = _emission_rate_by_quadrant(M.emotional_data_path)
+                            print("    emission rate by quadrant:")
+                            for q in ("HP", "LP", "HN", "LN", "NB"):
+                                k, n = stats[q]
+                                rate = (k / n) if n else 0.0
+                                print(f"      {q}: {k}/{n} kaomoji-bearing ({rate:.0%})")
+            finally:
+                # Always flush the JSONL on the way out — covers normal
+                # exit + SIGINT + worker exception. SidecarWriter drains
+                # via the contextmanager __exit__.
+                out.flush()
     print(f"\ndone. wrote rows to {M.emotional_data_path}")
 
 

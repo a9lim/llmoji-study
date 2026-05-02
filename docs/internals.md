@@ -8,10 +8,20 @@ every v3 analysis script.
 
 After `session.generate()`,
 `llmoji.hidden_capture.read_after_generate(session)` reads saklas's per-token
-last-position buckets and writes `(h_first, h_last, h_mean, per_token)` per
-probe layer to `data/hidden/<experiment>/<row_uuid>.npz`. ~20–70 MB per row;
-gitignored; regenerable from the runners. JSONL keeps probe scores for
-back-compat and audit.
+last-position buckets and writes `(h_first, h_last, h_mean[, per_token])`
+per probe layer to `data/hidden/<experiment>/<row_uuid>.npz`. The default
+since the 2026-05-02 perf batch is the three aggregates only — ~700 KB
+per row vs the earlier ~20–70 MB with the full per-token trace included
+(60× shrink; gates on `run_sample(store_full_trace=...)`). Smoke (`99`)
+opts in to the full trace; v3 / v3-introspection runners use the new
+default since no analysis script reads `hidden_L<idx>` post-h_first
+cutover. Loaders (`load_hidden_states(full_trace=False)`) already
+synthesize a length-2 stack from h_first/h_last so legacy
+`lc.hidden_states[0]` / `[-1]` indexing keeps working. Sidecars are
+gitignored, regenerable from the runners; npz writes happen on a
+background thread (`SidecarWriter`) so they overlap the next row's
+generation. JSONL keeps probe scores for back-compat and audit, flushed
+every 20 rows + on error / at run end.
 
 `llmoji.hidden_state_analysis.load_hidden_features(...)` returns
 `(metadata df, (n_rows, hidden_dim) feature matrix)`. Defaults: `which="h_first"`

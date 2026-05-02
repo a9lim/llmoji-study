@@ -34,7 +34,7 @@ from .config import (
     TEMPERATURE,
 )
 from .hidden_capture import read_after_generate
-from .hidden_state_io import hidden_state_path, save_hidden_states
+from .hidden_state_io import SidecarWriter, hidden_state_path, save_hidden_states
 from .prompts import Prompt
 from llmoji.taxonomy import extract
 
@@ -116,6 +116,88 @@ def build_messages(
     return [{"role": "user", "content": content}]
 
 
+def install_prefix_cache(
+    session: SaklasSession,
+    prompts: list[Prompt],
+    *,
+    extra_preamble: str | None = None,
+    kaomoji_instructed: bool = True,
+) -> int:
+    """Compute the longest common chat-template token prefix across
+    ``prompts`` (under the same condition) and install it via
+    ``session.cache_prefix()``. Returns the prefix length in tokens.
+
+    For v3-shaped runs the common prefix covers the chat-template head
+    + ``KAOMOJI_INSTRUCTION`` (+ ``extra_preamble`` if any); the variable
+    suffix per call is just the prompt body + assistant-turn-start.
+    Halves per-call prefill in practice. Must be called outside any
+    ``session.steering()`` scope. Re-call with a different prompt set or
+    preamble to replace the cache."""
+    if not prompts:
+        return 0
+    import torch
+    tok = session.tokenizer
+    all_ids: list[list[int]] = []
+    for p in prompts:
+        msgs = build_messages(
+            p,
+            kaomoji_instructed=kaomoji_instructed,
+            extra_preamble=extra_preamble,
+        )
+        result = tok.apply_chat_template(
+            msgs, add_generation_prompt=True, return_tensors="pt",
+        )
+        ids = result if isinstance(result, torch.Tensor) else result["input_ids"]
+        all_ids.append(ids[0].tolist())
+
+    common = all_ids[0]
+    for other in all_ids[1:]:
+        n = min(len(common), len(other))
+        i = 0
+        while i < n and common[i] == other[i]:
+            i += 1
+        common = common[:i]
+        if not common:
+            return 0
+    if not common:
+        return 0
+    return session.cache_prefix(torch.tensor(common, dtype=torch.long))
+
+
+def install_full_input_cache(
+    session: SaklasSession,
+    prompt: Prompt,
+    *,
+    extra_preamble: str | None = None,
+    kaomoji_instructed: bool = True,
+) -> int:
+    """Cache the full chat-templated input for ``prompt`` (minus the
+    final token) via ``session.cache_prefix()``. Returns the cached
+    length.
+
+    Useful when the same prompt runs N>1 times with different seeds
+    (v3 main: 8 seeds/cell). Seeds 2..N hit the cache exactly and
+    do only a 1-token suffix prefill + decode — effectively
+    decode-only after the first seed. Caching N-1 (not the full
+    input) avoids the zero-suffix edge case in saklas's generate
+    flow.
+
+    Replaces any prior cache. Call at the top of each prompt's
+    seed loop. Degenerate at N=1 — use ``install_prefix_cache``
+    over the prompt set instead."""
+    import torch
+    msgs = build_messages(
+        prompt,
+        kaomoji_instructed=kaomoji_instructed,
+        extra_preamble=extra_preamble,
+    )
+    result = session.tokenizer.apply_chat_template(
+        msgs, add_generation_prompt=True, return_tensors="pt",
+    )
+    full = result if isinstance(result, torch.Tensor) else result["input_ids"]
+    return session.cache_prefix(full[0, :-1])
+
+
 _STEER_EXPR_BY_CONDITION = {
     "steered_happy": "happy",
     "steered_sad":   "sad",
@@ -160,9 +242,11 @@ def run_sample(
     seed: int,
     hidden_dir: Path | None = None,
     experiment: str = "default",
-    store_full_trace: bool = True,
+    # no v3 analysis script reads `hidden_L<idx>` post-h_first cutover; ~60× sidecar shrink.
+    store_full_trace: bool = False,
     extra_preamble: str | None = None,
     override_max_tokens: int | None = None,
+    sidecar_writer: SidecarWriter | None = None,
 ) -> SampleRow:
     """Run one generation and build a feature row.
 
@@ -170,10 +254,20 @@ def run_sample(
     states + attention weights under
     ``<hidden_dir>/hidden/<experiment>/<row_uuid>.npz`` — enables
     post-hoc probe computation and cosine-in-hidden-state analysis.
-    ``store_full_trace=False`` stores only the three aggregate
-    snapshots (first/last/attention-weighted) per layer, dropping the
+    Default ``store_full_trace=False`` stores only the three aggregate
+    snapshots (h_first / h_last / h_mean) per layer, dropping the
     per-token trace — ~60x smaller sidecars at the cost of losing
-    mid-sequence access.
+    mid-sequence access. No v3 analysis script reads ``hidden_L<idx>``
+    post-h_first cutover, so this is safe for the hot path. Pass
+    ``store_full_trace=True`` explicitly for the smoke test or any
+    analysis that needs mid-sequence states.
+
+    ``sidecar_writer`` (optional, mutually exclusive with the inline
+    save path): if provided, the sidecar write is enqueued on the
+    writer's background thread and this function returns as soon as
+    the CPU snapshot is built. The runner owns the writer and is
+    responsible for draining/closing it. ``hidden_dir`` is still
+    required for canonical path resolution.
 
     ``extra_preamble`` (used by the introspection pilot) is prepended
     to KAOMOJI_INSTRUCTION inside the user message. Treated as
@@ -272,12 +366,19 @@ def run_sample(
 
     # Hidden-state sidecar capture (if requested). Reads directly from
     # saklas's post-generation capture buckets — no extra forward pass.
+    # The capture itself is gated by ``store_full_trace``: with it
+    # False (the default, hot path), the per-token trace never crosses
+    # the device boundary — only the three aggregates do.
     row_uuid = ""
     if hidden_dir is not None:
         row_uuid = uuid.uuid4().hex
-        capture = read_after_generate(session)
+        capture = read_after_generate(session, store_full_trace=store_full_trace)
         sidecar = hidden_state_path(hidden_dir, experiment, row_uuid)
-        save_hidden_states(capture, sidecar, store_full_trace=store_full_trace)
+        if sidecar_writer is not None:
+            # Async path: enqueue and return. Caller owns drain/close.
+            sidecar_writer.submit(capture, sidecar, store_full_trace=store_full_trace)
+        else:
+            save_hidden_states(capture, sidecar, store_full_trace=store_full_trace)
 
     return SampleRow(
         condition=condition,

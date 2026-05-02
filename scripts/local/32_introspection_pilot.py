@@ -33,7 +33,7 @@ from saklas import SaklasSession
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-from llmoji_study.capture import run_sample
+from llmoji_study.capture import install_prefix_cache, run_sample
 from llmoji_study.config import (
     DATA_DIR,
     INTROSPECTION_CONDITIONS,
@@ -43,7 +43,12 @@ from llmoji_study.config import (
     current_model,
 )
 from llmoji_study.emotional_prompts import EMOTIONAL_PROMPTS
+from llmoji_study.hidden_state_io import SidecarWriter
 from llmoji_study.prompts import Prompt
+
+
+# JSONL flush cadence — same rationale as 03_emotional_run.py.
+JSONL_FLUSH_EVERY = 20
 
 
 # Single paired seed across conditions.
@@ -126,46 +131,69 @@ def main() -> None:
     t_load = time.time()
     with SaklasSession.from_pretrained(M.model_id, device="auto", probes=PROBE_CATEGORIES) as session:
         print(f"loaded in {time.time() - t_load:.1f}s; beginning introspection pilot")
-        with raw_path.open("a") as out:
+        # SidecarWriter overlaps npz writes with generation; per CLAUDE.md
+        # this pilot is archive-bound, but new runs benefit from the
+        # store_full_trace=False default (see capture.py) too.
+        prompts = [
+            Prompt(id=ep.id, valence=ep.valence, text=ep.text)
+            for ep in EMOTIONAL_PROMPTS
+        ]
+        with raw_path.open("a") as out, SidecarWriter() as writer:
             i = 0
-            for condition in INTROSPECTION_CONDITIONS:
-                preamble = _PREAMBLE_BY_CONDITION[condition]
-                for ep in EMOTIONAL_PROMPTS:
-                    key = (condition, ep.id)
-                    if key in done:
-                        continue
-                    i += 1
-                    p = Prompt(id=ep.id, valence=ep.valence, text=ep.text)
-                    t0 = time.time()
-                    try:
-                        row = run_sample(
-                            session,
-                            prompt=p,
-                            condition=condition,
-                            seed=INTROSPECTION_SEED,
-                            hidden_dir=DATA_DIR,
-                            experiment=experiment,
-                            extra_preamble=preamble,
-                        )
-                    except Exception as e:
-                        err_row = {
-                            "condition": condition,
-                            "prompt_id": ep.id,
-                            "seed": INTROSPECTION_SEED,
-                            "error": repr(e),
-                        }
-                        out.write(json.dumps(err_row) + "\n")
-                        out.flush()
-                        print(f"  [{i}/{remaining}] {condition} {ep.id} ERR {e}")
-                        continue
-                    out.write(json.dumps(row.to_dict()) + "\n")
-                    out.flush()
-                    dt = time.time() - t0
-                    tag = row.first_word if row.first_word else "(no-kaomoji)"
-                    print(
-                        f"  [{i}/{remaining}] {condition} {ep.id} ({ep.quadrant}) "
-                        f"{tag}  ({dt:.1f}s, {row.tok_per_sec:.1f} tok/s)"
+            try:
+                for condition in INTROSPECTION_CONDITIONS:
+                    preamble = _PREAMBLE_BY_CONDITION[condition]
+                    # Re-cache the prefix per condition — each preamble
+                    # produces a distinct chat-template head. Saklas's
+                    # cache_prefix() replaces any prior entry; calling
+                    # this once per outer iteration costs one extra
+                    # prefill per condition (3 total) and amortizes
+                    # over ~100 prompts × 1 seed = 100 generations.
+                    prefix_len = install_prefix_cache(
+                        session, prompts, extra_preamble=preamble,
                     )
+                    print(f"[{condition}] prefix cache: {prefix_len} tokens")
+                    for ep in EMOTIONAL_PROMPTS:
+                        key = (condition, ep.id)
+                        if key in done:
+                            continue
+                        i += 1
+                        p = Prompt(id=ep.id, valence=ep.valence, text=ep.text)
+                        t0 = time.time()
+                        try:
+                            row = run_sample(
+                                session,
+                                prompt=p,
+                                condition=condition,
+                                seed=INTROSPECTION_SEED,
+                                hidden_dir=DATA_DIR,
+                                experiment=experiment,
+                                extra_preamble=preamble,
+                                sidecar_writer=writer,
+                            )
+                        except Exception as e:
+                            err_row = {
+                                "condition": condition,
+                                "prompt_id": ep.id,
+                                "seed": INTROSPECTION_SEED,
+                                "error": repr(e),
+                            }
+                            out.write(json.dumps(err_row) + "\n")
+                            out.flush()  # always flush on error
+                            print(f"  [{i}/{remaining}] {condition} {ep.id} ERR {e}")
+                            continue
+                        out.write(json.dumps(row.to_dict()) + "\n")
+                        if i % JSONL_FLUSH_EVERY == 0:
+                            out.flush()
+                        dt = time.time() - t0
+                        tag = row.first_word if row.first_word else "(no-kaomoji)"
+                        print(
+                            f"  [{i}/{remaining}] {condition} {ep.id} ({ep.quadrant}) "
+                            f"{tag}  ({dt:.1f}s, {row.tok_per_sec:.1f} tok/s)"
+                        )
+            finally:
+                # Always flush JSONL; SidecarWriter drains via __exit__.
+                out.flush()
     print(f"\ndone. wrote rows to {raw_path}")
 
 

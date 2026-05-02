@@ -41,7 +41,11 @@ class LayerCapture:
     """Per-layer capture: full per-token trace + three aggregates.
 
     Shapes are fp32 numpy:
-      hidden_states : (n_tokens, hidden_dim)
+      hidden_states : (n_tokens, hidden_dim) when ``store_full_trace=True``;
+                      (2, hidden_dim) fallback stack of (h_first, h_last)
+                      when ``store_full_trace=False`` — matches the
+                      ``load_hidden_states(full_trace=False)`` reconstruction
+                      so downstream [0] / [-1] indexing still works.
       h_first       : (hidden_dim,) — hidden_states[0]
       h_last        : (hidden_dim,) — hidden_states[-1]
       h_mean        : (hidden_dim,) — hidden_states.mean(axis=0)
@@ -60,7 +64,11 @@ class FullSequenceCapture:
     n_tokens: int  # number of generated tokens (= size of each layer's trace)
 
 
-def read_after_generate(session: Any) -> FullSequenceCapture:
+def read_after_generate(
+    session: Any,
+    *,
+    store_full_trace: bool = False,
+) -> FullSequenceCapture:
     """Read saklas's post-generation hidden-state buckets into a
     ``FullSequenceCapture``.
 
@@ -76,6 +84,14 @@ def read_after_generate(session: Any) -> FullSequenceCapture:
     ``h = h[:n]`` on captures that overshoot ``generated_ids``). We
     mirror that trim here so ``h_last`` aligns with the last scored
     generated token, not the EOS step.
+
+    Performance: layers are stacked together on-device into a single
+    ``(n_layers, n_tokens, hidden_dim)`` tensor and transferred to
+    host with one ``.cpu()`` call. With ``store_full_trace=False`` (the
+    hot path post-h_first cutover — see capture.run_sample), the full
+    trace never leaves the GPU; only the three ``(n_layers, hidden_dim)``
+    aggregates are transferred. ~55× fewer device→host syncs for a
+    56-layer model.
     """
     buckets: dict[int, list[torch.Tensor]] = session._capture._per_layer
     if not buckets:
@@ -94,7 +110,11 @@ def read_after_generate(session: Any) -> FullSequenceCapture:
     else:
         trim_n = min((len(b) for b in buckets.values() if b), default=0)
 
-    layers: dict[int, LayerCapture] = {}
+    # Pass 1: per-layer trim + stack on-device. We hold off on the
+    # device→host transfer until all kept layers are stacked together,
+    # so we can do one .cpu() instead of N.
+    kept_idxs: list[int] = []
+    kept_stacks: list[torch.Tensor] = []
     n_tokens = 0
     for idx, bucket in buckets.items():
         if not bucket:
@@ -104,9 +124,8 @@ def read_after_generate(session: Any) -> FullSequenceCapture:
         trimmed = bucket[:trim_n] if trim_n > 0 else bucket
         if not trimmed:
             continue
-        # Each element is a (hidden_dim,) tensor per step. Stack +
-        # fp32 + CPU in one shot.
-        stacked = torch.stack(trimmed).detach().to(torch.float32).cpu().numpy()
+        # (n_tokens, hidden_dim), still on-device, original dtype.
+        stacked = torch.stack(trimmed)
         if n_tokens == 0:
             n_tokens = stacked.shape[0]
         elif stacked.shape[0] != n_tokens:
@@ -114,12 +133,56 @@ def read_after_generate(session: Any) -> FullSequenceCapture:
                 f"inconsistent n_tokens across layers after trim: "
                 f"layer {idx} has {stacked.shape[0]}, expected {n_tokens}"
             )
-        layers[idx] = LayerCapture(
-            layer_idx=idx,
-            hidden_states=stacked,
-            h_first=stacked[0].copy(),
-            h_last=stacked[-1].copy(),
-            h_mean=stacked.mean(axis=0),
+        kept_idxs.append(idx)
+        kept_stacks.append(stacked)
+
+    if not kept_idxs:
+        return FullSequenceCapture(layers={}, n_tokens=0)
+
+    # All-layer batched stack: (n_layers, n_tokens, hidden_dim).
+    # The existing inconsistency check above guarantees same n_tokens.
+    all_stack = torch.stack(kept_stacks)  # device, original dtype
+
+    layers: dict[int, LayerCapture] = {}
+    if store_full_trace:
+        # One device→host transfer for the entire (n_layers, n_tokens,
+        # hidden_dim) tensor, then slice in numpy.
+        full_np = all_stack.detach().to(torch.float32).cpu().numpy()
+        for k, idx in enumerate(kept_idxs):
+            stacked_np = full_np[k]
+            layers[idx] = LayerCapture(
+                layer_idx=idx,
+                hidden_states=stacked_np,
+                h_first=stacked_np[0].copy(),
+                h_last=stacked_np[-1].copy(),
+                h_mean=stacked_np.mean(axis=0),
+            )
+    else:
+        # Compute aggregates on-device (still batched), then transfer
+        # only the three small (n_layers, hidden_dim) tensors. The full
+        # per-token trace never crosses the bus.
+        h_first_dev = all_stack[:, 0, :]
+        h_last_dev = all_stack[:, -1, :]
+        h_mean_dev = all_stack.mean(dim=1)
+        # Single combined transfer: (3, n_layers, hidden_dim).
+        agg_np = (
+            torch.stack([h_first_dev, h_last_dev, h_mean_dev])
+            .detach().to(torch.float32).cpu().numpy()
         )
+        h_first_np, h_last_np, h_mean_np = agg_np[0], agg_np[1], agg_np[2]
+        for k, idx in enumerate(kept_idxs):
+            hf, hl, hm = h_first_np[k], h_last_np[k], h_mean_np[k]
+            # Length-2 stack of (h_first, h_last) — same shape that
+            # load_hidden_states(full_trace=False) reconstructs.
+            # Keeps downstream code that touches lc.hidden_states[0]
+            # / [-1] working without branching.
+            hidden_states_fallback = np.stack([hf, hl])
+            layers[idx] = LayerCapture(
+                layer_idx=idx,
+                hidden_states=hidden_states_fallback,
+                h_first=hf,
+                h_last=hl,
+                h_mean=hm,
+            )
 
     return FullSequenceCapture(layers=layers, n_tokens=n_tokens)

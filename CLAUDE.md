@@ -191,6 +191,28 @@ phenomenal status. Aggregating that across 800+ generations is not nothing.
   to avoid cross-contamination during the rewrite. **All ~3300 prior
   v3 generations are invalidated for cross-run comparison; rerun gated
   on further design discussion + ethics review of trial scale.**
+- **Generation-loop perf batch landed 2026-05-02.** Stacks on top of
+  the MAX_NEW_TOKENS cutover. (a) Sidecar: `store_full_trace=False` is
+  the new `run_sample` default — `hidden_L<idx>` was unread by every
+  analysis script post-h_first cutover; ~60× shrink (45 GB → ~750 MB
+  per model). Smoke (`99`) opts back in explicitly. (b) Capture:
+  `read_after_generate` batched across layers on-device (single stack,
+  single device→host transfer); full trace never leaves GPU when not
+  stored. (c) Async I/O: `SidecarWriter` in `hidden_state_io.py`
+  overlaps `np.savez_compressed` with the next generation via a
+  1-thread executor + `try/finally` drain. (d) JSONL flush every 20
+  rows + on error / at run end. (e) Prefix KV caching: new
+  `install_prefix_cache` / `install_full_input_cache` helpers in
+  `capture.py` wire saklas's new `SaklasSession.cache_prefix()` API.
+  v3 main caches the full per-prompt input minus 1 token per outer-loop
+  iteration so seeds 2..8 do a 1-token suffix prefill (~43% prefill
+  reduction); introspection pilot re-caches per condition (~88% prefill
+  savings — preamble dominates). Phase-split smoke at
+  `scripts/local/98_v3_phase_timing_smoke.py` measures per-row {gen,
+  capture, npz, jsonl} timing for A/B validation. Saklas-side
+  companion: `cache_prefix()` public API + gated per-token entropy
+  `log_softmax` (only when consumers exist) + chat-template encode
+  LRU cache; tests in `saklas/tests/test_session.py::TestPrefixCache`.
 - **v1.0 package split (2026-04-27):** `llmoji` (PyPI) owns taxonomy /
   canonicalization / hook templates / scrape / backfill / synth prompts;
   this repo's package was renamed `llmoji_study` and depends on
