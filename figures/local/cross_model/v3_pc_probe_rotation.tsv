@@ -1,0 +1,10 @@
+model	probe	axis	pc_capture_norm	rotated_x	rotated_y	rotated_z	angle_deg_to_target
+gemma	happy.sad	x	0.85536	0.93439	-0.04500	-0.35340	20.87010
+gemma	angry.calm	y	0.45147	-0.04500	0.91355	0.40422	23.99888
+gemma	fearful.unflinching	z	0.76226	-0.35340	0.40422	0.84363	32.47434
+qwen	happy.sad	x	0.84748	0.86631	-0.25143	-0.43162	29.96784
+qwen	angry.calm	y	0.87084	-0.25143	0.83409	-0.49099	33.47856
+qwen	fearful.unflinching	z	0.56639	-0.43162	-0.49099	0.75673	40.82359
+ministral	happy.sad	x	0.91868	0.73739	0.06520	-0.67231	42.49009
+ministral	angry.calm	y	0.73257	0.06520	0.99242	-0.10420	7.06021
+ministral	fearful.unflinching	z	0.66291	-0.67231	-0.10420	0.73290	42.86985

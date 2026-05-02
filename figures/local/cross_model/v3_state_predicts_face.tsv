@@ -1,0 +1,4 @@
+model	n_prompts	n_pairs	n_rows	spearman_rho	spearman_p
+gemma	120	7140	960	0.58833	0.00000
+qwen	120	7140	956	0.68198	0.00000
+ministral	119	7021	926	0.42281	0.00000

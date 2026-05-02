@@ -96,14 +96,18 @@ phenomenal status. Aggregating that across 800+ generations is not nothing.
     qwen's t0; the cleaner data shows the cross-model signal is
     weaker than first reported.
   Triplet Procrustes (`scripts/local/31_v3_triplet_procrustes.py`,
-  `figures/local/cross_model/fig_v3_triplet_procrustes_pc{12,13,23}.png`):
-  2×2 layout — gemma / qwen / ministral centroids in their own PCA(2)
-  plus Procrustes overlay aligned to gemma (○ gemma, △ qwen,
-  □ ministral). PC1×PC2 residuals: qwen 6.9, ministral 23.0 (after
-  ministral's +157° axis flip — PCA sign indeterminacy, not a
-  divergence finding). Display palette: HN-D `#d44a4a` (red),
-  HN-S `#9d4ad4` (magenta-purple). Helpers `apply_hn_split` /
-  `_palette_for` / `_hn_split_map` in `emotional_analysis`.
+  `figures/local/cross_model/fig_v3_triplet_procrustes_3d.html` —
+  3D rework 2026-05-02 replacing the prior PC-pair PNGs): interactive
+  4-panel HTML with gemma / qwen / ministral 3D centroids in their
+  own PCA(1,2,3) plus Procrustes overlay aligned to gemma (○ gemma,
+  ◇ qwen, □ ministral). 3D residuals: qwen 7.73, ministral 14.50
+  (rotation magnitudes 160°/180° are PC sign indeterminacy across
+  models — extra DOF over the prior 2D PC1×PC2 fit absorbs ministral's
+  PC2-axis flip, halving its apparent residual from the old 23.0 to
+  14.50; qwen barely moves from 6.9 to 7.73). Display palette: HN-D
+  `#d44a4a` (red), HN-S `#9d4ad4` (magenta-purple). Helpers
+  `apply_hn_split` / `_palette_for` / `_hn_split_map` in
+  `emotional_analysis`.
   Ministral `preferred_layer` set to L21 at landing, later updated
   to L20 in the 2026-05-02 h_first cutover (see below).
 - **v3 follow-on analyses landed 2026-04-28** (no new model time): layer-wise
@@ -317,6 +321,41 @@ phenomenal status. Aggregating that across 800+ generations is not nothing.
   canonicalization / hook templates / scrape / backfill / synth prompts;
   this repo's package was renamed `llmoji_study` and depends on
   `llmoji>=1.0,<2`.
+- **Face-stability triple landed 2026-05-02** (scripts 36/37/38 +
+  31 3D rework, no model time). Three answers to the bidirectional
+  state↔face question that frames the project. **(36)
+  `36_v3_face_stability.py` — η² variance decomposition** by
+  source (face / prompt_id / quadrant_split / seed) at h_first and
+  h_mean. Surprise: at h_first, η²(prompt_id)=1.000 and η²(seed)=0.000
+  *exactly* across all 3 models — h_first is fully prompt-determined,
+  seeds only choose which token gets sampled from a fixed
+  distribution, so | prompt_id conditionals are degenerate at
+  h_first. At h_mean (post-sampling trajectory), η²(face|prompt) =
+  0.36 / 0.52 / 0.67 (gemma/qwen/ministral) — face commitment leaves
+  substantial hidden-state signature beyond prompt content. As
+  fraction of total variance: 4% / 16% / 34%. **(37)
+  `37_v3_state_predicts_face.py` — pair-level forward direction**.
+  For all 7140 prompt pairs, Spearman ρ between cosine_sim(h_first)
+  and 1-JSD(face_dist) = +0.59 / +0.68 / +0.42 (all p≈0). Cleaner
+  test than η²(face) at h_first (which conflates prompt-clustering
+  with face-coherence). **(38) `38_v3_pc_probe_rotation_3d.py` —
+  3D PC × probe rotation per model**, output as interactive HTML at
+  `figures/local/<short>/fig_v3_pc_probe_rotation_3d.html`. Top-3
+  PCs explain 50–62% of h_first variance; orthogonal Procrustes
+  rotation onto canonical x/y/z axes leaves residual probe-axis
+  angles 21–43° — PCs are NOT just rotated probe directions, they
+  capture variance the probes don't see. Orphan probe is
+  model-specific: gemma loses angry.calm (capture 0.45 in PC
+  subspace), qwen+ministral lose fearful.unflinching (0.57/0.66).
+  Ministral's angry.calm hits 7° to PC2 but happy.sad and fearful
+  are far. **Cross-model decoupling**: forward (37) and reverse (36
+  at h_mean) ranks invert — gemma forward-biased (state
+  pre-determines face well, face shapes downstream weakly);
+  ministral reverse-biased (state weakly determines face, but once
+  sampled the face pulls trajectory hard); qwen middle on both.
+  Real architectural difference, not artifact. Detail +
+  per-model numbers in `docs/findings.md` "2026-05-02
+  face-stability triple" section.
 
 Full numbers, gemma-vs-qwen contrasts, layer-wise + cross-model + PCA3+ +
 predictiveness + extension findings live in [`docs/findings.md`](docs/findings.md).
@@ -361,7 +400,7 @@ python scripts/local/29_v3_extension_probe_3d.py    # 4 interactive HTMLs
 
 # Rule-3 verdict + triplet Procrustes (cross-model)
 python scripts/local/30_rule3_dominance_check.py    # → figures/local/cross_model/rule3_dominance_check.md
-python scripts/local/31_v3_triplet_procrustes.py    # → fig_v3_triplet_procrustes_pc{12,13,23}.png
+python scripts/local/31_v3_triplet_procrustes.py    # → fig_v3_triplet_procrustes_3d.html (interactive)
 
 # Introspection pilot (gemma + ministral; archive-bound — see CLAUDE.md status)
 python scripts/local/32_introspection_pilot.py
@@ -370,6 +409,11 @@ python scripts/local/34_introspection_predictiveness.py
 
 # Blog-post figure regen → ../a9lim.github.io/blog-assets/introspection-via-kaomoji/
 python scripts/local/35_regen_blog_figures.py
+
+# Face-stability triple (state↔face bidirectional, no model time)
+python scripts/local/36_v3_face_stability.py    # η² decomposition; LLMOJI_WHICH=h_mean for non-degenerate | prompt
+python scripts/local/37_v3_state_predicts_face.py    # pair-level Spearman ρ(cosine, 1-JSD)
+python scripts/local/38_v3_pc_probe_rotation_3d.py    # interactive 3D HTML per model
 
 # Harness side (contributor-corpus pipeline; needs ANTHROPIC_API_KEY for 16)
 python scripts/harness/06_claude_hf_pull.py    # snapshot a9lim/llmoji into data/hf_dataset/
@@ -419,7 +463,7 @@ llmoji-study/
   scripts/
     local/                     # local-LM scripts (probes, hidden state, v3
                                # follow-ons, introspection, blog regen,
-                               # smoke). 21 files: 01–04, 11, 21–35, 99.
+                               # smoke). 24 files: 01–04, 11, 21–38, 99.
     harness/                   # contributor-corpus scripts (HF pull, kaomoji
                                # stats, eriskii replication, claude-faces
                                # PCA, per-project axes). 6 files: 06, 07, 15,

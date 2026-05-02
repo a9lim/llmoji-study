@@ -1,0 +1,22 @@
+model	kind	factor	given	eta2	n_groups	n_rows
+gemma	marginal	face		0.61303	52	960
+gemma	marginal	prompt_id		0.87853	120	960
+gemma	marginal	quadrant_split		0.44412	6	960
+gemma	marginal	seed		0.00190	8	960
+gemma	conditional	face	prompt_id	0.36256	52	960
+gemma	conditional	quadrant_split	prompt_id	0.00000	6	960
+gemma	conditional	face	quadrant_split	0.33415	52	960
+qwen	marginal	face		0.64563	89	956
+qwen	marginal	prompt_id		0.70504	120	956
+qwen	marginal	quadrant_split		0.38615	6	956
+qwen	marginal	seed		0.00687	8	956
+qwen	conditional	face	prompt_id	0.51552	89	956
+qwen	conditional	quadrant_split	prompt_id	0.00000	6	956
+qwen	conditional	face	quadrant_split	0.42338	89	956
+ministral	marginal	face		0.77331	231	926
+ministral	marginal	prompt_id		0.49213	119	926
+ministral	marginal	quadrant_split		0.20791	6	926
+ministral	marginal	seed		0.01401	8	926
+ministral	conditional	face	prompt_id	0.67030	231	926
+ministral	conditional	quadrant_split	prompt_id	0.00000	6	926
+ministral	conditional	face	quadrant_split	0.72933	231	926

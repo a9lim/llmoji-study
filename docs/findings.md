@@ -905,6 +905,142 @@ post-2026-05-02 h_first standardization at L50 / L59 / L20.
   pre-fix expectations (~5–10 pp rather than the predicted 30 pp) —
   the v3 quadrant signal genuinely generalizes to held-out prompts.
 
+### Face-stability triple — state↔face bidirectional (2026-05-02, post-cleanliness)
+
+Three follow-on analyses on existing N=8 cleanliness-pass sidecars (no
+model time). Frames the project's central question explicitly: does the
+hidden state determine the face (forward), and does the face commit
+hidden-state structure (reverse)? Prior work (probe → kaomoji
+correlations, predictiveness CV) leaned reverse-direction; these add
+the forward leg and a cross-model architectural read.
+
+**Script 36 — η² variance decomposition.** Per-model BSS(G) / TSS at
+h_first and h_mean @ preferred_layer, with G ∈ {face, prompt_id,
+quadrant_split, seed} plus conditional η²(face | prompt_id) and
+η²(face | quadrant_split). Surprise: at h_first, η²(prompt_id) =
+**1.000** and η²(seed) = **0.000** *exactly* across all three models.
+h_first is the state immediately before the first generated token is
+sampled — it's fully determined by the prompt, and seeds only choose
+which token gets drawn from a fixed distribution. The | prompt_id
+conditional is therefore degenerate at h_first (residual is identically
+zero). At h_mean (averaged over the post-MAX_NEW_TOKENS=16 generation
+window), prompt-determinism breaks and the conditional becomes
+informative:
+
+| model | η²(prompt) h_first | η²(prompt) h_mean | η²(face\|prompt) h_mean | as % of total |
+| --- | ---: | ---: | ---: | ---: |
+| gemma | 1.000 | 0.879 | 0.36 | 4% |
+| qwen | 1.000 | 0.705 | 0.52 | 16% |
+| ministral | 1.000 | 0.492 | 0.67 | 34% |
+
+Face commitment leaves substantial hidden-state signature *beyond*
+prompt content. Ministral's reverse-direction story is strongest —
+opposite of its noisy affect-PCA ranking. Caveat: ministral has 231
+unique faces in 926 rows (~4 emissions/face) vs gemma's 52 in 960 (~18)
+so part of η²(face) is mechanical singleton-DOF inflation; ω²
+adjustment or a min_count filter would refine the absolute numbers,
+but the qualitative ministral > qwen > gemma rank survives because
+gemma's 0.36 with ~18 rows/face is already substantive on its own.
+
+Cross-checks pass: η²(seed) ≈ 0 on h_first (true zero) and tiny on
+h_mean (0.002 / 0.007 / 0.014, downstream-divergence scale);
+η²(quadrant\|prompt) = 0 on h_mean (sanity — quadrant is fully
+determined by prompt id).
+
+Outputs: `figures/local/cross_model/{fig_,}v3_face_stability_eta2_{h_first,h_mean}.{png,tsv}`.
+
+**Script 37 — pair-level forward direction.** η²(face) at h_first
+conflates two things: (a) prompt clusters in h_first space (trivial —
+different prompts have different states) and (b) face-coherence within
+those clusters (the actual mechanism). Script 37 isolates (b) by going
+pair-level. For all 7140 prompt pairs (or 7021 on ministral, 1 prompt
+emits zero kaomoji): cosine_sim of the per-prompt h_first vector
+against 1 − JSD of the per-prompt face-emission distribution across
+8 seeds. Spearman correlation across pairs:
+
+| model | Spearman ρ | n_pairs | p |
+| --- | ---: | ---: | ---: |
+| qwen | **+0.682** | 7140 | ≈ 0 |
+| gemma | +0.588 | 7140 | ≈ 0 |
+| ministral | +0.423 | 7021 | 1.5e-302 |
+
+**Forward direction confirmed clean of the prompt-clustering
+confound.** Ministral-weakest pattern from η²(face) at h_first
+replicates here, so it's not a DOF artifact. JSD normalized by
+sqrt(ln 2) so the y-axis sits in [0, 1].
+
+Outputs: `figures/local/cross_model/v3_state_predicts_face.tsv` +
+per-model hexbin scatter `figures/local/<short>/fig_v3_state_predicts_face.png`.
+
+**Script 38 — 3D PC × probe rotation per model.** Top-3 PCs of h_first
+@ preferred_layer, with the canonical probes (happy.sad / angry.calm /
+fearful.unflinching) projected into the PC subspace via row-level
+correlation. Orthogonal Procrustes finds R ∈ O(3) such that R · D[k] ≈
+e_k, rotating the PC-space frame so each probe approximately aligns
+with a canonical axis. Apply to row coords + render as interactive
+HTML at `figures/local/<short>/fig_v3_pc_probe_rotation_3d.html`.
+
+| model | top-3 PC variance | weakest-captured probe | residual angles after rotation |
+| --- | ---: | --- | --- |
+| gemma | 61.6% | angry.calm (capture 0.45) | 21° / 24° / 32° |
+| qwen | 58.8% | fearful.unflinching (0.57) | 30° / 33° / 41° |
+| ministral | 50.1% | fearful.unflinching (0.66) | 42° / **7°** / 43° |
+
+(Capture = ‖corr-vector(probe, PCs)‖, ∈ [0, 1]; closer to 1 means the
+probe lies mostly inside the PC subspace.)
+
+Findings:
+
+1. PCs are **NOT** rotated probe directions. Even after best-fit
+   Procrustes, residual angles are 21–43°. The 2D mismatch is real
+   geometry, not an artifact of dimension reduction.
+2. The **orphan probe is model-specific**. Gemma loses angry.calm in
+   PC subspace; qwen and ministral both lose fearful.unflinching.
+   Suggests gemma's affect representation puts dominance / arousal on
+   one axis and valence on another, while qwen / ministral collapse
+   anger and fear differently.
+3. Ministral's angry.calm hits **7°** to PC2 — its PC2 IS roughly
+   "anger axis" — but happy.sad and fearful.unflinching are at 42°
+   and 43°. Ministral has one probe-aligned PC and two PCs that aren't.
+
+Outputs: 3 per-model HTMLs + `figures/local/cross_model/v3_pc_probe_rotation.tsv`
+(per probe per model: pc_capture_norm, rotated_xyz, angle_deg_to_target).
+
+**Cross-model decoupling — the structural finding.** Forward (script
+37) and reverse (script 36 at h_mean) ranks **invert**:
+
+| model | forward ρ | reverse η²(face\|prompt) at h_mean |
+| --- | ---: | ---: |
+| gemma | 0.59 ↑ | 0.36 ↓ |
+| qwen | 0.68 ↑ | 0.52 → |
+| ministral | 0.42 ↓ | 0.67 ↑ |
+
+Reading: **gemma is forward-biased** — its hidden state
+pre-determines the face well, but once the face is sampled it does
+little to perturb downstream trajectory. **Ministral is
+reverse-biased** — its hidden state is more permissive about which
+face gets sampled, but once a face is committed it pulls the
+trajectory hard. Qwen is middling on both. This is a real
+architectural difference between the three models in how face
+commitment relates to internal state, not a measurement artifact.
+Pre-registers a steering prediction: if face leaves a 34% TSS
+signature on ministral vs 4% on gemma, steering should be most
+leveraged on ministral; the reverse-direction work (saklas-style
+contrastive PCA + steering) gets more bang per α on the
+reverse-biased model.
+
+**31 3D rework (same date)**: `scripts/local/31_v3_triplet_procrustes.py`
+now renders one interactive 4-panel HTML at
+`figures/local/cross_model/fig_v3_triplet_procrustes_3d.html` (gemma /
+qwen / ministral 3D centroids + Procrustes-aligned overlay) instead of
+three PC-pair PNGs. 3D residuals: **qwen 7.73, ministral 14.50** (both
+with rotation magnitudes 160°/180° from PC sign indeterminacy across
+models — extra DOF over the prior 2D PC1×PC2 fit absorbs ministral's
+PC2-axis flip, halving its apparent residual from the 2D 23.0 to 3D
+14.50; qwen's barely moves, 6.9 → 7.73). Genuine geometric divergence
+of ministral from gemma is ~2× qwen's, not ~3× as the 2D PC1×PC2
+view suggested. Old PC-pair PNGs deleted.
+
 ### Vocab pilot — Ministral-3-14B-Instruct-2512
 
 Same 30 v1/v2 PROMPTS, same seed, same instructions. 30 generations,

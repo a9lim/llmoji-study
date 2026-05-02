@@ -1,37 +1,35 @@
-"""v3 triplet Procrustes: cross-model quadrant-geometry alignment
+# pyright: reportAttributeAccessIssue=false, reportArgumentType=false, reportReturnType=false
+"""v3 triplet Procrustes in 3D: cross-model quadrant-geometry alignment
 across gemma / qwen / ministral, with the rule-3-redesign HN split
 active. PCA(3) is fit per model on its preferred-layer hidden state;
-the three figures below slice that decomposition through different
-PC pairs.
+per-quadrant centroids form 6-point clouds in PC1×PC2×PC3 space, and
+the cross-model alignment is computed via 3D orthogonal Procrustes
+(qwen→gemma, ministral→gemma).
 
-Three 2×2 figures:
+Output is a single interactive HTML with a 2×2 grid of 3D scenes:
 
-  fig_v3_triplet_procrustes_pc12.png    PC1 × PC2  (Russell circumplex)
-  fig_v3_triplet_procrustes_pc13.png    PC1 × PC3
-  fig_v3_triplet_procrustes_pc23.png    PC2 × PC3
-
-Each 2×2 panel:
-
-  top-left      gemma centroids in the active PC plane at L31
-  top-right     qwen centroids in the active PC plane at L61
-  bottom-left   ministral centroids in the active PC plane at L21
+  top-left      gemma centroids in its own PC(1,2,3)
+  top-right     qwen centroids in its own PC(1,2,3)
+  bottom-left   ministral centroids in its own PC(1,2,3)
   bottom-right  Procrustes overlay: gemma centered (○), qwen
-                rotated to fit gemma (△), ministral rotated to fit
+                rotated to fit gemma (◇), ministral rotated to fit
                 gemma (□). Same per-quadrant color across the three
                 marker styles; lines connect same-quadrant centroids
-                across models so divergence reads visually.
+                across models so divergence reads visually in 3D.
 
-PC sign-indeterminacy means rotations near ±180° just indicate that
-some model assigns opposite signs to the active PCs vs gemma — a
-rigid axis flip, not a divergence finding. The reported rotation is
-the raw orthogonal-Procrustes angle so the number is honest.
+3D rotation indeterminacy: PC sign-flips and PC-pair swaps both fall
+out as proper rotations in O(3), so a Procrustes rotation that
+includes a near-180° axis flip just means some model's PC basis is
+oriented oppositely to gemma's — a rigid frame change, not a
+divergence finding. The reported total rotation angle (the
+axis-angle magnitude of R) is the raw orthogonal-Procrustes value
+so the number is honest.
 
 Quadrant labels are HP / LP / HN-D / HN-S / LN / NB (rule-3-redesign
-6-category split). Untagged HN rows (hn06 / hn15 / hn17, three
-borderline reads) drop out before PCA.
+6-category split). Untagged HN rows drop out before PCA.
 
 Output:
-  figures/local/cross_model/fig_v3_triplet_procrustes_pc{12,13,23}.png
+  figures/local/cross_model/fig_v3_triplet_procrustes_3d.html
   figures/local/cross_model/v3_triplet_procrustes_summary.json
 """
 
@@ -41,85 +39,76 @@ import json
 import sys
 from pathlib import Path
 
-import matplotlib.pyplot as plt
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+
 import numpy as np
 import pandas as pd
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from scipy.linalg import orthogonal_procrustes
 from sklearn.decomposition import PCA
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from llmoji_study.config import FIGURES_DIR, MODEL_REGISTRY
 from llmoji_study.emotional_analysis import (
     QUADRANT_COLORS,
     QUADRANT_ORDER_SPLIT,
-    _use_cjk_font,
     load_emotional_features_all_layers,
 )
 
+
 MODELS = ("gemma", "qwen", "ministral")
 QUADRANT_ORDER = QUADRANT_ORDER_SPLIT
+REFERENCE_MODEL = "gemma"
+
+# Plotly's 3D markers: small but visually-distinct triplet.
+MARKERS_3D = {
+    "gemma":     "circle",
+    "qwen":      "diamond",
+    "ministral": "square",
+}
 
 
 def _load_at_preferred_layer(short: str) -> tuple[pd.DataFrame, np.ndarray, int]:
-    """Load v3 hidden state at this model's preferred layer, with HN
-    split. Drops kaomoji-empty + untagged-HN rows. Returns (df, X)
-    row-aligned."""
     M = MODEL_REGISTRY[short]
-    df, X3, layer_idxs = load_emotional_features_all_layers(
-        short, split_hn=True,
-    )
+    df, X3, layer_idxs = load_emotional_features_all_layers(short, split_hn=True)
     layer = M.preferred_layer if M.preferred_layer is not None else max(layer_idxs)
     li = layer_idxs.index(layer)
     X = X3[:, li, :]
     return df, X, layer
 
 
-def _fit_pca3(df: pd.DataFrame, X: np.ndarray) -> tuple[np.ndarray, PCA]:
-    """Fit PCA(3) on the model's hidden states and return the (n, 3)
-    projection plus the fitted PCA object (for its
-    `explained_variance_ratio_`)."""
+def _fit_pca3(X: np.ndarray) -> tuple[np.ndarray, PCA]:
     pca = PCA(n_components=3)
     Y = pca.fit_transform(X)
     return Y, pca
 
 
-def _centroids_in_plane(
-    df: pd.DataFrame, Y3: np.ndarray, pc_pair: tuple[int, int],
+def _centroids_3d(
+    df: pd.DataFrame, Y3: np.ndarray,
 ) -> dict[str, np.ndarray]:
-    """Per-quadrant centroids in the 2D plane spanned by the given PC
-    pair (e.g. (0, 1) → PC1 × PC2; (0, 2) → PC1 × PC3)."""
-    i, j = pc_pair
-    centroids: dict[str, np.ndarray] = {}
+    """Per-quadrant centroids in PC(1,2,3) space."""
+    out: dict[str, np.ndarray] = {}
     for q in QUADRANT_ORDER:
         mask = (df["quadrant"] == q).to_numpy()
         if mask.any():
-            sub = Y3[mask][:, [i, j]]
-            centroids[q] = sub.mean(axis=0)
-    return centroids
+            out[q] = Y3[mask].mean(axis=0)
+    return out
 
 
-# Back-compat alias: a few callers (and earlier docs) reference the old
-# PC1×PC2-specific helper. New code should use _fit_pca3 +
-# _centroids_in_plane.
-def _centroids_in_pca2(df: pd.DataFrame, X: np.ndarray) -> tuple[
-    dict[str, np.ndarray], np.ndarray, PCA
-]:
-    Y3, pca = _fit_pca3(df, X)
-    cents = _centroids_in_plane(df, Y3, (0, 1))
-    return cents, Y3[:, :2], pca
-
-
-def _procrustes_align(
+def _procrustes_align_3d(
     centroids_a: dict[str, np.ndarray],
     centroids_b: dict[str, np.ndarray],
-) -> dict[str, object]:
-    """Find rotation R such that B-centroids @ R best fits A-centroids
-    after centering. Rescale aligned B to match A's norm."""
-    common = [q for q in QUADRANT_ORDER if q in centroids_a and q in centroids_b]
-    if len(common) < 2:
+) -> dict:
+    """3D orthogonal Procrustes: rotate B-centroids onto A-centroids
+    after centering. Returns aligned B coords + the rotation matrix +
+    total axis-angle magnitude in degrees."""
+    common = [q for q in QUADRANT_ORDER
+              if q in centroids_a and q in centroids_b]
+    if len(common) < 3:
         return {"common": common, "rotation_deg": float("nan"),
-                "residual": float("nan"), "Cg": None, "Cq_aligned": None}
+                "residual": float("nan"),
+                "Ca_centered": None, "Cb_aligned": None,
+                "R": None}
     Ca = np.asarray([centroids_a[q] for q in common])
     Cb = np.asarray([centroids_b[q] for q in common])
     Ca_c = Ca - Ca.mean(axis=0, keepdims=True)
@@ -131,199 +120,128 @@ def _procrustes_align(
     if norm_b > 0:
         Cb_aligned = Cb_aligned * (norm_a / norm_b)
     residual = float(np.linalg.norm(Cb_aligned - Ca_c))
-    angle = float(np.degrees(np.arctan2(R[1, 0], R[0, 0])))
+    # Axis-angle magnitude: cos(θ) = (tr(R) - 1) / 2.
+    cos_theta = (float(np.trace(R)) - 1.0) / 2.0
+    cos_theta = max(min(cos_theta, 1.0), -1.0)
+    angle = float(np.degrees(np.arccos(cos_theta)))
     return {
         "common": common,
         "rotation_deg": angle,
         "residual": residual,
         "Ca_centered": Ca_c,
         "Cb_aligned": Cb_aligned,
+        "R": R,
     }
 
 
-def _draw_centroids(ax, centroids: dict[str, np.ndarray], title: str) -> None:
+def _add_per_model_scene(
+    fig: go.Figure, scene_idx: int,
+    centroids: dict[str, np.ndarray],
+    title: str,
+) -> None:
+    """Add per-quadrant centroid markers + axis lines to one 3D scene.
+
+    Plotly subplot scenes are addressed via ``scene{N}`` — caller
+    passes scene_idx so traces get attached to the right panel."""
+    scene = "scene" if scene_idx == 1 else f"scene{scene_idx}"
     for q, pt in centroids.items():
         color = QUADRANT_COLORS.get(q, "#666")
-        ax.scatter(pt[0], pt[1], c=color, s=200,
-                   edgecolor="black", linewidth=0.8)
-        ax.annotate(q, (pt[0], pt[1]),
-                    xytext=(7, 5), textcoords="offset points",
-                    fontsize=9, fontweight="bold")
-    ax.axhline(0, color="#ccc", linewidth=0.4, zorder=0)
-    ax.axvline(0, color="#ccc", linewidth=0.4, zorder=0)
-    ax.set_xlabel("PC1")
-    ax.set_ylabel("PC2")
-    ax.set_title(title, fontsize=10)
+        fig.add_trace(
+            go.Scatter3d(
+                x=[pt[0]], y=[pt[1]], z=[pt[2]],
+                mode="markers+text",
+                marker=dict(size=8, color=color,
+                            line=dict(color="black", width=1)),
+                text=[q], textposition="top center",
+                textfont=dict(size=10),
+                name=f"{title} {q}",
+                showlegend=False,
+                hovertemplate=(
+                    f"{title}<br>{q}<br>"
+                    "PC1=%{x:.2f}<br>PC2=%{y:.2f}<br>PC3=%{z:.2f}"
+                    "<extra></extra>"
+                ),
+                scene=scene,
+            )
+        )
 
 
-REFERENCE_MODEL = "gemma"   # all alignments computed against this model
-
-# Marker shapes for the overlay panel — visually distinct enough to
-# read at small sizes, kept consistent with figure conventions
-# elsewhere (○ / △ / □ is the standard 3-way differentiator).
-MARKERS = {
-    "gemma":     "o",   # circle
-    "qwen":      "^",   # triangle
-    "ministral": "s",   # square
-}
-
-
-def _draw_overlay_triplet(
-    ax,
+def _add_overlay_scene(
+    fig: go.Figure, scene_idx: int,
     common: list[str],
-    cents_by_model: dict[str, np.ndarray],   # model -> (n_common, 2) coords in shared frame
-    pair_summaries: dict[str, tuple[float, float]],  # model -> (rot_deg, residual)
+    cents_by_model: dict[str, np.ndarray],
 ) -> None:
-    # Per-quadrant: scatter for each model with its own marker shape;
-    # connect the same-quadrant points across the three models with a
-    # thin line so deviation reads visually.
+    """Add the aligned overlay: each quadrant gets one marker per
+    model + a connecting line through them so deviation reads
+    visually."""
+    scene = "scene" if scene_idx == 1 else f"scene{scene_idx}"
+
+    # Per-quadrant connecting lines (gemma → qwen → ministral).
     for i, q in enumerate(common):
         color = QUADRANT_COLORS.get(q, "#666")
-        # connecting line — gemma → qwen → ministral
         xs = [cents_by_model["gemma"][i, 0],
               cents_by_model["qwen"][i, 0],
               cents_by_model["ministral"][i, 0]]
         ys = [cents_by_model["gemma"][i, 1],
               cents_by_model["qwen"][i, 1],
               cents_by_model["ministral"][i, 1]]
-        ax.plot(xs, ys, color=color, linestyle="--",
-                linewidth=0.9, alpha=0.55, zorder=1)
-        for short in MODELS:
-            pt = cents_by_model[short][i]
-            ax.scatter(pt[0], pt[1], c=color, s=200,
-                       marker=MARKERS[short], edgecolor="black",
-                       linewidth=0.8, zorder=3)
-        # Quadrant label anchored on gemma's position (the reference)
-        gpt = cents_by_model["gemma"][i]
-        ax.annotate(q, (gpt[0], gpt[1]),
-                    xytext=(8, 6), textcoords="offset points",
-                    fontsize=10, fontweight="bold")
-
-    ax.axhline(0, color="#ccc", linewidth=0.4, zorder=0)
-    ax.axvline(0, color="#ccc", linewidth=0.4, zorder=0)
-    ax.set_xlabel("aligned PC1")
-    ax.set_ylabel("aligned PC2")
-
-    # Legend: one entry per model + marker
-    from matplotlib.lines import Line2D
-    legend_handles = [
-        Line2D([0], [0], marker=MARKERS[m], color="w",
-               markerfacecolor="#444", markeredgecolor="black",
-               markersize=10, label=m, markeredgewidth=0.8)
-        for m in MODELS
-    ]
-    ax.legend(handles=legend_handles, loc="best",
-              fontsize=9, frameon=False, title="model (marker)")
-
-    # Title with both pair Procrustes summaries
-    qwen_rot, qwen_res = pair_summaries["qwen"]
-    min_rot, min_res = pair_summaries["ministral"]
-    ax.set_title(
-        f"all three overlaid on gemma\n"
-        f"qwen→gemma: rot {qwen_rot:+.1f}°, residual {qwen_res:.2f}   "
-        f"ministral→gemma: rot {min_rot:+.1f}°, residual {min_res:.2f}",
-        fontsize=10,
-    )
-
-
-# Three planes through PCA(3): the canonical PC1×PC2 plane (the
-# Russell-circumplex view) and two PC3-bearing planes that test
-# whether structure orthogonal to the affect plane is shared
-# across models.
-PC_PAIRS: list[tuple[tuple[int, int], str, str]] = [
-    ((0, 1), "pc12", "PC1 × PC2"),
-    ((0, 2), "pc13", "PC1 × PC3"),
-    ((1, 2), "pc23", "PC2 × PC3"),
-]
-
-
-def _build_figure_for_pair(
-    per_model: dict[str, dict],
-    pc_pair: tuple[int, int],
-    plane_label: str,
-    out_path: Path,
-) -> dict:
-    """Build the 2×2 figure for one PC pair. Returns the per-pair
-    summary dict (per-model centroids, rotations, residuals)."""
-    pi, pj = pc_pair
-    pc_a = pi + 1
-    pc_b = pj + 1
-
-    cents_by_model: dict[str, dict[str, np.ndarray]] = {
-        m: _centroids_in_plane(per_model[m]["df"], per_model[m]["Y3"], pc_pair)
-        for m in MODELS
-    }
-    common = [q for q in QUADRANT_ORDER
-              if all(q in cents_by_model[m] for m in MODELS)]
-
-    ref_cents = cents_by_model[REFERENCE_MODEL]
-    aligned: dict[str, np.ndarray] = {}
-    pair_summaries: dict[str, tuple[float, float]] = {}
-    Cg = np.asarray([ref_cents[q] for q in common])
-    Cg_c = Cg - Cg.mean(axis=0, keepdims=True)
-    aligned[REFERENCE_MODEL] = Cg_c
-    pair_summaries[REFERENCE_MODEL] = (0.0, 0.0)
-    for m in MODELS:
-        if m == REFERENCE_MODEL:
-            continue
-        result = _procrustes_align(ref_cents, cents_by_model[m])
-        aligned[m] = result["Cb_aligned"]
-        pair_summaries[m] = (
-            float(result["rotation_deg"]),
-            float(result["residual"]),
+        zs = [cents_by_model["gemma"][i, 2],
+              cents_by_model["qwen"][i, 2],
+              cents_by_model["ministral"][i, 2]]
+        fig.add_trace(
+            go.Scatter3d(
+                x=xs, y=ys, z=zs,
+                mode="lines",
+                line=dict(color=color, width=4, dash="dash"),
+                opacity=0.6,
+                showlegend=False, hoverinfo="skip",
+                scene=scene,
+            )
         )
 
-    fig, axes = plt.subplots(2, 2, figsize=(13, 11))
-    panel_for = {
-        "gemma":     axes[0, 0],
-        "qwen":      axes[0, 1],
-        "ministral": axes[1, 0],
-    }
+    # Per-quadrant per-model markers; quadrant label anchored on gemma.
+    for i, q in enumerate(common):
+        color = QUADRANT_COLORS.get(q, "#666")
+        for m in MODELS:
+            pt = cents_by_model[m][i]
+            text = [q] if m == "gemma" else [""]
+            fig.add_trace(
+                go.Scatter3d(
+                    x=[pt[0]], y=[pt[1]], z=[pt[2]],
+                    mode="markers+text",
+                    marker=dict(size=8, color=color,
+                                symbol=MARKERS_3D[m],
+                                line=dict(color="black", width=1)),
+                    text=text, textposition="top center",
+                    textfont=dict(size=11),
+                    name=q,
+                    showlegend=False,
+                    hovertemplate=(
+                        f"{m}<br>{q}<br>"
+                        "x=%{x:.2f}<br>y=%{y:.2f}<br>z=%{z:.2f}"
+                        "<extra></extra>"
+                    ),
+                    scene=scene,
+                )
+            )
+
+    # Marker-shape legend (one entry per model, neutral color).
     for m in MODELS:
-        ax = panel_for[m]
-        info = per_model[m]
-        evr = info["pca"].explained_variance_ratio_
-        _draw_centroids(
-            ax, cents_by_model[m],
-            f"{m} L{info['layer']}  "
-            f"(PC{pc_a} {evr[pi]*100:.1f}%, PC{pc_b} {evr[pj]*100:.1f}%, "
-            f"n={info['n']})",
+        fig.add_trace(
+            go.Scatter3d(
+                x=[None], y=[None], z=[None],
+                mode="markers",
+                marker=dict(size=8, color="#444",
+                            symbol=MARKERS_3D[m],
+                            line=dict(color="black", width=1)),
+                name=f"{m}",
+                showlegend=True,
+                scene=scene,
+            )
         )
-        # axis labels match the active plane
-        ax.set_xlabel(f"PC{pc_a}")
-        ax.set_ylabel(f"PC{pc_b}")
-
-    _draw_overlay_triplet(axes[1, 1], common, aligned, pair_summaries)
-    axes[1, 1].set_xlabel(f"aligned PC{pc_a}")
-    axes[1, 1].set_ylabel(f"aligned PC{pc_b}")
-
-    fig.suptitle(
-        f"v3 cross-model quadrant geometry — {plane_label} "
-        f"(HN split: HN-D anger / HN-S fear)",
-        fontsize=13, y=1.005,
-    )
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-
-    return {
-        "plane": plane_label,
-        "pc_indices": list(pc_pair),
-        "common_quadrants": common,
-        "models": {
-            m: {
-                "centroids": {q: cents_by_model[m][q].tolist()
-                              for q in cents_by_model[m]},
-                "procrustes_rotation_deg": pair_summaries[m][0],
-                "procrustes_residual": pair_summaries[m][1],
-            }
-            for m in MODELS
-        },
-    }
 
 
 def main() -> None:
-    _use_cjk_font()
     print("Loading all three models at their preferred layers...")
     loaded: dict[str, tuple[pd.DataFrame, np.ndarray, int]] = {}
     for m in MODELS:
@@ -331,26 +249,115 @@ def main() -> None:
         loaded[m] = (df, X, layer)
         print(f"  {m}: L{layer}, {len(df)} rows after split-mode filter, X{X.shape}")
 
-    # Per-model: fit PCA(3) once. The three PC-pair figures slice this
-    # 3-component decomposition, so PC1+2+3 explained-variance is a
-    # single per-model property regardless of which plane we plot.
     per_model: dict[str, dict] = {}
     for m in MODELS:
         df, X, layer = loaded[m]
-        Y3, pca = _fit_pca3(df, X)
+        Y3, pca = _fit_pca3(X)
         per_model[m] = {
             "df": df,
             "Y3": Y3,
             "pca": pca,
             "layer": layer,
-            "n": len(df),
+            "n": int(len(df)),
+            "centroids_3d": _centroids_3d(df, Y3),
         }
+
+    # Procrustes against gemma.
+    ref = per_model[REFERENCE_MODEL]["centroids_3d"]
+    common = [q for q in QUADRANT_ORDER
+              if all(q in per_model[m]["centroids_3d"] for m in MODELS)]
+    aligned: dict[str, np.ndarray] = {}
+    pair_summaries: dict[str, tuple[float, float]] = {REFERENCE_MODEL: (0.0, 0.0)}
+    Cg = np.asarray([ref[q] for q in common])
+    Cg_c = Cg - Cg.mean(axis=0, keepdims=True)
+    aligned[REFERENCE_MODEL] = Cg_c
+    procrustes_R: dict[str, np.ndarray | None] = {REFERENCE_MODEL: np.eye(3)}
+    for m in MODELS:
+        if m == REFERENCE_MODEL:
+            continue
+        result = _procrustes_align_3d(ref, per_model[m]["centroids_3d"])
+        aligned[m] = result["Cb_aligned"]
+        pair_summaries[m] = (
+            float(result["rotation_deg"]),
+            float(result["residual"]),
+        )
+        procrustes_R[m] = result["R"]
+
+    # Build the 2×2 figure with 3D scenes in each cell.
+    titles = []
+    for m in MODELS:
+        evr = per_model[m]["pca"].explained_variance_ratio_
+        titles.append(
+            f"{m} L{per_model[m]['layer']}<br>"
+            f"<sub>PC1 {evr[0]*100:.1f}% · PC2 {evr[1]*100:.1f}% · "
+            f"PC3 {evr[2]*100:.1f}% · n={per_model[m]['n']}</sub>"
+        )
+    qwen_rot, qwen_res = pair_summaries["qwen"]
+    min_rot, min_res = pair_summaries["ministral"]
+    titles.append(
+        f"all three overlaid on gemma<br>"
+        f"<sub>qwen→gemma {qwen_rot:.1f}° (resid {qwen_res:.2f}) · "
+        f"ministral→gemma {min_rot:.1f}° (resid {min_res:.2f})</sub>"
+    )
+
+    fig = make_subplots(
+        rows=2, cols=2,
+        specs=[[{"type": "scene"}, {"type": "scene"}],
+               [{"type": "scene"}, {"type": "scene"}]],
+        subplot_titles=titles,
+        horizontal_spacing=0.04, vertical_spacing=0.06,
+    )
+
+    # Per-model scenes (1, 2, 3) + overlay (4).
+    _add_per_model_scene(fig, 1, per_model["gemma"]["centroids_3d"], "gemma")
+    _add_per_model_scene(fig, 2, per_model["qwen"]["centroids_3d"], "qwen")
+    _add_per_model_scene(fig, 3, per_model["ministral"]["centroids_3d"], "ministral")
+    _add_overlay_scene(fig, 4, common, aligned)
+
+    # Common scene styling: equal-aspect cube + same axis labels.
+    common_axes = dict(
+        xaxis=dict(title="PC1", showbackground=True, backgroundcolor="#f8f8f8"),
+        yaxis=dict(title="PC2", showbackground=True, backgroundcolor="#f8f8f8"),
+        zaxis=dict(title="PC3", showbackground=True, backgroundcolor="#f8f8f8"),
+        aspectmode="cube",
+    )
+    fig.update_layout(
+        scene=common_axes,
+        scene2=common_axes,
+        scene3=common_axes,
+        scene4=dict(
+            xaxis=dict(title="aligned PC1", showbackground=True, backgroundcolor="#f8f8f8"),
+            yaxis=dict(title="aligned PC2", showbackground=True, backgroundcolor="#f8f8f8"),
+            zaxis=dict(title="aligned PC3", showbackground=True, backgroundcolor="#f8f8f8"),
+            aspectmode="cube",
+        ),
+        title=dict(
+            text=("v3 cross-model quadrant geometry in 3D — "
+                  "PC(1,2,3) per model, Procrustes-aligned overlay "
+                  "(HN split: HN-D anger / HN-S fear)"),
+            x=0.5, xanchor="center",
+        ),
+        legend=dict(font=dict(size=10), itemsizing="constant"),
+        margin=dict(l=10, r=10, t=80, b=10),
+        height=1000, width=1400,
+    )
 
     out_dir = FIGURES_DIR / "local" / "cross_model"
     out_dir.mkdir(parents=True, exist_ok=True)
+    out_html = out_dir / "fig_v3_triplet_procrustes_3d.html"
+    fig.write_html(str(out_html), include_plotlyjs="cdn")
+    print(f"\nwrote {out_html}")
+
+    # Remove the now-superseded 2D PNGs so the directory stays honest.
+    for slug in ("pc12", "pc13", "pc23"):
+        old = out_dir / f"fig_v3_triplet_procrustes_{slug}.png"
+        if old.exists():
+            old.unlink()
+            print(f"  removed superseded {old.name}")
 
     summary = {
         "reference_model": REFERENCE_MODEL,
+        "common_quadrants": common,
         "models": {
             m: {
                 "layer": per_model[m]["layer"],
@@ -358,27 +365,29 @@ def main() -> None:
                 "explained_variance_ratio_pc123": [
                     float(v) for v in per_model[m]["pca"].explained_variance_ratio_
                 ],
-            } for m in MODELS
+                "centroids_3d": {
+                    q: per_model[m]["centroids_3d"][q].tolist()
+                    for q in per_model[m]["centroids_3d"]
+                },
+                "procrustes_rotation_deg": pair_summaries[m][0],
+                "procrustes_residual": pair_summaries[m][1],
+                "procrustes_R": (
+                    procrustes_R[m].tolist()  # type: ignore[union-attr]
+                    if procrustes_R[m] is not None else None
+                ),
+            }
+            for m in MODELS
         },
-        "planes": [],
     }
-
-    print("\n=== Procrustes alignment to gemma per PC-pair ===")
-    print(f"{'plane':10s} {'model':12s} {'rot°':>10s} {'residual':>12s}")
-    for pc_pair, slug, label in PC_PAIRS:
-        out_png = out_dir / f"fig_v3_triplet_procrustes_{slug}.png"
-        plane_summary = _build_figure_for_pair(per_model, pc_pair, label, out_png)
-        summary["planes"].append(plane_summary)
-        print(f"  wrote {out_png}")
-        for m in MODELS:
-            rot = plane_summary["models"][m]["procrustes_rotation_deg"]
-            res = plane_summary["models"][m]["procrustes_residual"]
-            print(f"{label:10s} {m:12s} {rot:+10.2f} {res:12.3f}")
-        print()
-
     out_json = out_dir / "v3_triplet_procrustes_summary.json"
     out_json.write_text(json.dumps(summary, indent=2))
     print(f"wrote {out_json}")
+
+    print("\n=== 3D Procrustes alignment to gemma ===")
+    print(f"{'model':12s} {'rot°':>8s} {'residual':>10s}")
+    for m in MODELS:
+        rot, res = pair_summaries[m]
+        print(f"{m:12s} {rot:8.2f} {res:10.3f}")
 
 
 if __name__ == "__main__":
