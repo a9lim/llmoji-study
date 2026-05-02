@@ -249,10 +249,21 @@ One unsteered arm, 100 Russell-quadrant-balanced prompts (HP/LP/HN/LN/NB) × 8
 seeds = 800 generations. Tests whether kaomoji choice tracks state in the
 regime that motivated the project. Descriptive only.
 
-**Findings (post-canonicalization, hidden-state space, 32 forms,
-h_mean at L31 — gemma's `preferred_layer`; the 2026-04-28 layer-wise
-emergence analysis showed L57 silhouette = 0.117 vs L31 silhouette =
-0.184, so v3 figures default here now):**
+**Current canonical (h_first at L50, post-2026-05-02
+standardization):** Russell-quadrant silhouette over PCA(2)
+coordinates is **0.235** at L50, top-5 layers L47–51 (~84–91%
+depth, plateau not single peak). All v3 figures default here via
+`MODEL_REGISTRY.preferred_layer`. The detailed numbers below are
+the prior canonical (h_mean at L31, 2026-04-28 cutover) — preserved
+because their per-quadrant centroids and per-face PCA breakdowns
+haven't been re-run under h_first yet. Cross-checked claims still
+hold qualitatively under h_first (HN/LN separation, valence-loaded
+PC1, kaomoji-as-partial-readout pattern); the absolute PC explained-
+variance fractions and centroid coordinates would shift.
+
+**Historical findings (h_mean at L31 — the 2026-04-28 layer-wise
+emergence analysis showed L57 silhouette = 0.117 vs L31 silhouette
+= 0.184; v3 figures defaulted here from 2026-04-28 to 2026-05-02):**
 
 - PCA: PC1 **19.83%**, PC2 **7.04%** (cumulative 26.87% vs probe-space
   PC1 = 89%, valence-collapse solved). Per-face PCA (over 32 face
@@ -298,7 +309,21 @@ Same prompts, seeds, instructions. `thinking=False` (Qwen3.6 is a reasoning
 model — closest-equivalent comparison). 800 generations, 0 errors, 100%
 bracket-start compliance. Sidecars at `data/hidden/v3_qwen/`.
 
-**Findings (post-canonicalization, hidden-state space, 65 forms):**
+**Current canonical (h_first at L59, post-2026-05-02
+standardization):** Russell-quadrant silhouette is **0.244** at L59,
+top-5 layers L54–59 (~88–97% depth) — explicit near-deepest plateau.
+The "gemma 1D-affect-with-arousal-modifier vs qwen 2D Russell"
+framing this section originally argued from has dissolved under
+h_first: gemma + qwen both peak deep with similar silhouette
+magnitudes (0.235 vs 0.244, near-identical), and triplet Procrustes
+alignment to gemma residual is 5.6 — the three-architecture
+geometry is congruent. The detailed numbers below are h_mean
+(historical); preserved because per-quadrant centroids and the
+PC2-anti-parallel-arousal observation aren't yet re-derived at
+h_first.
+
+**Historical findings (h_mean at L57, post-canonicalization,
+hidden-state space, 65 forms):**
 
 - 2.0× broader vocabulary than gemma's 32 at the same N. Faces by dominant
   quadrant: HP 10 / LP 20 / HN 9 / LN 11 / NB 15.
@@ -360,6 +385,17 @@ prompt overlaps. ~30 min compute on M5 Max.
 
 **All gating rules pass; main run pre-registered at standard N=800
 with the saklas tokenizer fix below.**
+
+**Current canonical (h_first at L20, post-2026-05-02
+standardization):** Russell-quadrant silhouette **0.149** at L20
+(~54% depth), top-5 layers L20–26. Of the three models, ministral
+is the only one that stays mid-depth under h_first — gemma + qwen
+both shifted to deep peaks. The h_first cutover gave ministral the
+biggest signal-cleanup ratio (3.3× silhouette gain over h_mean's
+0.045). The pilot-time numbers below were captured under h_mean at
+L21; updated `preferred_layer` in `MODEL_REGISTRY` is L20.
+
+**Historical findings (h_mean at L21, pilot N=95):**
 
 - **Rule 1 (silhouette ≥ 0.10):** PASS. Ministral peak at L21 / 36
   (~58% fractional depth), silhouette = **0.153**. Gemma peaks at
@@ -589,13 +625,28 @@ the existing-data analysis justified).
 
 ### v3 follow-on analyses (2026-04-28)
 
+> **Framing note (post-2026-05-02 h_first cutover):** the numbers
+> in this section were computed under h_mean at L31 (gemma) / L59
+> (qwen). Under the current h_first canonical, gemma silhouette is
+> 0.235 at L50 (was 0.184 at L31) and qwen is 0.244 at L59 (was
+> 0.313 in this section's table — the qwen number got smaller
+> because h_mean overweights the long generation tail; h_first
+> reads only the kaomoji-emission state). The qualitative findings
+> below all hold under h_first; the cross-model alignment and
+> three-model congruence claims are *cleaner* under h_first.
+> Concrete h_first numbers: see Status block above and the
+> per-pilot subsections.
+
 Four scripts run on the existing v3 sidecars — no new model time. Helper
-`load_hidden_features_all_layers` in `hidden_state_analysis.py` opens each
-sidecar once and returns a `(n_rows, n_layers, hidden_dim)` tensor with a
-disk cache at `data/cache/v3_<short>_h_mean_all_layers.npz` (gitignored,
-~80 MB compressed per model). Sidecars store h_first/h_last/h_mean for
-EVERY probe layer, not just the deepest — `(layer_idxs)` runs 2-57 on gemma
-and 2-61 on qwen. Multi-layer trajectory is recoverable from existing data.
+`load_emotional_features_all_layers` in `emotional_analysis.py` (wraps
+`load_hidden_features_all_layers` from `hidden_state_analysis.py` with the
+canonicalize + kaomoji filter + optional HN split) opens each sidecar once
+and returns a `(n_rows, n_layers, hidden_dim)` tensor with a disk cache
+at `data/cache/v3_<short>_h_mean_all_layers.npz` (gitignored, legacy
+filename — contents reflect the active `which`; ~80 MB compressed per
+model). Sidecars store h_first/h_last/h_mean for EVERY probe layer, not
+just the deepest — `(layer_idxs)` runs 2-57 on gemma, 2-61 on qwen, 2-37
+on ministral. Multi-layer trajectory is recoverable from existing data.
 
 **Layer-wise emergence (`scripts/21_v3_layerwise_emergence.py`).** Per probe
 layer, fit PCA(2) on h_mean and measure quadrant separation via silhouette

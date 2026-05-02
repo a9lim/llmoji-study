@@ -187,7 +187,7 @@ in every subsequent pull as if part of the corpus — including in `06` flat
 output and every figure built from it. Symptom: an unfamiliar `submitter_id`
 or `_pre_1_1`-tagged source model that doesn't appear in
 `HfApi.list_repo_files`. Fix:
-`rm -rf data/hf_dataset && python scripts/06_claude_hf_pull.py`. Cache is
+`rm -rf data/hf_dataset && python scripts/harness/06_claude_hf_pull.py`. Cache is
 gitignored and regenerable. Hit 2026-04-28 when the legacy 1.0 bundle had
 been dropped from HF but kept reappearing in `07` output from a stale cache.
 

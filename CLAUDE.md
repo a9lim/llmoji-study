@@ -100,14 +100,16 @@ phenomenal status. Aggregating that across 800+ generations is not nothing.
   (red, inherits HN), HN-S `#9d4ad4` (magenta-purple). New helpers
   `apply_hn_split` / `_palette_for` / `_hn_split_map` in
   `emotional_analysis`. Ministral `preferred_layer` set to L21 in
-  `MODEL_REGISTRY` (was None → defaulted to deepest L37).
+  `MODEL_REGISTRY` at the time of this landing (later updated to L20
+  in the 2026-05-02 h_first cutover, see below).
 - **v3 follow-on analyses landed 2026-04-28** (no new model time): layer-wise
   emergence trajectory, same-face-cross-quadrant natural experiment,
-  cross-model alignment (CKA + Procrustes), PC3+ × probes. Headline: gemma's
-  affect representation peaks at L31 of 56, not the deepest L57 — switching
-  to L31 (via the new `preferred_layer` field on `ModelPaths`) substantially
-  sharpens gemma's Russell-quadrant separation and dissolves the prior
-  "gemma 1D vs qwen 2D" framing.
+  cross-model alignment (CKA + Procrustes), PC3+ × probes. Headline at
+  landing time (h_mean): gemma's affect peaks at L31 of 56, not the
+  deepest L57. Switching to per-model `preferred_layer` substantially
+  sharpened Russell-quadrant separation and dissolved the prior
+  "gemma 1D vs qwen 2D" framing. Numbers superseded by the
+  2026-05-02 h_first cutover (gemma L50, qwen L59, ministral L20).
 - **Probe extension landed 2026-04-29** to address the V-A circumplex's
   anger/fear collapse. Three new contrastive packs at
   `llmoji_study/probe_packs/<name>/`: `powerful.powerless` (PAD dominance),

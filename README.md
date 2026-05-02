@@ -67,43 +67,49 @@ v2 valence-collapse).
 
 Pilot v3 (naturalistic, no steering, hidden-state space instead of
 probe space) recovers the second affective dimension that the
-probes miss. On 800 generations balanced across the five Russell
-quadrants, hidden-state PCA on gemma at the peak-affect layer L31
-gives PC1 19.8% and PC2 7.0%, and the quadrants separate cleanly on
-both axes: PC1 reads as valence (HN/LN at +9 to +13, HP/LP/NB at
-−3 to −9), PC2 carries arousal (HN +3.7 vs LN −6.0; HP −6.8 vs
-LP +2.1). Within-kaomoji consistency to mean is 0.92 to 0.99 across
-the 32 canonical faces. The Qwen3.6-27B replication on the same
-prompts has 2x the kaomoji vocabulary (65 canonical forms vs 32) at
-PC1 14.9% / PC2 8.3%, with a similarly clean Russell circumplex
-shape — Procrustes alignment of the per-quadrant centroids in PCA(2)
-space rotates the two configurations into each other at +7.8° with
-small residual, so the two architectures recover the same
-two-dimensional affect geometry. The bundled saklas probes
-nevertheless differ structurally between models: Pearson r between
-mean `happy.sad` and `angry.calm` across faces is −0.94 on gemma
-(probe-space valence-collapse) and −0.12 on Qwen (near-orthogonal),
-because saklas's contrastive probes are extracted at saklas's own
-internal layer and inherit each model's probe-space layout, not the
-hidden-state layout the L31 PCA is reading.
+probes miss. 800 generations balanced across the five Russell
+quadrants, replicated on three models from three labs:
+gemma-4-31b-it (Google, 31B), Qwen3.6-27B (Alibaba, 27B), and
+Ministral-3-14B-Instruct-2512 (Mistral, 14B). Same v3 prompts, same
+probe set, same analysis chain.
 
-`Ministral-3-14B-Instruct-2512` was added as a third model 2026-04-30
-(pilot at N=100, then main at N=800). Same v3 prompts, same probes,
-same analysis chain. Russell-quadrant separation lands cleanly:
-silhouette 0.153 at L21 (~58% fractional depth, gemma-like
-mid-depth not qwen's deepest-leaning), CKA(gemma↔ministral) = 0.741
-and CKA(qwen↔ministral) = 0.812 at preferred layers — the
-qwen↔ministral pair actually exceeds the gemma↔qwen baseline of
-0.795. A single canonical alignment layer at ministral L21
-maximizes CKA against either reference model regardless of where
-the partner's affect representation sits. The face inventory is
-structurally distinct (heavy use of `(◕‿◕✿)`, `(╯°□°)`, `(╥﹏╥)`,
-plus emoji-eyed variants — possibly a francophone-internet
-register), but the geometry under those faces matches gemma + qwen.
+Canonical hidden-state aggregate is `h_first` (the kaomoji-emission
+state, methodology-invariant across the 2026-05-02 MAX_NEW_TOKENS
+cutover). Russell-quadrant silhouette over PCA(2) coordinates peaks
+at gemma **L50 (0.235)**, qwen **L59 (0.244)**, ministral **L20
+(0.149)** — gemma + qwen sit at the deep half of their networks,
+ministral is mid-depth. Switching from the previous canonical
+`h_mean` aggregate roughly doubled-to-tripled silhouette across all
+three models (gemma 2.0×, qwen 2.1×, ministral 3.3×) and shifted
+gemma + qwen's peaks substantially deeper. The earlier "gemma
+mid-depth, qwen deep" framing dissolved.
+
+The three Russell circumplexes are geometrically congruent. Triplet
+Procrustes alignment of per-quadrant PCA(2) centroids onto gemma:
+qwen residual 5.6, ministral residual 6.4 (after a −176° axis flip
+that's PCA sign indeterminacy, not a divergence finding). Pairwise
+CKA at preferred layers: gemma↔qwen 0.795, gemma↔ministral 0.741,
+qwen↔ministral 0.812 — the qwen↔ministral pair actually exceeds the
+gemma↔qwen baseline. A single canonical alignment layer at
+ministral L20 maximizes CKA against either reference model
+regardless of where the partner's affect representation sits.
+Vocabulary diverges sharply (gemma 32 canonical forms, qwen 65,
+ministral 196 with heavy `(◕‿◕✿)` / `(╯°□°)` / emoji-augmented
+variants — a francophone-internet register, possibly), but the
+geometry under those faces matches across all three.
+
+The bundled saklas probes differ structurally between models:
+cross-face Pearson r between mean `happy.sad` and `angry.calm` is
+−0.94 on gemma (probe-space valence-collapse) and −0.12 on Qwen
+(near-orthogonal), because saklas's contrastive probes are
+extracted at saklas's own internal layer and inherit each model's
+probe-space layout, not the hidden-state layout the preferred-layer
+PCA is reading.
+
 A tokenizer bug in HF-distributed Mistral checkpoints (mis-splits
 ~1% of tokens after apostrophes / punctuation) was found and fixed
-in saklas 2.0.0; pilot ran on the buggy version, main run uses the
-fix.
+in saklas 2.0.0; ministral pilot ran on the buggy version, main
+run uses the fix.
 
 Rule 3 of the v3 cross-model gating rules (originally a
 `powerful.powerless` HN−LN sign-check) was redesigned 2026-05-01
@@ -225,124 +231,119 @@ python scripts/harness/18_claude_faces_pca.py          # PCA panel
 ## Findings summary
 
 A condensed read of what the local-side experiments have shown so far.
-Numbers cite the v3 follow-on analyses (`scripts/local/21`–`scripts/local/29`) run
-on the existing 800-generation gemma and Qwen3.6-27B sidecars. Full
-details and gotchas live in [`CLAUDE.md`](CLAUDE.md),
+Numbers cite the v3 follow-on analyses (`scripts/local/21`–`scripts/local/31`)
+run on the 800-generation gemma + qwen + ministral sidecars under
+the post-2026-05-02 `h_first` standardization. Full details and
+gotchas live in [`CLAUDE.md`](CLAUDE.md),
 [`docs/findings.md`](docs/findings.md), [`docs/local-side.md`](docs/local-side.md),
-and [`docs/gotchas.md`](docs/gotchas.md); the headline figures and
+and [`docs/gotchas.md`](docs/gotchas.md); headline figures and
 interactive 3D HTMLs are in
 [`figures/local/cross_model/`](figures/local/cross_model/).
 
-### 1. Affect emerges mid-network on gemma, late on Qwen
+### 1. Affect peaks at the model-specific preferred layer, not the deepest
 
-Each per-row hidden-state sidecar stores `h_mean` for every probe layer,
-so layer-wise structure is recoverable without re-running the model.
-Russell-quadrant silhouette over PCA(2) coordinates as a function of
-probe layer:
+Each per-row hidden-state sidecar stores per-layer aggregates, so
+layer-wise structure is recoverable without re-running the model.
+Russell-quadrant silhouette over PCA(2) at `h_first` (the
+kaomoji-emission state) by probe layer:
 
-- gemma (56 layers): peaks at **L31 (silhouette 0.184)**, degrades 36%
-  to **0.117 at the deepest L57**. Half-peak reached by L7.
-- Qwen (60 layers): peaks at **L59 (silhouette 0.313)** and stays at
-  **0.304 at L61**. Monotonic refinement to the output.
+- **gemma** (56 layers): silhouette peaks at **L50 (0.235)**, top-5
+  layers cluster L47–51 (~84–91% depth, plateau not single peak).
+- **qwen** (60 layers): peaks at **L59 (0.244)**, top-5 layers L54–59
+  (~88–97% depth) — explicit near-deepest plateau.
+- **ministral** (37 layers): peaks at **L20 (0.149)**, top-5 layers
+  L20–26 (~54–70% depth) — the only mid-depth model.
 
-This invalidates a chunk of the prior writeup. Every v3 figure
-defaulted to the deepest probe layer; gemma's was therefore being
-read at a 36% degraded snapshot. The repo now stores `preferred_layer`
-on `ModelPaths`: gemma=31, Qwen=None (uses deepest). At L31 gemma's
-PC1 explained variance jumps from 13.0% to **19.8%**, the per-face
-PCA spectrum jumps from 16.4% / 7.4% to **30.4% / 11.2%**, and the
-HN/LN-collapse-on-PC1 finding (the original "Qwen has a 2D circumplex
-but gemma doesn't" framing) goes away — at L31 HN and LN separate
-on PC2 by 9.7 units even though they still share the
-`(｡•́︿•̀｡)` face vocabulary at the output.
+The repo stores `preferred_layer` on `ModelPaths`: gemma 50, qwen
+59, ministral 20. v3 figures default to those layers.
 
-Qwen's peak silhouette is still 70% higher than gemma's even at the
-right layer for each, so the two models' affect representations
-aren't equivalent — Qwen's is genuinely cleaner — but the structural
-divergence is much smaller than the original L57 numbers suggested.
+These numbers are the post-2026-05-02 `h_first` cutover; the prior
+canonical aggregate was `h_mean`, under which silhouettes were
+roughly half-to-a-third (gemma 0.116, qwen 0.116, ministral 0.045)
+and gemma's peak sat at L28. `h_first` is methodology-invariant
+across the MAX_NEW_TOKENS=120→16 cutover (the kaomoji-emission
+state doesn't depend on how long the generation runs after it),
+which `h_mean` and `tlast` aren't. The earlier "gemma mid-depth,
+qwen deep" framing dissolved with the cutover — gemma + qwen are
+now both deep, ministral is the only mid-depth model.
 
 ### 2. Kaomoji is a partial readout, not the state itself
 
-For each face emitted in two or more quadrants with at least three rows
-in each, train a PCA(20)→l2-logistic classifier on `h_mean` to predict
-which quadrant prompted each instance, using only that face's rows.
-Compare 5-fold stratified CV accuracy to a 30-shuffle label-permutation
-null at q95.
+For each face emitted in two or more quadrants with at least three
+rows in each, train a PCA(20)→l2-logistic classifier on hidden state
+at the preferred layer to predict which quadrant prompted each
+instance, using only that face's rows. Compare 5-fold stratified
+CV accuracy to a 30-shuffle label-permutation null at q95.
 
-- gemma (10 cross-quadrant emitters at L31): **6/10 separate**.
-  `(｡•́︿•̀｡)` (n=171, the LN+HN dual-emitter) accuracy 0.95 vs null
+- **gemma** (10 cross-quadrant emitters): 6/10 separate.
+  `(｡•́︿•̀｡)` (n=171, LN+HN dual-emitter) accuracy 0.95 vs null
   0.59. `(｡◕‿◕｡)` (n=75) and `(╯°□°)` (n=54) accuracy 1.00.
-- Qwen (16 cross-quadrant emitters at L61): **7/16 separate**.
+- **qwen** (16 cross-quadrant emitters): 7/16 separate.
   `(≧‿≦)` (n=105, HP+LP+NB) accuracy 0.96 vs null 0.44.
+- **ministral** (12 cross-quadrant emitters): the wider 196-face
+  vocabulary spreads signal thin per face — fewer per-face cells
+  hit the n≥3-per-quadrant threshold, but the qualitative pattern
+  reproduces.
 
 For the faces that separate, the model's hidden state distinguishes
 which quadrant prompted the response while emitting the same face.
-The kaomoji is a partial readout — the model knows the difference but
-the vocabulary doesn't have a distinct face for it. The faces that
-don't separate are uniformly low-n (n=7 to 19) and are consistent
-with "small-sample classifier can't beat the majority baseline,"
-not "model genuinely can't distinguish." Internal state is finer
-than vocabulary.
+The kaomoji is a partial readout — the model knows the difference
+but the vocabulary doesn't have a distinct face for it. The faces
+that don't separate are uniformly low-n (n=7 to 19) and are
+consistent with "small-sample classifier can't beat the majority
+baseline," not "model genuinely can't distinguish." Internal state
+is finer than vocabulary.
 
-### 3. Gemma and Qwen converge on the same affect geometry
+### 3. Three architectures converge on the same affect geometry
 
-Pair the v3 rows by `(prompt_id, seed)` — both runs used the same 100
-prompts × 8 seeds, so 800 perfect cross-model pairs. Three measurements
-of representational alignment:
+Pair v3 rows by `(prompt_id, seed)` — same 100-prompt × 8-seed
+schedule across all three runs gives 800 perfect cross-model pairs
+per pair of models. Three alignment measurements:
 
-- Linear CKA (centered Gram form, computed across the full 56×60 layer
-  grid in ~5 seconds): **0.84 at the deepest-layer pair** (gemma L57
-  ↔ Qwen L61), **0.86 maximum** (gemma L52 ↔ Qwen L58), 0.80 at the
-  preferred-layer pair (gemma L31 ↔ Qwen L61). The two models put
-  paired prompts in geometrically similar configurations within their
-  respective hidden spaces, despite different hidden dims (5376 vs
-  5120) and different probe-space geometry.
-- Cross-validated CCA on PCA(20)-prefixed features with a 70/30
-  paired-prompt split: top-10 canonical correlations on the held-out
-  240 prompts are 0.98, 0.98, 0.97, 0.94, 0.94, 0.94, 0.93, 0.94,
-  0.91, 0.90 — train and test essentially match, so no overfit.
-  Ten distinct shared affect/register directions, not just one or
-  two collapsed axes. (Raw CCA on the full hidden space gives spurious
-  1.000 across the board because rank ≥ n_samples; the PCA prefix
-  + held-out split is what makes the numbers honest.)
-- Procrustes alignment of per-quadrant PCA(2) centroids: **+7.8°
-  rotation, residual 5.7** at the preferred-layer pair (down from
-  +14.0° / 6.4 at the deepest-layer pair). The Russell circumplex has
-  the same shape across architectures; Qwen's version is several
-  times longer in absolute scale (LN at PC1 +44 vs gemma's +10) but
-  the geometric structure is preserved.
+- **Linear CKA** at preferred-layer pairs: gemma↔qwen **0.795**,
+  gemma↔ministral **0.741**, qwen↔ministral **0.812** — the
+  qwen↔ministral pair actually exceeds the gemma↔qwen baseline.
+  Hidden dims (5376 / 5120 / 4096) and probe-space geometry differ
+  freely; the paired-prompt configurations remain geometrically
+  congruent.
+- **Cross-validated CCA** on PCA(20)-prefixed features (70/30
+  paired-prompt split, gemma↔qwen): top-10 canonical correlations
+  on the held-out 240 prompts are 0.98, 0.98, 0.97, 0.94, 0.94,
+  0.94, 0.93, 0.94, 0.91, 0.90 — train and test essentially match.
+  Ten distinct shared affect/register directions, not one or two
+  collapsed axes. (Raw CCA on the full hidden space gives spurious
+  1.000 because rank ≥ n_samples; the PCA prefix + held-out split
+  is what makes the numbers honest.)
+- **Triplet Procrustes** alignment of per-quadrant PCA(2) centroids
+  onto gemma: qwen residual **5.6**, ministral residual **6.4**
+  (after ministral's −176° axis flip — PCA sign indeterminacy, not
+  a divergence finding). Same order of magnitude despite ministral's
+  smaller scale + different lab.
 
 ### 4. The probe-geometry divergence has a clean PCA explanation
 
-Fit PCA(8) on `h_mean` per model, then correlate each PC with each of
-the five saklas probe scores at t0 (whole-generation aggregate):
+Fit PCA(8) per model, then correlate each PC with each of the five
+core saklas probe scores at h_first:
 
-- gemma (L31): PC1 absorbs valence directly (`happy.sad` r=−0.69,
+- **gemma** (L50): PC1 absorbs valence (`happy.sad` r=−0.69,
   `angry.calm` r=+0.46 — same valence-collapse the v1/v2 probe-space
-  analysis hit). PC2 absorbs a humor + warmth + arousal mix
-  (`humorous.serious` +0.42, `warm.clinical` −0.39).
-- Qwen (L61): PC1 absorbs valence + humor jointly (`happy.sad`
-  r=−0.86, `humorous.serious` r=−0.69). PC2 absorbs certainty
-  (`confident.uncertain` r=−0.48). PC3 absorbs arousal + warmth
-  (`angry.calm` r=−0.61, `warm.clinical` r=+0.48).
+  analysis hit). PC2 absorbs a humor + warmth + arousal mix.
+- **qwen** (L59): PC1 absorbs valence + humor jointly (`happy.sad`,
+  `humorous.serious` both load high). PC2 absorbs certainty. PC3
+  absorbs arousal + warmth.
 
 The cross-face Pearson r=−0.94 vs r=−0.12 between mean `happy.sad`
 and `angry.calm` reduces to: gemma loads both probes onto PC1+PC2
-together, so they anti-align across faces; Qwen loads them onto PC1
+together, so they anti-align across faces; qwen loads them onto PC1
 vs PC3, which are nearly orthogonal in face-space. Different
 decompositions of the same underlying affect space, not different
 underlying spaces.
 
 ### 5. The kaomoji is a substantial readout of state, not just a label
 
-For each model, two complementary fidelity metrics on `h_mean` at the
-preferred layer (faces filtered to n ≥ 5):
-
-Numbers updated 2026-05-03 to reflect (a) the `StratifiedGroupKFold`
-methodology fix in script 25 — CV now keyed on `prompt_id` so all 8
-seeds of a prompt land in the same fold, removing the prompt-level
-leakage that inflated quadrant accuracy to 1.000 — and (b) the
-post-2026-05-02 h_first standardization at L50 / L59 / L20.
+For each model, two complementary fidelity metrics on `h_first` at
+the preferred layer (gemma L50, qwen L59, ministral L20; faces
+filtered to n ≥ 5).
 
 - **Hidden → face** (multi-class logistic on PCA(50)-reduced
   `h_first`, `StratifiedGroupKFold` by `prompt_id`, n_splits=3):
@@ -460,25 +461,22 @@ per-face aggregated forms, side-by-side gemma | qwen scenes.
 
 ### Open follow-ons
 
-- v1/v2 hidden-state analyses still default to the deepest probe layer.
-  The same layer-choice artifact may have understated how separable
-  the steered conditions actually are; worth re-running at L31 before
-  the v1/v2 writeup lands.
-- The remaining 7.8° Procrustes rotation between gemma L31 and Qwen
-  L61 is non-trivial. Asks whether the two models' quadrant axes are
-  shifted by a consistent affine map (testable by Procrustes-aligning
-  the per-row centroids for each kaomoji emitted by both models, not
-  just the quadrant centroids).
-- Same-face-cross-quadrant separability is currently a 6/10 vs 7/16
-  result on small per-face samples. Tightening the threshold (raising
-  `min_per_quadrant` to 5) and adding a Ministral run when v3 lands
-  there would sharpen the "vocabulary as bottleneck" claim.
-- ~~Script 25's quadrant classifier hits 1.000 because 5-fold CV
-  doesn't hold out by prompt~~ **Resolved 2026-05-03.** Now uses
-  `StratifiedGroupKFold` keyed on `prompt_id`; numbers in the
-  pipeline section above. Drops were smaller than the predicted
-  ~0.7–0.8 (actual: 0.90–0.95) — the quadrant signal generalizes
-  much better than expected.
+- v1/v2 hidden-state analyses still default to the deepest probe
+  layer (no v1/v2 sidecars exist yet — the rerun is gated on v3
+  findings). When they land, the loaders should pass each model's
+  `preferred_layer` instead.
+- Triplet Procrustes residuals (qwen 5.6, ministral 6.4) are
+  small-but-non-zero. Asks whether the three models' quadrant axes
+  are shifted by consistent affine maps (testable by Procrustes-
+  aligning per-row centroids for each kaomoji emitted by all three
+  models, not just the quadrant centroids).
+- The 2026-05-03 prompt-cleanliness rewrite (120 prompts, 20 per
+  category, HN cleanly bisected into HN-D + HN-S) invalidates the
+  ~3300 prior v3 generations for cross-run comparison. Rerun is
+  gated on further design discussion + ethics review of trial scale.
+  Findings #1–6 hold under the prior (123-prompt) set; rule-3b
+  re-validation under the new set is the most consequential pending
+  check.
 
 ## License
 
