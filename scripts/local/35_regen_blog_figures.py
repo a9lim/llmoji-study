@@ -157,7 +157,7 @@ def plot_heatmap(short: str, theme: str) -> None:
         split_hn=True,
     )
     out = BLOG_ASSETS_DIR / f"fig_emo_a_kaomoji_sim_{short}_{theme}.png"
-    plot_kaomoji_cosine_heatmap(df, X, str(out))
+    plot_kaomoji_cosine_heatmap(df, X, str(out), min_count=3)
     print(f"  wrote {out}")
 
 

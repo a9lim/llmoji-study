@@ -356,6 +356,61 @@ phenomenal status. Aggregating that across 800+ generations is not nothing.
   Real architectural difference, not artifact. Detail +
   per-model numbers in `docs/findings.md` "2026-05-02
   face-stability triple" section.
+- **Claude-faces ↔ local-model face-input bridge — fused pipeline
+  2026-05-02** (no v3 model time, ~10–15 min/model encoder runs).
+  Two parallel approaches:
+  - **Approach A (descriptions)** — script 45 (qwen-only, archived).
+    Soft profile cos +0.345 perm-p 0.001 (n=41 shared); argmax
+    NB-skewed (133/228) because descriptions are statement-form like
+    NB prompts. Kept as comparison; downstream consumers prefer B.
+  - **Approach B (face strings) — canonical**. Unified pipeline:
+    `46_face_input_encode.py --model {gemma|qwen|ministral|nemotron_jp|rinna}`
+    encodes the face union through the chosen model's face-input
+    forward pass; `44_face_input_pc_space.py --model <m>` runs joint
+    PCA(3) + cosine-NN classification. The 4 prior per-model variants
+    (44/46 qwen + 47/48 gemma) were fused into these 2 unified scripts;
+    the per-model variants are deleted from git history (this session).
+  - **Face union construction**: ∪ of (gemma + qwen + ministral) v3
+    emission + claude-faces corpus (228) = 510 raw faces. Encoder
+    drops 204 ministral-only-not-claude (emoji-in-parens noise that
+    inflates the joint PCA's dominant directions); filtered union =
+    306. Per-face quadrant ground truth = SUMMED emission distribution
+    across all 3 v3 models (`total_emit_*` parquet columns) — e.g.
+    `(⊙_⊙)` gets HN-S=99+0+1=100, NB=0+1+0=1, total=101.
+  - **Encoder branches**: `MODEL_REGISTRY[m].use_saklas` flag routes
+    to either (a) saklas + probes + steering + sidecar capture (gemma /
+    qwen / ministral, probe-calibrated) or (b) raw HF
+    `AutoModelForCausalLM` + `output_hidden_states=True` (Japanese
+    encoders without probe calibration; nemotron_h Mamba/hybrid).
+    `preferred_layer` indexes saklas's bucket layer in mode (a) and
+    transformers' `hidden_states` tuple in mode (b).
+  - **Numbers (post-filter, n=306, 173 non-emit NN targets)**:
+
+    | encoder | hidden_dim | PC1+2+3 | non-emit HP/LP/HN-D/HN-S/LN/NB |
+    |---|---|---|---|
+    | qwen (saklas) | 5120 | 32.0% | 43/41/9/16/10/54 |
+    | gemma (saklas) | 5376 | 41.2% | 43/34/7/17/13/59 |
+    | rinna (raw HF, JP) | 768 | 35.4% | 11/48/13/16/29/56 |
+
+    Gemma + qwen agree closely (only LP/LN differ by ~5); rinna
+    shifts toward less-HP / more-LN — likely tokenization effects
+    (T5Tokenizer fragments kaomoji differently than gemma/qwen
+    BPE) rather than Japanese-training fidelity gain. Verdict on
+    "Japanese model improves bridge fidelity": inconclusive on rinna
+    alone. **nemotron_jp blocked**: nemotron_h modeling code hard-
+    imports `mamba_ssm` which has CUDA/Triton kernels only — won't
+    run on M5 MPS. Possible follow-up on the 4090 workstation.
+  - **Cross-model face overlap (script 49)**: only **8 faces** are
+    emitted by all 3 v3 models out of a 337-face union. Per-pair modal-
+    quadrant agreement: gemma↔qwen 75% (mean JSD 0.146), gemma↔ministral
+    62% (0.285), qwen↔ministral 50% (0.353). 4-of-8 fully unanimous
+    (`(ﾉ◕ヮ◕)`/`(≧▽≦)` HP, `(╯°□°)` HN-D, `(｡・́︿・̀｡)` LN). Real
+    divergences: `(╥﹏╥)` reads gemma=HP / qwen=HN-D / ministral=LN
+    (3 different affect contexts for the crying face); `(⊙_⊙)` reads
+    gemma=HN-S(99) but qwen barely emits it. Each model has its own
+    kaomoji register; ministral's vocab (231 unique faces) is 4.4×
+    gemma's (52), but ~210 of those are emoji-in-parens noise.
+    Output: `data/v3_cross_model_face_overlap.tsv`.
 
 Full numbers, gemma-vs-qwen contrasts, layer-wise + cross-model + PCA3+ +
 predictiveness + extension findings live in [`docs/findings.md`](docs/findings.md).
@@ -415,6 +470,12 @@ python scripts/local/36_v3_face_stability.py    # η² decomposition; LLMOJI_WHI
 python scripts/local/37_v3_state_predicts_face.py    # pair-level Spearman ρ(cosine, 1-JSD)
 python scripts/local/38_v3_pc_probe_rotation_3d.py    # interactive 3D HTML per model
 
+# Claude-faces ↔ local-model face-input bridge (canonical = approach B; see CLAUDE.md status)
+python scripts/local/46_face_input_encode.py --model qwen          # face-union encode through encoder; saklas path for gemma/qwen/ministral, raw HF for nemotron_jp/rinna
+python scripts/local/44_face_input_pc_space.py --model qwen        # joint PCA(3) + cosine-NN classify non-emitted faces → 3D HTML + nn.tsv
+python scripts/local/49_v3_cross_model_face_overlap.py             # how many faces shared by all 3 v3 models, modal-quadrant divergence
+python scripts/local/45_descriptions_in_qwen_space.py              # archived: qwen forward pass on per-face description text → 6-D profile vs v3-prompt centroids
+
 # Harness side (contributor-corpus pipeline; needs ANTHROPIC_API_KEY for 16)
 python scripts/harness/06_claude_hf_pull.py    # snapshot a9lim/llmoji into data/hf_dataset/
 python scripts/harness/07_claude_kaomoji_basics.py
@@ -463,7 +524,7 @@ llmoji-study/
   scripts/
     local/                     # local-LM scripts (probes, hidden state, v3
                                # follow-ons, introspection, blog regen,
-                               # smoke). 24 files: 01–04, 11, 21–38, 99.
+                               # smoke). 31 files: 01–04, 11, 21–38, 40, 41, 44–46, 49, 98, 99.
     harness/                   # contributor-corpus scripts (HF pull, kaomoji
                                # stats, eriskii replication, claude-faces
                                # PCA, per-project axes). 6 files: 06, 07, 15,

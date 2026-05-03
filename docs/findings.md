@@ -1041,6 +1041,137 @@ PC2-axis flip, halving its apparent residual from the 2D 23.0 to 3D
 of ministral from gemma is ~2× qwen's, not ~3× as the 2D PC1×PC2
 view suggested. Old PC-pair PNGs deleted.
 
+### Claude-faces ↔ local-model face-input bridge — fused pipeline (2026-05-02)
+
+Canonical approach: face strings through a local model's face-input
+forward pass (kaomoji-instruction system prompt, face string as user
+message, capture h_first @ preferred_layer). Then joint PCA(3) +
+cosine-NN classify against v3-emitted anchors, inheriting summed
+quadrant blend across all 3 v3 models. The earlier per-model
+variants (44+46 qwen, 47+48 gemma) were fused into two unified
+scripts that take `--model {gemma|qwen|ministral|nemotron_jp|rinna}`.
+The descriptions-through-qwen approach (script 45) is kept as a
+comparison; numbers below all reference the canonical face-string
+approach.
+
+#### Face union construction
+
+  - **Sources**: gemma v3 emission (52 unique faces) ∪ qwen v3 (89)
+    ∪ ministral v3 (231) ∪ claude-faces corpus (228 from
+    `a9lim/llmoji`).
+  - **Raw union**: 510 unique face strings (337 v3-emitted + 173
+    claude-only after dedup).
+  - **Encoder filter** (applied at `46_face_input_encode.py` so the
+    parquet is clean): drop 204 ministral-only-not-claude faces —
+    most are emoji-in-parens noise that, before filtering, pulled
+    the dominant joint-PCA directions toward an artifact cluster.
+    Of ministral's 231 unique emissions, only **27 are real** (also
+    appear in gemma / qwen / claude).
+  - **Filtered union**: 306 faces. 133 are anchors (any v3 model
+    emitted them, with summed quadrant blend); 173 are claude-only
+    NN targets.
+  - **Quadrant ground truth**: per-face `total_emit_*` columns sum
+    counts across all 3 v3 models. e.g. `(⊙_⊙)` gets HN-S=99+0+1=100,
+    NB=0+1+0=1, total=101 — its blend reflects how often it
+    appeared in each prompt category aggregated across models.
+
+#### Encoder branches
+
+`MODEL_REGISTRY[m].use_saklas` flag routes to one of:
+
+  - **(a) Saklas mode**: probes + steering + sidecar capture, used for
+    gemma / qwen / ministral (probe-calibrated). `preferred_layer`
+    indexes the saklas bucket layer (gemma=50, qwen=59, ministral=20).
+  - **(b) Raw HF mode**: `AutoModelForCausalLM` +
+    `output_hidden_states=True`, captures last-input-position residual
+    at `preferred_layer` (now indexing transformers' `hidden_states`
+    tuple, where 0=embedding output and N=output of layer N). No
+    probes, no steering. Used for models without probe calibration
+    (rinna) or with architectures saklas can't load (nemotron_h
+    Mamba/hybrid). Optional `trust_remote_code` for custom-code models.
+
+#### Numbers (post-filter, n=306, 173 non-emit NN targets)
+
+| encoder | mode | hidden_dim | PC1+2+3 | non-emit HP/LP/HN-D/HN-S/LN/NB |
+|---|---|---|---|---|
+| qwen | saklas | 5120 | 32.0% | 43/41/9/16/10/54 |
+| gemma | saklas | 5376 | 41.2% | 43/34/7/17/13/59 |
+| rinna | raw HF (JP) | 768 | 35.4% | 11/48/13/16/29/56 |
+
+Gemma and qwen agree closely on the non-emit classification (both
+land at ~43 HP, ~52–59 NB; main difference is gemma reads slightly
+more LN, qwen slightly more LP). With the 133 v3-emitted anchors
+shared between encoders and only the encoder's hidden geometry
+varying, the only freedom is which anchor each non-emit hidden
+vector cosine-matches — and the two converge.
+
+Rinna is qualitatively different: much less HP (11 vs 43), much more
+LN (29 vs 10–13). Likely tokenization effects — `T5Tokenizer` on
+SentencePiece breaks `(╯°□°)` etc. into different chunks than the
+gemma/qwen BPE — rather than a Japanese-training fidelity gain. NN
+matches in rinna's space cluster more by surface-form parens
+similarity than by affect content. Verdict on "Japanese model
+improves bridge fidelity": inconclusive on rinna alone.
+
+**nemotron_jp blocked** (also in MODEL_REGISTRY, would have used raw
+HF mode): the `nemotron_h` modeling code hard-imports `mamba_ssm`
+which has CUDA/Triton kernels only — won't run on M5 MPS. Possible
+follow-up on the 4090 workstation. Three other JP options were
+floated but not pursued: `cyberagent/calm3-22b-chat`,
+`tokyotech-llm/Llama-3.1-Swallow-8B`, sentence-transformers like
+`intfloat/multilingual-e5-base` (trades emission-side anchor
+property for bidirectional attention).
+
+Sample NN matches (qwen, post-fuse): `(>_<) → (>﹏<)` cos 0.99
+(HN-S), `(¬_¬) → (¬‿¬)` cos 0.96 (NB), `(;´д`) → (;´༎ຶд༎ຶ`)` cos
+0.99 (HN-S) — structurally-similar faces inherit sensible
+quadrant blends.
+
+#### Cross-model face overlap (script 49)
+
+Out of a 337-face union across the 3 v3 models, only **8 faces are
+emitted by all 3**. Per-pair modal-quadrant agreement on those 8:
+
+| pair | modal-agree | mean JSD |
+|---|---|---|
+| gemma ↔ qwen | 75% | 0.146 |
+| gemma ↔ ministral | 62% | 0.285 |
+| qwen ↔ ministral | 50% | 0.353 |
+
+4 of the 8 are fully unanimous: `(ﾉ◕ヮ◕)` HP, `(≧▽≦)` HP, `(╯°□°)`
+HN-D, `(｡・́︿・̀｡)` LN — universal high-arousal kaomoji whose register
+is unambiguous across models.
+
+Real divergences in the other 4 — same face, different affect read:
+
+  - `(╥﹏╥)` (crying face): gemma=**HP**(12) / qwen=HN-D(24) /
+    ministral=LN(67). Gemma reads the crying face as joy-context
+    (tears of joy); qwen as anger; ministral as past-tense sadness.
+  - `(⊙_⊙)` (round-eye stare): gemma=HN-S(**99**) / qwen=NB(1) /
+    ministral=HN-S(1). Gemma leans hard on this for fear/anxiety;
+    the others barely emit it.
+  - `(｡♥‿♥｡)` (heart-eyes): gemma+qwen=LP / ministral=**LN**(5).
+    Ministral reads heart-eyes as sad — possibly a tokenization
+    artifact, possibly a real register difference.
+
+Each model has its own kaomoji register; ministral's vocab (231
+unique faces) is 4.4× gemma's (52), but ~210 of those 231 are the
+emoji-in-parens noise filtered out at the encoder. Output:
+`data/v3_cross_model_face_overlap.tsv`.
+
+#### Approach A — descriptions through qwen (archived comparison)
+
+`scripts/local/45_descriptions_in_qwen_space.py` encodes each
+face's contributor description (synthesized per-bundle text from
+`a9lim/llmoji`) as the user message instead of the face string.
+Soft profile cosine = +0.345, perm-p = 0.001 (n=41 shared faces).
+Argmax is NB-skewed (133/228 NB) because descriptions are
+statement-form like NB prompts. Kept around as a comparison;
+canonical pipeline uses approach B (face strings) since A's
+register-match pull on NB makes the argmax unusable for
+classification.
+
+
 ### Vocab pilot — Ministral-3-14B-Instruct-2512
 
 Same 30 v1/v2 PROMPTS, same seed, same instructions. 30 generations,

@@ -288,6 +288,16 @@ class ModelPaths:
     experiment: str
     figures_dir: Path
     preferred_layer: int | None = None
+    # Encoder-side hooks for the face-input pipeline (scripts/local/46+44).
+    # use_saklas=False routes the encoder through a raw HF
+    # AutoModelForCausalLM forward pass with output_hidden_states=True
+    # (no probes, no steering). Use this for models saklas can't load
+    # (e.g. Mamba/hybrid like nemotron_h) or models with no probe
+    # calibration (e.g. Japanese-only base models). When False,
+    # `preferred_layer` indexes into transformers' hidden_states tuple
+    # (0 = embedding, N = output of layer N), so deepest = num_hidden_layers.
+    use_saklas: bool = True
+    trust_remote_code: bool = False
 
 
 MODEL_REGISTRY: dict[str, ModelPaths] = {
@@ -333,6 +343,33 @@ MODEL_REGISTRY: dict[str, ModelPaths] = {
         # ~55% depth). Ministral is the only model that stays mid-depth
         # under both aggregates; gemma and qwen both shift deep.
         preferred_layer=20,
+    ),
+    # Japanese-trained encoders for the face-input pipeline only —
+    # NOT used in v3 (no probe calibration, no emission run). Both
+    # bypass saklas and run through raw HF transformers.
+    "nemotron_jp": ModelPaths(
+        model_id="nvidia/NVIDIA-Nemotron-Nano-9B-v2-Japanese",
+        short_name="nemotron_jp",
+        emotional_data_path=DATA_DIR / "nemotron_jp_emotional_raw.jsonl",
+        emotional_summary_path=DATA_DIR / "nemotron_jp_emotional_summary.tsv",
+        experiment="v3_nemotron_jp",
+        figures_dir=FIGURES_DIR / "local" / "nemotron_jp",
+        # nemotron_h hybrid Mamba/attention, 56 hidden layers; deepest
+        # hidden_state = index 56 (after final layer).
+        preferred_layer=56,
+        use_saklas=False,
+        trust_remote_code=True,
+    ),
+    "rinna": ModelPaths(
+        model_id="rinna/japanese-gpt-neox-small",
+        short_name="rinna",
+        emotional_data_path=DATA_DIR / "rinna_emotional_raw.jsonl",
+        emotional_summary_path=DATA_DIR / "rinna_emotional_summary.tsv",
+        experiment="v3_rinna",
+        figures_dir=FIGURES_DIR / "local" / "rinna",
+        # GPTNeoX, 12 hidden layers; deepest hidden_state = index 12.
+        preferred_layer=12,
+        use_saklas=False,
     ),
 }
 
