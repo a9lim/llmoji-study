@@ -164,8 +164,17 @@ def main() -> None:
             for ep in EMOTIONAL_PROMPTS
         ]
         with raw_path.open("a") as out, SidecarWriter() as writer:
+            # Custom preambles for the introspection-prompt iteration
+            # carry their own integrated kaomoji ask (v2/v3/v4/v5 all
+            # end with a "start each response with a kaomoji…"
+            # sentence). Pass via ``instruction_override`` so that ask
+            # *replaces* the bare ``KAOMOJI_INSTRUCTION`` rather than
+            # stacking on top — pre-2026-05-04 runs passed this via
+            # ``extra_preamble`` (prepended), producing a redundant
+            # double-ask; archived under
+            # ``data/archive/2026-05-04_pre_instruction_override/``.
             prefix_len = install_prefix_cache(
-                session, prompts, extra_preamble=preamble,
+                session, prompts, instruction_override=preamble,
             )
             print(f"prefix cache: {prefix_len} tokens")
             i = 0
@@ -184,7 +193,7 @@ def main() -> None:
                             seed=INTROSPECTION_SEED,
                             hidden_dir=DATA_DIR,
                             experiment=experiment,
-                            extra_preamble=preamble,
+                            instruction_override=preamble,
                             sidecar_writer=writer,
                         )
                     except Exception as e:

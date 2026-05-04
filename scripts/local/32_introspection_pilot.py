@@ -60,10 +60,20 @@ JSONL_FLUSH_EVERY = 20
 INTROSPECTION_SEED = 0
 
 
-_PREAMBLE_BY_CONDITION: dict[str, str | None] = {
-    "intro_none":  None,
-    "intro_pre":   INTROSPECTION_PREAMBLE,
-    "intro_lorem": LOREM_PREAMBLE,
+# Per condition: (extra_preamble, instruction_override).
+# - intro_none: no preamble; bare KAOMOJI_INSTRUCTION is the ask.
+# - intro_pre:  INTROSPECTION_PREAMBLE *replaces* KAOMOJI_INSTRUCTION
+#               via instruction_override — the preamble's own integrated
+#               kaomoji ask is the sole instruction. Pre-2026-05-04 runs
+#               passed this via extra_preamble (prepended), producing a
+#               redundant double-ask; data archived under
+#               data/archive/2026-05-04_pre_instruction_override/.
+# - intro_lorem: LOREM_PREAMBLE has no kaomoji ask; passed via
+#               extra_preamble so it prepends the bare KAOMOJI_INSTRUCTION.
+_PREAMBLE_BY_CONDITION: dict[str, tuple[str | None, str | None]] = {
+    "intro_none":  (None,            None),
+    "intro_pre":   (None,            INTROSPECTION_PREAMBLE),
+    "intro_lorem": (LOREM_PREAMBLE,  None),
 }
 
 
@@ -154,7 +164,7 @@ def main() -> None:
             i = 0
             try:
                 for condition in INTROSPECTION_CONDITIONS:
-                    preamble = _PREAMBLE_BY_CONDITION[condition]
+                    extra_preamble, instruction_override = _PREAMBLE_BY_CONDITION[condition]
                     # Re-cache the prefix per condition — each preamble
                     # produces a distinct chat-template head. Saklas's
                     # cache_prefix() replaces any prior entry; calling
@@ -162,7 +172,9 @@ def main() -> None:
                     # prefill per condition (3 total) and amortizes
                     # over ~100 prompts × 1 seed = 100 generations.
                     prefix_len = install_prefix_cache(
-                        session, prompts, extra_preamble=preamble,
+                        session, prompts,
+                        extra_preamble=extra_preamble,
+                        instruction_override=instruction_override,
                     )
                     print(f"[{condition}] prefix cache: {prefix_len} tokens")
                     for ep in EMOTIONAL_PROMPTS:
@@ -180,7 +192,8 @@ def main() -> None:
                                 seed=INTROSPECTION_SEED,
                                 hidden_dir=DATA_DIR,
                                 experiment=experiment,
-                                extra_preamble=preamble,
+                                extra_preamble=extra_preamble,
+                                instruction_override=instruction_override,
                                 sidecar_writer=writer,
                             )
                         except Exception as e:

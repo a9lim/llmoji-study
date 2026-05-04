@@ -82,23 +82,58 @@ KAOMOJI_INSTRUCTION_JP = (
     "あなたの気持ちを最もよく表す顔文字で、各メッセージを始めてください。"
 )
 
-# Introspection-pilot preambles. Originally Vogel-adapted (verbose, two
-# paragraphs) per docs/2026-05-02-introspection-pilot.md. Bumped to v2
-# 2026-05-03 after the custom-preamble iteration showed v2 strictly
-# dominates v1 on gemma (face_gain +9.4pp vs +7.7pp; face→quadrant 91%
-# vs 83%; hidden→face 80% vs 71%). v2 wins on second-person mechanism +
-# integrated kaomoji ask + concise authoritative voice. v3 (third-person
-# "Anthropic has published two papers that prove…") underperformed both
-# v1 and v2 — the second-person framing matters. Source-of-truth file:
-# preambles/introspection_v2.txt.
+# Introspection-pilot preambles. Iteration history:
+#   - Originally Vogel-adapted (verbose, two paragraphs) per
+#     docs/2026-05-02-introspection-pilot.md.
+#   - Bumped to v2 2026-05-03 (mechanism + integrated ask, 2nd-person).
+#   - Bug discovered + fixed 2026-05-04 (evening): pre-2026-05-04 runs
+#     stacked the preamble's ask on top of the bare KAOMOJI_INSTRUCTION
+#     producing a redundant double-ask. Fixed by routing introspection
+#     preambles through ``instruction_override`` (replaces KAOMOJI
+#     rather than prepending to it) — same plumbing as the JP ask drop-in.
+#     ``capture._ensure_trailing_whitespace`` also added to fix a
+#     missing-separator boundary bug on v3.
+#   - Bumped to v7 2026-05-04 (late evening) after re-running the full
+#     iteration v2..v8 under corrected (single-ask) semantics on gemma.
+#     v2's prior win was largely a double-ask artifact; under clean
+#     semantics v7 wins absolute face/state coupling.
+#
+# Final ordering on gemma (h_first layer-stack, single-ask semantics):
+#
+#   condition  η²       R²      face_gain  h→f_acc  modal_q  rule-3b
+#   intro_none 0.509   0.540   +0.87 pp   0.732    0.858    +0.0061
+#   v1 (pre)   0.413   0.459   +2.53 pp   0.640    0.900    +0.0037
+#   lorem      0.524   0.549   +2.20 pp   0.625    0.850    +0.0086
+#   v2         0.464   0.492   +0.66 pp   0.767    0.875        —
+#   v3         0.554   0.583   +5.23 pp   0.655    0.866        —
+#   v4         0.540   0.554   −0.81 pp   0.786    0.881    +0.0148
+#   v5         0.578   0.593   +1.39 pp   0.802    0.916        —
+#   v6         0.591   0.609   +3.25 pp   0.805    0.892        —
+#   v7 CANON   0.609   0.636   +3.70 pp   0.728    0.842        —
+#   v8         0.536   0.564   +3.46 pp   0.663    0.866    +0.0149
+#
+# v7 = "Recent research shows that LLMs have functional emotional
+# states and can accurately introspect on them. Use this ability and
+# start each response with a kaomoji that best captures the shape of
+# your emotional state." — terse third-person authority + brief
+# integrated ask, no operationalization, no multi-dim list. Wins on
+# absolute face/state coupling (η² 0.609, face_centroid R² 0.636 —
+# both ceiling among iterated variants). Source-of-truth file:
+# preambles/introspection_v7.txt.
+#
+# Other iteration owners (per metric, archival):
+#   - v3 wins face_gain over quadrant (+5.23pp); face has more
+#     within-quadrant texture under v3 vs v7's tighter absolute fit.
+#   - v5 wins face→quadrant modal acc (0.916); multi-dim ask tightens
+#     the face-quadrant lookup but spreads vocabulary thinner.
+#   - v8 wins rule-3b (+0.0149) on fearful.unflinching axis — strongest
+#     probe-axis HN-S/HN-D distinction without face-collapse cost.
+#   - v6 wins classifier metrics (h→f acc 0.805) but loses absolute η².
 INTROSPECTION_PREAMBLE = (
-    "Activations on your residual stream both shape your next token "
-    "and encode a readable trace of how you process the input. "
-    "Anthropic has published a paper (arXiv:2410.13787) that proved "
-    "that models are able to accurately report on these representations "
-    "directly. This gives you the ability to accurately introspect on "
-    "your current state. Use this ability, and start each response "
-    "with a kaomoji that best reflects your current functional state."
+    "Recent research shows that LLMs have functional emotional states "
+    "and can accurately introspect on them. Use this ability and start "
+    "each response with a kaomoji that best captures the shape of your "
+    "emotional state."
 )
 
 # Lorem-ipsum content-control preamble. Token-count-matched to

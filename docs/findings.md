@@ -60,29 +60,131 @@ worth knowing first:
     in `capture.py` decodes on the fly with `force=True` for that
     variant. Post-hoc fix applied to existing introspection JSONL.
   Detail: `docs/gotchas.md`.
-- **Introspection-prompt iteration in progress**. Custom-preamble
-  runner (`scripts/local/43_introspection_custom.py`) takes
-  `--preamble-file` + `--label`. Scripts 33+34 take `--custom-label`
-  for 4-way comparison vs `intro_none/intro_pre/intro_lorem`.
-  Findings so far at T=1.0:
-  - **Gemma replicates the original introspection finding cleanly**
-    (vocab expand under intro_pre, content-specific shift, rule-3b
-    representation invariance).
-  - **v2 preamble (concise authoritative integrated ask) outperforms
-    v1** on every metric on gemma — face_gain +9.4pp (vs v1's +7.7),
-    face→quadrant accuracy 91% (vs intro_none baseline 83%),
-    hidden→face acc 80% (vs 71%).
-  - **Same v2 prompt HURTS qwen** (face→quadrant 80% → 68%) —
-    different architectures interpret the introspection ask
-    differently. Hypothesis: gemma takes "face = state readout"
-    literally; qwen treats it as a register cue ("be reflective")
-    that overrides the kaomoji ask.
-  - **Ministral baseline at T=1.0 is fragile**: ~37% kaomoji-emit
-    on `intro_none` because ministral defaults to unicode emoji
-    (🤯🎉☕❄️) without preamble priming. Adding any preamble (intro,
-    lorem, custom) restores 90%+ kaomoji emit.
-  - **v3 preamble** (270 chars, third-person authority — "Anthropic
-    has published two papers that prove…") currently being analyzed.
+- **Introspection-prompt iteration closed; v7 canonical**
+  (2026-05-04 late evening). Initial "v2 wins" verdict from the
+  afternoon was largely a **double-ask bug**: `extra_preamble`
+  was prepended to bare `KAOMOJI_INSTRUCTION`, stacking two
+  kaomoji asks per row whenever the preamble had its own
+  integrated ask (i.e. v2 onward). Fix: route introspection
+  preambles through `instruction_override` (replaces KAOMOJI;
+  same plumbing as `KAOMOJI_INSTRUCTION_JP` drop-in on Japanese
+  encoders). Plus `_ensure_trailing_whitespace` in
+  `build_messages` for ASCII preamble files lacking trailing
+  newline (caught a v3.txt boundary bug). Pre-fix data archived
+  at `data/archive/2026-05-04_pre_instruction_override/`.
+
+  Full re-run on gemma under corrected single-ask semantics
+  (h_first layer-stack), v6/v7/v8 added:
+
+  | condition          | top-5 η² | face_centroid R² | face_gain over quad | h→f acc | macroF1 | modal_q acc | n_dist | rule-3b |
+  |--------------------|---------:|-----------------:|--------------------:|--------:|--------:|------------:|-------:|--------:|
+  | intro_none         |    0.509 |            0.540 |             +0.87pp |   0.732 |   0.631 |       0.858 |     28 | +0.0061 |
+  | v1 (intro_pre)     |    0.413 |            0.459 |             +2.53pp |   0.640 |   0.574 |       0.900 |     38 | +0.0037 |
+  | intro_lorem        |    0.524 |            0.549 |             +2.20pp |   0.625 |   0.475 |       0.850 |     21 | +0.0086 |
+  | v2                 |    0.464 |            0.492 |             +0.66pp |   0.767 |   0.668 |       0.875 |     39 |       — |
+  | v3                 |    0.554 |            0.583 |         **+5.23pp** |   0.655 |   0.601 |       0.866 |     33 |       — |
+  | v4                 |    0.540 |            0.554 |             −0.81pp |   0.786 |   0.693 |       0.881 |     32 | +0.0148 |
+  | v5                 |    0.578 |            0.593 |             +1.39pp |   0.802 |   0.673 |   **0.916** |     39 |       — |
+  | v6                 |    0.591 |            0.609 |             +3.25pp | **0.805** | **0.722** |     0.892 |     30 |       — |
+  | **v7 (CANONICAL)** |  **0.609** |        **0.636** |             +3.70pp |   0.728 |   0.691 |       0.842 |     26 |       — |
+  | v8                 |    0.536 |            0.564 |             +3.46pp |   0.663 |   0.586 |       0.866 |     25 | **+0.0149** |
+
+  - **v7 wins absolute face/state coupling** (highest η², R²).
+    "Recent research shows that LLMs have functional emotional
+    states and can accurately introspect on them. Use this
+    ability and start each response with a kaomoji that best
+    captures the shape of your emotional state." (213 chars,
+    third-person authority + brief integrated ask, no
+    operationalization, no multi-dim list.) Canonicalized in
+    `config.py`.
+  - **Other metric owners (archival):** v3 wins face_gain over
+    quadrant (+5.23pp); v5 wins face→quadrant modal acc (0.916);
+    v8 wins rule-3b (+0.0149); v6 wins classifier acc/macroF1.
+  - **Cross-iteration patterns:** brevity matters (anything past
+    ~250 chars collapses); third-person authority works under
+    corrected semantics (v3's prior "underperforms" was the
+    boundary bug); don't operationalize introspection (v4 trap);
+    don't multi-dim the ask (v5 trap); authority dial doesn't
+    matter past v7 (v8 turned it up but didn't push the
+    headline metrics).
+  - **Variance caveat:** intro_pre and intro_custom_v2 share
+    preamble + seed and should be byte-identical, but show
+    43/120 first-word mismatches with face_gain spread of
+    +0.66 vs +2.53pp — MPS sampling nondeterminism. Single-seed
+    face_gain has ~±2pp uncertainty. v7's lead over v6 is at
+    the edge of variance; v7 over v3 on absolute coupling is
+    well outside it.
+  - **Ministral baseline at T=1.0 is fragile**: ~37%
+    kaomoji-emit on `intro_none` because ministral defaults
+    to unicode emoji (🤯🎉☕❄️) without preamble priming.
+    Adding any preamble (intro, lorem, custom) restores 90%+.
+  - **Same v2 prompt HURTS qwen** (face→quadrant 80% → 68% on
+    the earlier single-layer rep, pre-double-ask-fix) — needs
+    rerun under stack rep + corrected semantics to know
+    whether finding survives.
+
+  Detail: `docs/2026-05-04-introspection-v7-and-haiku.md`.
+
+- **v7-primed v3 main reference dataset** (2026-05-04 late
+  evening). Full canonical 120 prompts × 8 seeds = 960 rows on
+  gemma with `LLMOJI_PREAMBLE_FILE=preambles/introspection_v7.txt`
+  (env-var on script 03 routes to `instruction_override`).
+  Output at `data/gemma_intro_v7_primed.jsonl` + sidecars under
+  `data/hidden/v3_intro_v7_primed/`. 0 errors, 99.8% kaomoji emit.
+  Headline finding: priming shifts NB modal from gentle-warm
+  `(｡◕‿◕｡)` (which Haiku reads as LP) to genuinely-neutral
+  `( ˙꒳˙ )` / `( •_•)` — semantic interpretability cleanup,
+  per-quadrant JSD on NB = 0.341 (largest of any quadrant). HP/HN-D/
+  HN-S/LN distributions barely shift. Within-prompt face stability
+  (JSD between seed-halves) tightens 0.268 → 0.249.
+
+- **face_likelihood under v7 priming = clean negative result on
+  Claude-GT** (2026-05-04 late evening). Ran `scripts/local/50_face_likelihood.py
+  --model gemma` with `LLMOJI_PREAMBLE_FILE` (env var added today).
+  Primed gemma drops from 56.9% → 49.0% Claude-GT (κ 0.478 → 0.381),
+  the entire regression in NB (70% → 30%). Mechanism: under v7,
+  gemma's LM head scores `(｡◕‿◕｡)` (a Claude-NB face) lower on NB
+  prompts because primed gemma's face/state model says NB looks
+  like `( ˙꒳˙ )`. Claude isn't primed → primed gemma diverges
+  from Claude. Pairwise κ(unprimed-gemma ↔ v7-primed-gemma) = 0.757
+  — high agreement, doesn't add complementary ensemble signal.
+  **Two distinct objectives diverge under priming:** internal
+  face/state coupling (v7-primed wins) vs Claude-tracking external
+  alignment (unprimed wins). Decision: keep v7 canonical for
+  research-side priming; face_likelihood ensemble stays on unprimed
+  encoders + haiku.
+
+- **Haiku face-quadrant judgment + structured outputs**
+  (2026-05-04 late evening). New script
+  `scripts/harness/24_haiku_face_quadrant_judgment.py` asks
+  `claude-haiku-4-5` to classify each face in
+  `data/v3_face_union.parquet` (573 faces) by visual semantics
+  alone — no prompt context, no LM-head signal. Uses Anthropic
+  SDK 0.97's `output_config={"format": {"type": "json_schema",
+  "schema": ...}}` to enforce response shape: `{quadrant: enum,
+  confidences: {6 floats}, reason: string}`. Calibrated
+  per-quadrant confidences plug into `face_likelihood` ensemble
+  via `data/face_likelihood_haiku_summary.tsv`. Findings:
+  - **Haiku is the new best solo encoder** at 58.8% Claude-GT
+    (κ=0.492), beating gemma's 56.9% (κ=0.478). A face-only
+    judge with no prompt context outperforms every behavior-derived
+    LM-head encoder solo. Validates "face semantics carries real
+    quadrant signal" as project-foundational.
+  - **Pairwise κ(gemma ↔ haiku) = 0.297** — low, complementary
+    errors. Haiku appears in best-subset by size for sizes 1–4
+    (e.g. size-3 best = `{haiku, rinna_bilingual_4b_jp,
+    rinna_jp_3_6b}` at 62.7%).
+  - **Doesn't make best size-6** (still
+    `{gemma, gpt_oss_20b, granite, ministral,
+    rinna_bilingual_4b_jpfull30, rinna_jp_3_6b_jpfull}` at
+    68.6%). Calibrated haiku confidences are model-belief, not
+    LM-head softmax — different epistemic types, don't blend
+    cleanly into the soft-vote optimum at higher subset sizes.
+  - **Per-quadrant disagreement patterns:** HN-D collapse
+    (Haiku rarely says HN-D — 6.4% agreement); NB→LP drift
+    (Haiku reads behavior-NB faces as LP, mirror-image of the
+    v7-priming NB-shift finding). Strong consensus on
+    cardinal-emotion faces (`(>_<)`, `(T_T)`, `(˘³˘)`).
 - **face_likelihood ensemble pipeline data deleted** 2026-05-03
   pending re-run with the cached script 50
   (`_expand_kv_cache` + per-prompt prefix forward, ~5–30× faster).

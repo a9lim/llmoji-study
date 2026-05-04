@@ -13,6 +13,25 @@ Mirrors scripts/01_pilot_run.py structurally — same session setup,
 same resume-on-rerun semantics. Does not register steering profiles
 (unsteered only). Logs per-quadrant kaomoji-emission rate every 80
 completed rows so the user can bail early if emission falls below ~50%.
+
+Env vars:
+  LLMOJI_MODEL          model short-name routing (default: gemma)
+  LLMOJI_OUT_SUFFIX     output-path / experiment suffix; writes to
+                        data/<short>_<suffix>.jsonl + sidecars under
+                        data/hidden/v3_*_<suffix>/. Use to avoid
+                        clobbering canonical v3 main when running
+                        a variant.
+  LLMOJI_PREAMBLE_FILE  optional path to a UTF-8 file whose contents
+                        are passed as ``instruction_override`` —
+                        replacing ``KAOMOJI_INSTRUCTION`` rather than
+                        prepending to it (matches the JP drop-in
+                        plumbing on Japanese encoders). Used
+                        2026-05-04 to run a v2-primed v3 main under
+                        the canonical introspection preamble
+                        (preambles/introspection_v2.txt). Pair with
+                        ``LLMOJI_OUT_SUFFIX``.
+  LLMOJI_PILOT_GENS     override seeds-per-cell (default 8 from
+                        config.EMOTIONAL_SEEDS_PER_CELL); pilots only.
 """
 
 from __future__ import annotations
@@ -164,6 +183,22 @@ def main() -> None:
             experiment=new_experiment,
         )
         print(f"  output suffix: '_{out_suffix}' (sidecars under {new_experiment}/)")
+    # Optional system-preamble injection. Used 2026-05-04 to run a
+    # full v3 main under the canonical introspection preamble (v2)
+    # at 120×8 = 960 rows — the v2-primed reference dataset that
+    # unlocks face_likelihood / face-stability / Procrustes
+    # comparisons under priming. Pass a path to a UTF-8 text file;
+    # contents are passed as ``instruction_override`` (not
+    # ``extra_preamble``) so the preamble's own integrated kaomoji
+    # ask *replaces* the bare ``KAOMOJI_INSTRUCTION`` rather than
+    # stacking on top. Pair with ``LLMOJI_OUT_SUFFIX`` so output
+    # doesn't clobber the unprimed v3 main.
+    preamble_file = os.environ.get("LLMOJI_PREAMBLE_FILE")
+    instruction_override: str | None = None
+    if preamble_file:
+        instruction_override = Path(preamble_file).read_text()
+        print(f"  preamble: {preamble_file} ({len(instruction_override)} chars; "
+              f"replaces KAOMOJI_INSTRUCTION via instruction_override)")
     print(f"model: {M.short_name} ({M.model_id})")
     print(f"output: {M.emotional_data_path}")
     print(f"experiment: {M.experiment}")
@@ -209,7 +244,10 @@ def main() -> None:
                 Prompt(id=ep.id, valence=ep.valence, text=ep.text)
                 for ep in EMOTIONAL_PROMPTS
             ]
-            prefix_len = install_prefix_cache(session, prompts)
+            prefix_len = install_prefix_cache(
+                session, prompts,
+                instruction_override=instruction_override,
+            )
             print(f"prefix cache (cross-prompt): {prefix_len} tokens")
         else:
             print(f"prefix cache: per-prompt (N={EMOTIONAL_SEEDS_PER_CELL} seeds/cell)")
@@ -235,7 +273,10 @@ def main() -> None:
                     if EMOTIONAL_SEEDS_PER_CELL > 1:
                         # Cache full input minus 1 token; subsequent seeds
                         # do only a 1-token suffix prefill.
-                        install_full_input_cache(session, p)
+                        install_full_input_cache(
+                            session, p,
+                            instruction_override=instruction_override,
+                        )
                     for seed in pending_seeds:
                         i += 1
                         t0 = time.time()
@@ -247,6 +288,7 @@ def main() -> None:
                                 seed=seed,
                                 hidden_dir=DATA_DIR,
                                 experiment=M.experiment,
+                                instruction_override=instruction_override,
                                 sidecar_writer=writer,
                             )
                         except Exception as e:

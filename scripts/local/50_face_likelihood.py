@@ -445,7 +445,20 @@ def main() -> None:
     M = MODEL_REGISTRY[args.model]
     print(f"model: {M.short_name} ({M.model_id})")
     instruction = KAOMOJI_INSTRUCTION_JP if args.prompt_lang == "jp" else KAOMOJI_INSTRUCTION
-    print(f"prompt-lang: {args.prompt_lang}  (kaomoji ask: {instruction!r})")
+    # Optional: replace the bare KAOMOJI ask with an introspection
+    # preamble (canonical v7 in INTROSPECTION_PREAMBLE since 2026-05-04).
+    # Mirrors script 03's plumbing — the preamble's own integrated
+    # kaomoji ask becomes the sole instruction via the
+    # ``instruction_override`` codepath in build_messages. Used to test
+    # whether priming the LM head changes the face/state coupling
+    # measured by face_likelihood.
+    import os as _os
+    _preamble_file = _os.environ.get("LLMOJI_PREAMBLE_FILE")
+    if _preamble_file:
+        instruction = Path(_preamble_file).read_text()
+        print(f"  preamble override: {_preamble_file} ({len(instruction)} chars; "
+              f"replaces KAOMOJI ask)")
+    print(f"prompt-lang: {args.prompt_lang}  (kaomoji ask: {instruction!r:.100})")
 
     faces_df = _load_face_union(M.short_name)
     print(f"face union from data/v3_face_union.parquet: n={len(faces_df)}")
@@ -520,6 +533,12 @@ def main() -> None:
         suffix = "_jp"
     else:
         suffix = ""
+    # If a preamble override was supplied, tag the output so it doesn't
+    # clobber the canonical face_likelihood TSV. Reads the file's stem
+    # (e.g. "introspection_v7" → suffix "_v7primed").
+    if _preamble_file:
+        stem = Path(_preamble_file).stem.replace("introspection_", "")
+        suffix = f"{suffix}_{stem}primed"
     rows_path = DATA_DIR / f"face_likelihood_{M.short_name}{suffix}.parquet"
     rows_df.to_parquet(rows_path, index=False)
     print(f"wrote per-cell rows to {rows_path}")

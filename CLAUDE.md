@@ -54,7 +54,45 @@ phenomenal status. Aggregating that across 800+ generations is not nothing.
 
 ## Status (compressed)
 
-### Active threads (as of 2026-05-04 evening)
+### Active threads (as of 2026-05-04 late evening)
+
+- **Introspection v7 canonical + double-ask fix + v7-primed main
+  + Haiku face-judgment** all landed today. Detail in
+  `docs/2026-05-04-introspection-v7-and-haiku.md`.
+  - Pre-fix `extra_preamble` was prepended to bare KAOMOJI_INSTRUCTION,
+    stacking two kaomoji asks per row. Fixed via `instruction_override`
+    plumbing (replaces KAOMOJI; same as JP drop-in) +
+    `_ensure_trailing_whitespace` for ASCII preamble files lacking
+    trailing newline. Pre-fix data archived at
+    `data/archive/2026-05-04_pre_instruction_override/`.
+  - Re-run on gemma under corrected semantics: **v7 wins absolute
+    face/state coupling** (η² 0.609, R² 0.636). Other metric owners:
+    v3 wins face_gain over quadrant (+5.23pp); v5 wins face→quadrant
+    modal acc (0.916); v8 wins rule-3b (+0.0149); v6 wins classifier
+    metrics. `INTROSPECTION_PREAMBLE` in `config.py` = v7.txt.
+  - **v7-primed v3 main** at `data/gemma_intro_v7_primed.jsonl`
+    (960 rows; sidecars under `data/hidden/v3_intro_v7_primed/`).
+    Headline: priming shifts NB modal from gentle-warm `(｡◕‿◕｡)`
+    to truly-neutral `( ˙꒳˙ )` / `( •_•)` (per-quadrant JSD 0.341,
+    largest of any quadrant). Semantic interpretability cleanup that
+    Haiku's face-judgment confirms.
+  - **face_likelihood under v7 priming = clean negative result**:
+    primed gemma 49.0% Claude-GT (vs unprimed 56.9%), entire
+    regression in NB. Internal coupling and Claude-tracking
+    diverge under priming. **Decision: face_likelihood ensemble
+    stays on unprimed encoders + haiku.**
+  - **Haiku-with-confidences = new best solo encoder** at 58.8%
+    Claude-GT (κ=0.492), beating gemma 56.9%. Uses Anthropic SDK
+    0.97's `output_config` JSON-schema-enforced structured output
+    for calibrated per-quadrant softmax. Pairwise κ(gemma ↔ haiku)
+    = 0.297 — high complementarity. In best subsets at size 1–4
+    but not size-6 (LM-head soft-vote dominates the optimum).
+  - Open: face-stability triple under priming (scripts 36/37/38
+    on `gemma_intro_v7_primed.jsonl`); multi-seed verification of
+    v7 vs v3 (~12 min compute, ±2pp face_gain band at n=1);
+    same-v2-hurts-qwen rerun under corrected semantics.
+
+### Earlier active threads (2026-05-04 afternoon)
 
 - **v3 main rerun at T=1.0 complete.** All 5 models (gemma, qwen,
   ministral, gpt_oss_20b, granite) at 960/960 rows. Face_likelihood
@@ -129,10 +167,11 @@ phenomenal status. Aggregating that across 800+ generations is not nothing.
   was script 50, which now reads the canonical union. Modules
   `analysis.py`, `probe_extensions.py`, and `probe_packs/` orphaned
   by these deletions are also gone.
-- **Introspection-prompt iteration** (`scripts/local/43_introspection_custom.py`).
-  v2 outperforms v1 on gemma; same v2 hurts qwen. v3 preamble
-  (270 chars, third-person authority framing) tested but underperformed
-  v1 + v2. Detail in `docs/findings.md`.
+  *(Introspection v7 canonical, double-ask fix, primed-main, and
+  Haiku face-judgment threads all closed today — see "Active
+  threads (2026-05-04 late evening)" at top of this section for
+  the consolidated entry, or
+  `docs/2026-05-04-introspection-v7-and-haiku.md` for full detail.)*
 
 ### Key headline findings (current state)
 

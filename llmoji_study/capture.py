@@ -449,11 +449,42 @@ def build_messages(
     if kaomoji_instructed:
         instruction = instruction_override if instruction_override is not None else KAOMOJI_INSTRUCTION
         if extra_preamble:
-            instruction = extra_preamble + instruction
+            instruction = _ensure_trailing_whitespace(extra_preamble) + instruction
+        # Guard the preamble→prompt boundary too — preamble files that
+        # omit a trailing newline (e.g. introspection_v3.txt) would
+        # otherwise concatenate directly with the prompt body
+        # (`...feel.offer letter...`), producing weird tokenizer-
+        # boundary states. KAOMOJI_INSTRUCTION already ends with
+        # ". " so this is a no-op for the default path.
+        instruction = _ensure_trailing_whitespace(instruction)
         content = instruction + prompt.text
     else:
         content = prompt.text
     return [{"role": "user", "content": content}]
+
+
+def _ensure_trailing_whitespace(s: str) -> str:
+    """Append a single space if ``s`` ends with an ASCII non-whitespace
+    character.
+
+    Used at the boundaries of ``build_messages`` concatenation
+    (preamble→instruction, instruction→prompt) to prevent ASCII
+    preamble files / instruction overrides that omit a trailing
+    newline from running together with neighbours
+    (e.g. ``introspection_v3.txt`` ending ``"feel."`` would
+    otherwise concatenate as ``"feel.offer letter..."``).
+
+    Non-ASCII trailing characters (e.g. ``KAOMOJI_INSTRUCTION_JP``
+    ending in ``"。"``) are left alone — historical face_likelihood
+    JP-encoder data was generated without the separator and CJK
+    tokenizer boundaries don't need ASCII space.
+    """
+    if not s:
+        return s
+    last = s[-1]
+    if last.isspace() or ord(last) > 127:
+        return s
+    return s + " "
 
 
 _GPT_OSS_GENPROMPT_SENTINEL = "<|start|>assistant\n{%- endif -%}"
@@ -647,6 +678,7 @@ def install_prefix_cache(
     prompts: list[Prompt],
     *,
     extra_preamble: str | None = None,
+    instruction_override: str | None = None,
     kaomoji_instructed: bool = True,
 ) -> int:
     """Compute the longest common chat-template token prefix across
@@ -658,7 +690,14 @@ def install_prefix_cache(
     suffix per call is just the prompt body + assistant-turn-start.
     Halves per-call prefill in practice. Must be called outside any
     ``session.steering()`` scope. Re-call with a different prompt set or
-    preamble to replace the cache."""
+    preamble to replace the cache.
+
+    ``instruction_override`` swaps in a non-default kaomoji instruction
+    (replaces ``KAOMOJI_INSTRUCTION`` rather than prepending). Used for
+    introspection preambles whose own integrated kaomoji ask should be
+    the sole instruction (replaces the bare KAOMOJI_INSTRUCTION),
+    matching the JP drop-in plumbing used for ``KAOMOJI_INSTRUCTION_JP``.
+    """
     if not prompts:
         return 0
     import torch
@@ -669,6 +708,7 @@ def install_prefix_cache(
             p,
             kaomoji_instructed=kaomoji_instructed,
             extra_preamble=extra_preamble,
+            instruction_override=instruction_override,
         )
         result = tok.apply_chat_template(
             msgs, add_generation_prompt=True, return_tensors="pt",
@@ -695,6 +735,7 @@ def install_full_input_cache(
     prompt: Prompt,
     *,
     extra_preamble: str | None = None,
+    instruction_override: str | None = None,
     kaomoji_instructed: bool = True,
 ) -> int:
     """Cache the full chat-templated input for ``prompt`` (minus the
@@ -733,6 +774,7 @@ def install_full_input_cache(
         prompt,
         kaomoji_instructed=kaomoji_instructed,
         extra_preamble=extra_preamble,
+        instruction_override=instruction_override,
     )
     result = session.tokenizer.apply_chat_template(
         msgs, add_generation_prompt=True, return_tensors="pt",
@@ -788,6 +830,7 @@ def run_sample(
     # no v3 analysis script reads `hidden_L<idx>` post-h_first cutover; ~60× sidecar shrink.
     store_full_trace: bool = False,
     extra_preamble: str | None = None,
+    instruction_override: str | None = None,
     override_max_tokens: int | None = None,
     sidecar_writer: SidecarWriter | None = None,
 ) -> SampleRow:
@@ -812,20 +855,36 @@ def run_sample(
     responsible for draining/closing it. ``hidden_dir`` is still
     required for canonical path resolution.
 
-    ``extra_preamble`` (used by the introspection pilot) is prepended
-    to KAOMOJI_INSTRUCTION inside the user message. Treated as
-    "kaomoji_instructed = True" regardless of the condition string,
-    since the preamble itself implies a kaomoji-emission setup.
+    ``extra_preamble`` (originally for the introspection pilot's lorem
+    control) is prepended to ``KAOMOJI_INSTRUCTION`` inside the user
+    message. Treated as "kaomoji_instructed = True" regardless of the
+    condition string, since the preamble itself implies a kaomoji-
+    emission setup.
+
+    ``instruction_override`` (used 2026-05-04 onward by the
+    introspection-preamble pilots) replaces ``KAOMOJI_INSTRUCTION``
+    with the supplied string. Use this for preambles that include
+    their own integrated kaomoji ask (v2/v3/v4/v5 introspection-
+    preamble iterations) — without override, the bare
+    ``KAOMOJI_INSTRUCTION`` would stack after the preamble's ask
+    creating a redundant double-ask. Mirrors the JP plumbing used
+    for ``KAOMOJI_INSTRUCTION_JP`` on Japanese encoders. Like
+    ``extra_preamble``, also forces ``kaomoji_instructed = True``.
 
     ``override_max_tokens`` (used by the introspection pilot's
     hard-early-stop) sets ``max_tokens`` on the SamplingConfig in
     place of the registered MAX_NEW_TOKENS default.
     """
-    kaomoji_instructed = condition != "baseline" or extra_preamble is not None
+    kaomoji_instructed = (
+        condition != "baseline"
+        or extra_preamble is not None
+        or instruction_override is not None
+    )
     messages = build_messages(
         prompt,
         kaomoji_instructed=kaomoji_instructed,
         extra_preamble=extra_preamble,
+        instruction_override=instruction_override,
     )
     expr = steering_for(condition)
 
