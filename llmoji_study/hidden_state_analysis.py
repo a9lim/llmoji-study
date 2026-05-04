@@ -306,12 +306,30 @@ def load_hidden_features_all_layers(
         raise ValueError(f"which must be one of {WHICH_SNAPSHOTS}")
 
     if cache_path is not None and cache_path.exists():
+        # Stale-cache guard: if the source JSONL has more rows than the
+        # cache (a generation run finished or extended after the cache
+        # was built), invalidate. Matched-or-fewer counts are fine —
+        # `drop_errors` and missing sidecars can legitimately reduce
+        # cache row count below jsonl count, but the cache will never
+        # exceed jsonl. See docs/gotchas.md "stale all-layers cache".
+        n_jsonl = sum(1 for line in Path(jsonl_path).open() if line.strip())
         cached = np.load(cache_path)
-        meta_path = cache_path.with_suffix(".meta.jsonl")
-        df = pd.read_json(meta_path, lines=True) if meta_path.exists() else pd.DataFrame()
-        layer_idxs = [int(x) for x in cached["layer_idxs"]]
-        X3 = cached["X3"]
-        return df, X3, layer_idxs
+        n_cache = int(cached["X3"].shape[0]) if "X3" in cached.files else 0
+        if n_cache < n_jsonl:
+            cache_path.unlink()
+            meta_path = cache_path.with_suffix(".meta.jsonl")
+            if meta_path.exists():
+                meta_path.unlink()
+            print(
+                f"  [load_hidden_features_all_layers] cache stale "
+                f"({n_cache} cached vs {n_jsonl} jsonl rows); rebuilding"
+            )
+        else:
+            meta_path = cache_path.with_suffix(".meta.jsonl")
+            df = pd.read_json(meta_path, lines=True) if meta_path.exists() else pd.DataFrame()
+            layer_idxs = [int(x) for x in cached["layer_idxs"]]
+            X3 = cached["X3"]
+            return df, X3, layer_idxs
 
     jsonl_path = Path(jsonl_path)
     rows: list[dict[str, Any]] = []

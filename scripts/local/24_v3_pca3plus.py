@@ -37,10 +37,10 @@ import pandas as pd
 from scipy.stats import pearsonr
 from sklearn.decomposition import PCA
 
-from llmoji_study.config import DATA_DIR, PROBES, current_model
+from llmoji_study.config import PROBES, current_model
 from llmoji_study.emotional_analysis import (
     _use_cjk_font,
-    load_emotional_features,
+    load_emotional_features_stack,
 )
 
 
@@ -148,15 +148,12 @@ def main() -> None:
         print(f"no v3 data at {M.emotional_data_path}")
         sys.exit(1)
 
-    layer_label = "max" if M.preferred_layer is None else f"L{M.preferred_layer}"
     print(f"model: {M.short_name}")
-    print(f"loading v3 hidden-state features (h_mean, layer={layer_label})...")
-    df, X = load_emotional_features(
-        str(M.emotional_data_path), DATA_DIR,
-        experiment=M.experiment, which="h_first",
-        layer=M.preferred_layer,
+    print("loading v3 hidden-state features (h_first, layer-stack)...")
+    df, X = load_emotional_features_stack(
+        M.short_name, which="h_first",
     )
-    print(f"  {len(df)} rows, X {X.shape}")
+    print(f"  {len(df)} rows, X {X.shape} (layer-stack)")
     df, probes_all = _attach_probe_columns(df, M.emotional_data_path)
     print(f"  attached probe columns; {len(df)} rows after merge")
     print(f"  probes considered: {len(probes_all)} "

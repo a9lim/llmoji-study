@@ -47,7 +47,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from llmoji_study.config import MODEL_REGISTRY, PROBES as CORE_PROBES
 from llmoji_study.emotional_analysis import _hn_split_map
 
-MODELS = ("gemma", "qwen", "ministral")
+MODELS = ("gemma", "qwen", "ministral", "gpt_oss_20b", "granite")
 AGGREGATES = ("t0", "tlast", "mean")
 # Schema-spanning field map. Pre-2026-05-03 data stores fearful in
 # the dict-keyed ``extension_probe_scores_*`` fields (lazy rescore).

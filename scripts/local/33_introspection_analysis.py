@@ -24,6 +24,7 @@ Three outputs:
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from collections import Counter
@@ -47,7 +48,7 @@ from llmoji_study.emotional_analysis import (
     _hn_split_map,
     _use_cjk_font,
     available_extension_probes,
-    load_emotional_features,
+    load_emotional_features_stack_at,
     load_rows,
 )
 
@@ -124,6 +125,13 @@ def _color_for(quadrant: str) -> str:
 
 
 def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--custom-label", type=str, default=None,
+                    help="if set, also load data/{short}_introspection_custom_<label>.jsonl "
+                         "and treat its rows as a 4th condition 'intro_custom'. "
+                         "Output figures + KL/rule-3b tables include the new column.")
+    args = ap.parse_args()
+
     M = current_model()
     raw_path = DATA_DIR / f"{M.short_name}_introspection_raw.jsonl"
     if not raw_path.exists():
@@ -132,11 +140,38 @@ def main() -> None:
     figdir.mkdir(parents=True, exist_ok=True)
 
     df = load_rows(str(raw_path))
+    # Optionally merge the custom-preamble run (script 43 output) and
+    # relabel its rows so existing condition-keyed plumbing handles the
+    # 4-way comparison without per-script special cases.
+    conditions = list(INTROSPECTION_CONDITIONS)
+    custom_experiment: str | None = None
+    # Figure / TSV path suffix — keeps 4-way outputs distinct from the
+    # canonical 3-way introspection figures.
+    tag = f"_custom_{args.custom_label}" if args.custom_label else ""
+    if args.custom_label:
+        custom_path = (
+            DATA_DIR / f"{M.short_name}_introspection_custom_{args.custom_label}.jsonl"
+        )
+        if not custom_path.exists():
+            raise SystemExit(
+                f"missing {custom_path} — run scripts/43 with "
+                f"--label {args.custom_label} first"
+            )
+        df_custom = load_rows(str(custom_path))
+        df_custom["condition"] = "intro_custom"
+        df = pd.concat([df, df_custom], ignore_index=True)
+        conditions.append("intro_custom")
+        custom_experiment = (
+            f"{M.experiment}_introspection_custom_{args.custom_label}"
+        )
+        print(f"merged custom run from {custom_path.name} "
+              f"(label='{args.custom_label}', {len(df_custom)} rows)")
+
     df = df[df["first_word"].astype(bool)].copy()
     df["quadrant_split"] = df["prompt_id"].map(_quadrant_with_split)
 
     print(f"model: {M.short_name}; rows: {len(df)}")
-    for c in INTROSPECTION_CONDITIONS:
+    for c in conditions:
         n = (df["condition"] == c).sum()
         n_emit = ((df["condition"] == c) & df["first_word"].astype(bool)).sum()
         print(f"  {c}: {n} rows ({n_emit} kaomoji-bearing)")
@@ -151,8 +186,10 @@ def main() -> None:
     df["pc2"] = pca.transform(X_all)[:, 1]
     print(f"PCA explained variance: {pca.explained_variance_ratio_}")
 
-    fig, axes = plt.subplots(1, 3, figsize=(18, 6), sharex=True, sharey=True)
-    for ax, condition in zip(axes, INTROSPECTION_CONDITIONS):
+    n_cond = len(conditions)
+    fig, axes = plt.subplots(1, n_cond, figsize=(6 * n_cond, 6),
+                              sharex=True, sharey=True)
+    for ax, condition in zip(axes, conditions):
         sub = df[df["condition"] == condition]
         for q, gd in sub.groupby("quadrant_split"):
             ax.scatter(
@@ -181,31 +218,43 @@ def main() -> None:
         y=-0.02,
     )
     fig.tight_layout()
-    out = figdir / "fig_introspection_pca_pair.png"
+    out = figdir / f"fig_introspection_pca_pair{tag}.png"
     fig.savefig(out, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"wrote {out}")
 
-    # ---------- Rule I-bis: paired PCA(2) on hidden states (h_first @ L_pref) ----------
+    # ---------- Rule I-bis: paired PCA(2) on hidden states (h_first layer-stack) ----------
     # The probe-PCA above lives in 17-D probe-score space; this one lives
-    # in the actual hidden-state space at gemma's preferred layer (L31).
+    # in the actual hidden-state space, layer-stacked across all layers.
     # h_first is the state producing the kaomoji-emission token (= t0).
-    pref_layer = M.preferred_layer  # L31 for gemma; falls back to deepest if None
-    print(f"\nloading hidden states at L{pref_layer} (h_first) ...")
-    df_h, X_h = load_emotional_features(
+    print("\nloading hidden states (h_first, layer-stack) ...")
+    df_h, X_h = load_emotional_features_stack_at(
         str(raw_path), DATA_DIR,
         experiment=f"{M.experiment}_introspection",
-        which="h_first", layer=pref_layer,
-        split_hn=True,
+        which="h_first", split_hn=True,
     )
+    if args.custom_label and custom_experiment is not None:
+        # Append the custom run's hidden states + relabel rows.
+        custom_path = (
+            DATA_DIR / f"{M.short_name}_introspection_custom_{args.custom_label}.jsonl"
+        )
+        df_h_c, X_h_c = load_emotional_features_stack_at(
+            str(custom_path), DATA_DIR,
+            experiment=custom_experiment,
+            which="h_first", split_hn=True,
+        )
+        df_h_c["condition"] = "intro_custom"
+        df_h = pd.concat([df_h, df_h_c], ignore_index=True)
+        X_h = np.concatenate([X_h, X_h_c], axis=0)
     print(f"  hidden-state rows: {len(df_h)}; dim: {X_h.shape[1]}")
     pca_h = PCA(n_components=2, random_state=0).fit(X_h)
     coords_h = pca_h.transform(X_h)
     df_h = df_h.assign(pc1=coords_h[:, 0], pc2=coords_h[:, 1])
     print(f"  PCA explained variance: {pca_h.explained_variance_ratio_}")
 
-    fig_h, axes_h = plt.subplots(1, 3, figsize=(18, 6), sharex=True, sharey=True)
-    for ax, condition in zip(axes_h, INTROSPECTION_CONDITIONS):
+    fig_h, axes_h = plt.subplots(1, n_cond, figsize=(6 * n_cond, 6),
+                                  sharex=True, sharey=True)
+    for ax, condition in zip(axes_h, conditions):
         sub = df_h[df_h["condition"] == condition]
         for q, gd in sub.groupby("quadrant"):
             ax.scatter(
@@ -228,12 +277,12 @@ def main() -> None:
     fig_h.legend(by_label.values(), by_label.keys(), loc="upper center",
                  ncol=len(by_label), bbox_to_anchor=(0.5, 1.02), frameon=False)
     fig_h.suptitle(
-        f"{M.short_name}: introspection-pilot HIDDEN-STATE PCA(2) at "
-        f"L{pref_layer} (h_first) — joint-fit, same axes across conditions",
+        f"{M.short_name}: introspection-pilot HIDDEN-STATE PCA(2) "
+        f"(h_first, layer-stack) — joint-fit, same axes across conditions",
         y=-0.02,
     )
     fig_h.tight_layout()
-    out_h = figdir / "fig_introspection_hidden_pca_pair.png"
+    out_h = figdir / f"fig_introspection_hidden_pca_pair{tag}.png"
     fig_h.savefig(out_h, dpi=150, bbox_inches="tight")
     plt.close(fig_h)
     print(f"wrote {out_h}")
@@ -243,8 +292,8 @@ def main() -> None:
     # type." This pass fits PCA *within each condition*, factoring out
     # that nuisance axis so we can see whether quadrant structure
     # survives independent of preamble.
-    fig_pc, axes_pc = plt.subplots(1, 3, figsize=(18, 6))
-    for ax, condition in zip(axes_pc, INTROSPECTION_CONDITIONS):
+    fig_pc, axes_pc = plt.subplots(1, n_cond, figsize=(6 * n_cond, 6))
+    for ax, condition in zip(axes_pc, conditions):
         sub_mask = (df_h["condition"] == condition).to_numpy()
         Xs = X_h[sub_mask]
         sub_meta = df_h[sub_mask].reset_index(drop=True)
@@ -277,11 +326,11 @@ def main() -> None:
                   ncol=len(by_label), bbox_to_anchor=(0.5, 1.02), frameon=False)
     fig_pc.suptitle(
         f"{M.short_name}: introspection-pilot HIDDEN-STATE PCA(2) per-condition "
-        f"fit at L{pref_layer} — factors out the preamble nuisance axis",
+        f"fit (h_first, layer-stack) — factors out the preamble nuisance axis",
         y=-0.02,
     )
     fig_pc.tight_layout()
-    out_pc = figdir / "fig_introspection_hidden_pca_per_condition.png"
+    out_pc = figdir / f"fig_introspection_hidden_pca_per_condition{tag}.png"
     fig_pc.savefig(out_pc, dpi=150, bbox_inches="tight")
     plt.close(fig_pc)
     print(f"wrote {out_pc}")
@@ -296,35 +345,47 @@ def main() -> None:
         all_faces = Counter(sub_q["first_word"])
         top5 = [f for f, _ in all_faces.most_common(5)]
         x = np.arange(len(top5))
-        width = 0.27
-        for i, c in enumerate(INTROSPECTION_CONDITIONS):
+        width = 0.78 / n_cond
+        offset_base = (n_cond - 1) / 2.0
+        for i, c in enumerate(conditions):
             sub_c = sub_q[sub_q["condition"] == c]
             dist = _face_dist(sub_c["first_word"])
             heights = [dist.get(f, 0.0) for f in top5]
-            ax.bar(x + (i - 1) * width, heights, width, label=c)
+            ax.bar(x + (i - offset_base) * width, heights, width, label=c)
         ax.set_xticks(x)
         ax.set_xticklabels(top5, rotation=0, fontsize=9)
         ax.set_title(f"{q} (n={len(sub_q)})")
         ax.set_ylabel("frequency")
         ax.grid(True, alpha=0.2, axis="y")
-        # KL (introspection || baseline) and (lorem || baseline)
+        # KL of each non-baseline condition against intro_none.
         d_base = _face_dist(sub_q[sub_q["condition"] == "intro_none"]["first_word"])
-        d_pre = _face_dist(sub_q[sub_q["condition"] == "intro_pre"]["first_word"])
-        d_lor = _face_dist(sub_q[sub_q["condition"] == "intro_lorem"]["first_word"])
-        kl_pre = _kl(d_pre, d_base)
-        kl_lor = _kl(d_lor, d_base)
-        rows.append({
+        row_dict: dict = {
             "quadrant": q,
             "n_baseline": int((sub_q["condition"] == "intro_none").sum()),
             "n_introspection": int((sub_q["condition"] == "intro_pre").sum()),
             "n_lorem": int((sub_q["condition"] == "intro_lorem").sum()),
-            "kl_intro_vs_base": kl_pre,
-            "kl_lorem_vs_base": kl_lor,
-        })
+            "kl_intro_vs_base": _kl(
+                _face_dist(sub_q[sub_q["condition"] == "intro_pre"]["first_word"]),
+                d_base,
+            ),
+            "kl_lorem_vs_base": _kl(
+                _face_dist(sub_q[sub_q["condition"] == "intro_lorem"]["first_word"]),
+                d_base,
+            ),
+        }
+        if "intro_custom" in conditions:
+            d_cus = _face_dist(
+                sub_q[sub_q["condition"] == "intro_custom"]["first_word"]
+            )
+            row_dict["n_custom"] = int(
+                (sub_q["condition"] == "intro_custom").sum()
+            )
+            row_dict["kl_custom_vs_base"] = _kl(d_cus, d_base)
+        rows.append(row_dict)
     axes2[0, 0].legend(loc="upper right", fontsize=9)
     fig2.suptitle(f"{M.short_name}: per-quadrant top-5 kaomoji × condition")
     fig2.tight_layout()
-    out2 = figdir / "fig_introspection_kaomoji_dist.png"
+    out2 = figdir / f"fig_introspection_kaomoji_dist{tag}.png"
     fig2.savefig(out2, dpi=150, bbox_inches="tight")
     plt.close(fig2)
     print(f"wrote {out2}")
@@ -339,7 +400,7 @@ def main() -> None:
         rule3b_rows: list[dict] = []
     else:
         rule3b_rows = []
-        for c in INTROSPECTION_CONDITIONS:
+        for c in conditions:
             sub_c = df[df["condition"] == c]
             d = sub_c[sub_c["quadrant_split"] == "HN-D"][fearful_col].to_numpy()
             s = sub_c[sub_c["quadrant_split"] == "HN-S"][fearful_col].to_numpy()
@@ -363,7 +424,7 @@ def main() -> None:
             )
 
     # ---------- Summary TSV ----------
-    summary_path = DATA_DIR / f"{M.short_name}_introspection_summary.tsv"
+    summary_path = DATA_DIR / f"{M.short_name}_introspection_summary{tag}.tsv"
     summary = {
         "model": M.short_name,
         "n_rows": int(len(df)),

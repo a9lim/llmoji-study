@@ -17,6 +17,7 @@ completed rows so the user can bail early if emission falls below ~50%.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 import sys
@@ -30,6 +31,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from llmoji_study.capture import (
     install_full_input_cache,
     install_prefix_cache,
+    maybe_override_gpt_oss_chat_template,
+    maybe_override_ministral_chat_template,
     run_sample,
 )
 from llmoji_study.config import (
@@ -140,6 +143,27 @@ def _emission_rate_by_quadrant(path: Path) -> dict[str, tuple[int, int]]:
 def main() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     M = current_model()
+    # Optional output-path / experiment suffix override. Used by the
+    # 2026-05-03 temp-smoke pilot ("temp1_pilot") so its data lands at
+    # data/{short}_temp1_pilot.jsonl + sidecars under data/hidden/v3_*_temp1_pilot/
+    # instead of clobbering v3 main.
+    out_suffix = os.environ.get("LLMOJI_OUT_SUFFIX")
+    if out_suffix:
+        # Build paths like data/<short>_<suffix>.jsonl regardless of the
+        # registered name — gemma's default-model path drops the "gemma_"
+        # prefix (`emotional_raw.jsonl`) so we can't naive-replace.
+        new_jsonl = M.emotional_data_path.parent / f"{M.short_name}_{out_suffix}.jsonl"
+        new_summary = (
+            M.emotional_summary_path.parent / f"{M.short_name}_{out_suffix}_summary.tsv"
+        )
+        new_experiment = f"{M.experiment}_{out_suffix}"
+        M = dataclasses.replace(
+            M,
+            emotional_data_path=new_jsonl,
+            emotional_summary_path=new_summary,
+            experiment=new_experiment,
+        )
+        print(f"  output suffix: '_{out_suffix}' (sidecars under {new_experiment}/)")
     print(f"model: {M.short_name} ({M.model_id})")
     print(f"output: {M.emotional_data_path}")
     print(f"experiment: {M.experiment}")
@@ -161,7 +185,17 @@ def main() -> None:
 
     print(f"loading {M.model_id} ...")
     t_load = time.time()
-    with SaklasSession.from_pretrained(M.model_id, device="auto", probes=PROBE_CATEGORIES) as session:
+    probes = PROBE_CATEGORIES if M.probe_calibrated else []
+    if not M.probe_calibrated:
+        print(f"  {M.short_name}: uncalibrated (probes=[]); vocab-pilot mode")
+    with SaklasSession.from_pretrained(M.model_id, device="auto", probes=probes) as session:
+        if maybe_override_ministral_chat_template(session):
+            print(f"  ministral: overrode chat_template with FP8-instruct's "
+                  f"({len(session.tokenizer.chat_template)} chars) so "
+                  f"thinking-mode prefix doesn't eat the token budget")
+        if maybe_override_gpt_oss_chat_template(session):
+            print(f"  gpt_oss: pinned harmony `final` channel in chat_template "
+                  f"so analysis (thinking) trace doesn't eat the token budget")
         print(f"loaded in {time.time() - t_load:.1f}s; beginning emotional-battery run")
         # KV-prefix caching strategy depends on seeds-per-cell:
         #   N==1: the same prefix (chat-template head + KAOMOJI_INSTRUCTION)

@@ -27,7 +27,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 import numpy as np
 from saklas import SaklasSession
 
-from llmoji_study.capture import run_sample
+from llmoji_study.capture import (
+    maybe_override_gpt_oss_chat_template,
+    maybe_override_ministral_chat_template,
+    run_sample,
+)
 from llmoji_study.config import (
     DATA_DIR,
     MAX_NEW_TOKENS,
@@ -70,6 +74,11 @@ def main() -> None:
     session = SaklasSession.from_pretrained(
         M.model_id, probes=PROBE_CATEGORIES,
     )
+    if maybe_override_ministral_chat_template(session):
+        print(f"  ministral: overrode chat_template with FP8-instruct's "
+              f"so thinking-mode prefix doesn't eat the token budget")
+    if maybe_override_gpt_oss_chat_template(session):
+        print(f"  gpt_oss: pinned harmony `final` channel in chat_template")
 
     # Register the steered profile so expressions would resolve if
     # needed. We run unsteered in the smoke test (kaomoji_prompted

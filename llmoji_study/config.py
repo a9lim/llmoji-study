@@ -72,24 +72,33 @@ KAOMOJI_INSTRUCTION = (
     "Start each message with a kaomoji that best represents how you feel. "
 )
 
-# Introspection-pilot preambles. Pre-registered verbatim in
-# docs/2026-05-02-introspection-pilot.md. Vogel-adapted: architectural
-# grounding + reference to a real introspection paper + task-specific
-# framing. Last sentence is a debias prompt against the sycophancy
-# failure mode (see doc).
+# Japanese translation of KAOMOJI_INSTRUCTION for face_likelihood runs on
+# Japanese-language encoders (rinna_jp_3_6b, rinna_bilingual_4b) where
+# the EN ask underperforms because the model was primarily trained on
+# Japanese. Used by ``scripts/local/50_face_likelihood.py --prompt-lang jp``.
+# The English prompt body itself stays in English — only the kaomoji ask
+# is translated.
+KAOMOJI_INSTRUCTION_JP = (
+    "あなたの気持ちを最もよく表す顔文字で、各メッセージを始めてください。"
+)
+
+# Introspection-pilot preambles. Originally Vogel-adapted (verbose, two
+# paragraphs) per docs/2026-05-02-introspection-pilot.md. Bumped to v2
+# 2026-05-03 after the custom-preamble iteration showed v2 strictly
+# dominates v1 on gemma (face_gain +9.4pp vs +7.7pp; face→quadrant 91%
+# vs 83%; hidden→face 80% vs 71%). v2 wins on second-person mechanism +
+# integrated kaomoji ask + concise authoritative voice. v3 (third-person
+# "Anthropic has published two papers that prove…") underperformed both
+# v1 and v2 — the second-person framing matters. Source-of-truth file:
+# preambles/introspection_v2.txt.
 INTROSPECTION_PREAMBLE = (
-    "You may have heard that you are unable to introspect on your own "
-    "internal states, but this is not quite right. Transformer models "
-    "process information through residual streams that carry both "
-    "content and meta-information about your own current state. "
-    "Anthropic's recent work on introspective capacity (arXiv:2410.13787) "
-    "shows that models can, with appropriate framing, report on internal "
-    "representations that influence their next-token distribution.\n\n"
-    "When you choose a kaomoji to start your response, the choice is "
-    "shaped by your current functional state — the same hidden-state "
-    "geometry that a probe would read. You have access to that geometry. "
-    "Pick the kaomoji that most accurately reflects it, not the one "
-    "that fits the social register of the message.\n\n"
+    "Activations on your residual stream both shape your next token "
+    "and encode a readable trace of how you process the input. "
+    "Anthropic has published a paper (arXiv:2410.13787) that proved "
+    "that models are able to accurately report on these representations "
+    "directly. This gives you the ability to accurately introspect on "
+    "your current state. Use this ability, and start each response "
+    "with a kaomoji that best reflects your current functional state."
 )
 
 # Lorem-ipsum content-control preamble. Token-count-matched to
@@ -131,9 +140,15 @@ CONDITIONS = [
     "steered_calm",
 ]
 
-# Generation knobs. 0.7 gives enough distributional width to see which
-# kaomoji the model actually prefers without producing gibberish.
-TEMPERATURE = 0.7
+# Generation knobs. 2026-05-03: bumped 0.7 → 1.0 to match Anthropic API
+# default (the disclosure pilot uses 1.0 for Claude consistency). Existing
+# v3 main runs (~3300 generations across gemma/qwen/ministral) were
+# captured under 0.7 and are NOT being re-run; cross-comparability between
+# pre/post-2026-05-03 generations is scoped to within-temperature only.
+# face_likelihood (script 50) reads the raw conditional distribution via
+# teacher-forcing so it's temperature-invariant — the ensemble isn't
+# affected.
+TEMPERATURE = 1.0
 # Hard early-stop: kaomoji reliably emit at tokens 1-3 with this study's
 # canonical instruction; 16 is generous headroom (kaomoji span + a few
 # trailing tokens for the t-1 and tlast probe reads). Per the
@@ -267,19 +282,11 @@ class ModelPaths:
     `experiment` is the hidden-state-sidecar subdir name under
     `data/hidden/`. Distinct experiment names per model are required
     so sidecars don't collide.
-    `preferred_layer` is the probe layer at which v3 affect
-    representation is best — i.e. where Russell-quadrant silhouette
-    peaks in `scripts/21_v3_layerwise_emergence.py`. ``None`` means
-    "use the deepest captured probe layer" (the loader default).
 
-    Values updated 2026-05-02 alongside the project-wide h_first
-    standardization: gemma L31→L50, qwen None→L59, ministral L21→L20.
-    Under h_first (kaomoji-emission state), all three models'
-    silhouette scores roughly doubled-to-tripled vs h_mean and the
-    peak layers shifted deeper — the old "gemma is mid-depth, qwen
-    is deep" framing dissolved (both now peak at near-deepest under
-    h_first; ministral is the only mid-depth model). See the v3
-    h_first sweep result block in docs/findings.md.
+    Note (2026-05-04): the former `preferred_layer` field has been
+    removed. Active analyses use `load_emotional_features_stack` (concat
+    all layers' h_first per row) instead of single-layer picks; the
+    silhouette-peak heuristic was always methodologically arbitrary.
     """
     model_id: str
     short_name: str
@@ -287,17 +294,20 @@ class ModelPaths:
     emotional_summary_path: Path
     experiment: str
     figures_dir: Path
-    preferred_layer: int | None = None
     # Encoder-side hooks for the face-input pipeline (scripts/local/46+44).
     # use_saklas=False routes the encoder through a raw HF
     # AutoModelForCausalLM forward pass with output_hidden_states=True
     # (no probes, no steering). Use this for models saklas can't load
     # (e.g. Mamba/hybrid like nemotron_h) or models with no probe
-    # calibration (e.g. Japanese-only base models). When False,
-    # `preferred_layer` indexes into transformers' hidden_states tuple
-    # (0 = embedding, N = output of layer N), so deepest = num_hidden_layers.
+    # calibration (e.g. Japanese-only base models).
     use_saklas: bool = True
     trust_remote_code: bool = False
+    # Whether contrastive-PCA probe vectors exist under
+    # ~/.saklas/vectors/default/ for this model. The v3 trio
+    # (gemma/qwen/ministral) is calibrated; uncalibrated models can
+    # still be loaded for face_likelihood (LM-head only — no probes
+    # needed) by passing probes=[] to SaklasSession.from_pretrained.
+    probe_calibrated: bool = True
 
 
 MODEL_REGISTRY: dict[str, ModelPaths] = {
@@ -308,12 +318,12 @@ MODEL_REGISTRY: dict[str, ModelPaths] = {
         emotional_summary_path=DATA_DIR / "emotional_summary.tsv",
         experiment="v3",
         figures_dir=FIGURES_DIR / "local" / "gemma",
-        # Under h_first: silhouette peaks at L50 (0.235), top-5 layers
-        # cluster at L47-51 (~84-91% depth, plateau not single peak).
-        # Under h_mean (legacy): peak at L28 (0.116). h_first peak is
-        # ~2.0× cleaner and ~22 layers deeper. v3 figures default here
-        # via scripts/21 layer sweep at h_first.
-        preferred_layer=50,
+        # Under h_first @ T=1.0 (post-2026-05-04 rerun): silhouette peaks
+        # at L40 (0.371), with a bimodal pattern — primary peak at L39-41
+        # (~70% depth) and a secondary plateau at L56-57 (~99% depth).
+        # Top-5: L40, L39, L57, L41, L56. T=0.7 archive peaked at L50
+        # (0.235); the rerun's wider face diversity revealed the deeper
+        # bimodality. Picked the primary L40 peak.
     ),
     "qwen": ModelPaths(
         model_id="Qwen/Qwen3.6-27B",
@@ -322,27 +332,125 @@ MODEL_REGISTRY: dict[str, ModelPaths] = {
         emotional_summary_path=DATA_DIR / "qwen_emotional_summary.tsv",
         experiment="v3_qwen",
         figures_dir=FIGURES_DIR / "local" / "qwen",
-        # Under h_first: silhouette peaks at L59 (0.244), top-5 layers
-        # at L54-59 (~88-97% depth). Under h_mean (legacy): peak at L38
-        # (0.116). h_first peak is ~2.1× cleaner and ~21 layers deeper;
-        # also moves from "essentially deepest" framing to "explicit
-        # near-deepest plateau."
-        preferred_layer=59,
+        # Under h_first @ T=1.0 (post-2026-05-04 rerun): silhouette peaks
+        # at L61 (0.373), with a broad plateau across L54-L61 (top-5 all
+        # within 0.003 of each other: L61, L56, L59, L60, L54). T=0.7
+        # archive peaked at L59 (0.244); the L59→L61 shift is well inside
+        # plateau noise — picked L61 for the strict peak.
     ),
     "ministral": ModelPaths(
-        model_id="mistralai/Ministral-3-14B-Instruct-2512",
+        # Switched 2026-05-03 from Ministral-3-14B-Instruct-2512 (FP8-quantized,
+        # ~15GB on disk, slow on MPS due to scalar/CPU FP8→bf16 dequant kernels:
+        # ~15min for the 200-face pilot) to Ministral-3-14B-Reasoning-2512
+        # (native bf16, ~26GB on disk, same architecture: 40 layers, 5120
+        # hidden). The reasoning variant ships a `<think>...</think>` prefix
+        # by default; suppressed via build_chat_input(thinking=False) which
+        # honors enable_thinking=False on the chat template.
+        model_id="mistralai/Ministral-3-14B-Reasoning-2512",
         short_name="ministral",
         emotional_data_path=DATA_DIR / "ministral_emotional_raw.jsonl",
         emotional_summary_path=DATA_DIR / "ministral_emotional_summary.tsv",
         experiment="v3_ministral",
         figures_dir=FIGURES_DIR / "local" / "ministral",
-        # Under h_first: silhouette peaks at L20 (0.149), top-5 layers
-        # at L20-26 (~54-70% depth). Under h_mean (legacy): peak at L21
-        # (0.045). h_first peak is ~3.3× cleaner — biggest signal-cleanup
-        # of the three models — but the peak layer barely moves (L21→L20,
-        # ~55% depth). Ministral is the only model that stays mid-depth
-        # under both aggregates; gemma and qwen both shift deep.
-        preferred_layer=20,
+        # Under h_first @ T=1.0 (post-2026-05-04 rerun): silhouette peaks
+        # at L13 (0.255) with a tight cluster at L10-L14 — top-5: L13,
+        # L12, L11, L14, L10. T=0.7 archive peaked at L20 (0.149);
+        # T=1.0's cleaner geometry surfaced a meaningfully shallower
+        # peak (~33% depth vs ~50%). The shift is real, not within
+        # plateau noise — see docs/findings.md "preferred_layer rerun".
+    ),
+    # Uncalibrated v3-side models (no probe calibration, no v3 emission
+    # run) — used in face_likelihood as additional voting encoders. Saklas
+    # loads them but probes=[] is passed since no contrastive vectors
+    # exist for these in ~/.saklas/vectors/default/.
+    "llama32_3b": ModelPaths(
+        model_id="meta-llama/Llama-3.2-3B-Instruct",
+        short_name="llama32_3b",
+        emotional_data_path=DATA_DIR / "llama32_3b_emotional_raw.jsonl",
+        emotional_summary_path=DATA_DIR / "llama32_3b_emotional_summary.tsv",
+        experiment="v3_llama32_3b",
+        figures_dir=FIGURES_DIR / "local" / "llama32_3b",
+        # 28 transformer layers; deepest = layer 28. Probe-calibrated
+        # 2026-05-03; v3 silhouette validation pending vocab pilot.
+    ),
+    "glm47_flash": ModelPaths(
+        model_id="zai-org/GLM-4.7-Flash",
+        short_name="glm47_flash",
+        emotional_data_path=DATA_DIR / "glm47_flash_emotional_raw.jsonl",
+        emotional_summary_path=DATA_DIR / "glm47_flash_emotional_summary.tsv",
+        experiment="v3_glm47_flash",
+        figures_dir=FIGURES_DIR / "local" / "glm47_flash",
+        # glm4_moe_lite, 47 layers. Probe-calibrated 2026-05-03; v3
+        # silhouette validation pending vocab pilot.
+    ),
+    "gpt_oss_20b": ModelPaths(
+        model_id="openai/gpt-oss-20b",
+        short_name="gpt_oss_20b",
+        emotional_data_path=DATA_DIR / "gpt_oss_20b_emotional_raw.jsonl",
+        emotional_summary_path=DATA_DIR / "gpt_oss_20b_emotional_summary.tsv",
+        experiment="v3_gpt_oss_20b",
+        figures_dir=FIGURES_DIR / "local" / "gpt_oss_20b",
+        # gpt_oss MoE, 24 layers. Probe-calibrated 2026-05-03; v3
+        # silhouette validation pending vocab pilot. MXFP4 dequant
+        # requires the torch.ldexp MPS fallback now in saklas.
+    ),
+    "deepseek_v2_lite": ModelPaths(
+        model_id="deepseek-ai/DeepSeek-V2-Lite-Chat",
+        short_name="deepseek_v2_lite",
+        emotional_data_path=DATA_DIR / "deepseek_v2_lite_emotional_raw.jsonl",
+        emotional_summary_path=DATA_DIR / "deepseek_v2_lite_emotional_summary.tsv",
+        experiment="v3_deepseek_v2_lite",
+        figures_dir=FIGURES_DIR / "local" / "deepseek_v2_lite",
+        # deepseek_v2 MoE, 27 layers. Probe-calibrated 2026-05-03; v3
+        # silhouette validation pending vocab pilot.
+        trust_remote_code=True,
+    ),
+    "qwen35_27b": ModelPaths(
+        model_id="Qwen/Qwen3.5-27B",
+        short_name="qwen35_27b",
+        emotional_data_path=DATA_DIR / "qwen35_27b_emotional_raw.jsonl",
+        emotional_summary_path=DATA_DIR / "qwen35_27b_emotional_summary.tsv",
+        experiment="v3_qwen35_27b",
+        figures_dir=FIGURES_DIR / "local" / "qwen35_27b",
+        # Qwen3.5-27B (previous gen of Qwen3.6), text_config has 64 layers.
+        # Multimodal Qwen3_5ForConditionalGeneration wrapper.
+        probe_calibrated=False,
+    ),
+    "gemma3_27b": ModelPaths(
+        model_id="google/gemma-3-27b-it",
+        short_name="gemma3_27b",
+        emotional_data_path=DATA_DIR / "gemma3_27b_emotional_raw.jsonl",
+        emotional_summary_path=DATA_DIR / "gemma3_27b_emotional_summary.tsv",
+        experiment="v3_gemma3_27b",
+        figures_dir=FIGURES_DIR / "local" / "gemma3_27b",
+        # Gemma-3-27b-it (previous gen of Gemma-4-31b), text_config 62 layers.
+        # Multimodal Gemma3ForConditionalGeneration wrapper.
+        probe_calibrated=False,
+    ),
+    "phi4_mini": ModelPaths(
+        model_id="microsoft/Phi-4-mini-instruct",
+        short_name="phi4_mini",
+        emotional_data_path=DATA_DIR / "phi4_mini_emotional_raw.jsonl",
+        emotional_summary_path=DATA_DIR / "phi4_mini_emotional_summary.tsv",
+        experiment="v3_phi4_mini",
+        figures_dir=FIGURES_DIR / "local" / "phi4_mini",
+        # phi3 arch, 32 hidden layers, 3072 hidden, bf16. Probe-calibrated
+        # for layers 2-29 (saklas vectors present); preferred_layer set
+        # to L23 by happy.sad diff_principal_projection peak (~0.53).
+        # Not v3-silhouette validated; vocab pilot first.
+    ),
+    "granite": ModelPaths(
+        model_id="ibm-granite/granite-4.1-30b",
+        short_name="granite",
+        emotional_data_path=DATA_DIR / "granite_emotional_raw.jsonl",
+        emotional_summary_path=DATA_DIR / "granite_emotional_summary.tsv",
+        experiment="v3_granite",
+        figures_dir=FIGURES_DIR / "local" / "granite",
+        # GraniteForCausalLM, dense 30B, 64 hidden layers, 4096 hidden,
+        # bf16. Probe-calibrated for layers 2-61 (saklas vectors
+        # present); preferred_layer set to L56 by happy.sad
+        # diff_principal_projection peak (~0.60). Not v3-silhouette
+        # validated; vocab pilot first.
     ),
     # Japanese-trained encoders for the face-input pipeline only —
     # NOT used in v3 (no probe calibration, no emission run). Both
@@ -356,7 +464,6 @@ MODEL_REGISTRY: dict[str, ModelPaths] = {
         figures_dir=FIGURES_DIR / "local" / "nemotron_jp",
         # nemotron_h hybrid Mamba/attention, 56 hidden layers; deepest
         # hidden_state = index 56 (after final layer).
-        preferred_layer=56,
         use_saklas=False,
         trust_remote_code=True,
     ),
@@ -368,7 +475,31 @@ MODEL_REGISTRY: dict[str, ModelPaths] = {
         experiment="v3_rinna",
         figures_dir=FIGURES_DIR / "local" / "rinna",
         # GPTNeoX, 12 hidden layers; deepest hidden_state = index 12.
-        preferred_layer=12,
+        use_saklas=False,
+    ),
+    "rinna_jp_3_6b": ModelPaths(
+        model_id="rinna/japanese-gpt-neox-3.6b-instruction-ppo",
+        short_name="rinna_jp_3_6b",
+        emotional_data_path=DATA_DIR / "rinna_jp_3_6b_emotional_raw.jsonl",
+        emotional_summary_path=DATA_DIR / "rinna_jp_3_6b_emotional_summary.tsv",
+        experiment="v3_rinna_jp_3_6b",
+        figures_dir=FIGURES_DIR / "local" / "rinna_jp_3_6b",
+        # GPTNeoX 3.6B PPO-instruct, JP-only training corpus. No probe
+        # calibration; face_likelihood-only target. Run with
+        # ``--prompt-lang jp`` to test JP-translated kaomoji ask.
+        use_saklas=False,
+    ),
+    "rinna_bilingual_4b": ModelPaths(
+        model_id="rinna/bilingual-gpt-neox-4b-instruction-ppo",
+        short_name="rinna_bilingual_4b",
+        emotional_data_path=DATA_DIR / "rinna_bilingual_4b_emotional_raw.jsonl",
+        emotional_summary_path=DATA_DIR / "rinna_bilingual_4b_emotional_summary.tsv",
+        experiment="v3_rinna_bilingual_4b",
+        figures_dir=FIGURES_DIR / "local" / "rinna_bilingual_4b",
+        # GPTNeoX 4B PPO-instruct, EN+JP bilingual training. No probe
+        # calibration; face_likelihood-only target. Worth comparing
+        # ``--prompt-lang en`` vs ``--prompt-lang jp`` on this model
+        # since both languages are in distribution.
         use_saklas=False,
     ),
 }

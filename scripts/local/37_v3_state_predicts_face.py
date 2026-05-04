@@ -42,10 +42,10 @@ import pandas as pd
 from scipy.spatial.distance import jensenshannon
 from scipy.stats import spearmanr
 
-from llmoji_study.config import DATA_DIR, FIGURES_DIR, MODEL_REGISTRY
+from llmoji_study.config import FIGURES_DIR, MODEL_REGISTRY
 from llmoji_study.emotional_analysis import (
     _use_cjk_font,
-    load_emotional_features,
+    load_emotional_features_stack,
 )
 
 
@@ -148,13 +148,9 @@ def _per_model(short: str) -> dict | None:
         print(f"  [{short}] no v3 data; skipping")
         return None
 
-    layer_label = "max" if M.preferred_layer is None else f"L{M.preferred_layer}"
-    print(f"\n{short}  (h_first, layer={layer_label})")
-    df, X = load_emotional_features(
-        str(M.emotional_data_path), DATA_DIR,
-        experiment=M.experiment, which="h_first",
-        layer=M.preferred_layer,
-        split_hn=True,
+    print(f"\n{short}  (h_first, layer-stack)")
+    df, X = load_emotional_features_stack(
+        short, which="h_first", split_hn=True,
     )
     if len(df) == 0:
         print(f"  [{short}] no kaomoji-bearing rows")

@@ -33,7 +33,12 @@ from saklas import SaklasSession
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-from llmoji_study.capture import install_prefix_cache, run_sample
+from llmoji_study.capture import (
+    install_prefix_cache,
+    maybe_override_gpt_oss_chat_template,
+    maybe_override_ministral_chat_template,
+    run_sample,
+)
 from llmoji_study.config import (
     DATA_DIR,
     INTROSPECTION_CONDITIONS,
@@ -130,6 +135,13 @@ def main() -> None:
     print(f"loading {M.model_id} ...")
     t_load = time.time()
     with SaklasSession.from_pretrained(M.model_id, device="auto", probes=PROBE_CATEGORIES) as session:
+        if maybe_override_ministral_chat_template(session):
+            print(f"  ministral: overrode chat_template with FP8-instruct's "
+                  f"({len(session.tokenizer.chat_template)} chars) so "
+                  f"thinking-mode prefix doesn't eat the token budget")
+        if maybe_override_gpt_oss_chat_template(session):
+            print(f"  gpt_oss: pinned harmony `final` channel in chat_template "
+                  f"so analysis (thinking) trace doesn't eat the token budget")
         print(f"loaded in {time.time() - t_load:.1f}s; beginning introspection pilot")
         # SidecarWriter overlaps npz writes with generation; per CLAUDE.md
         # this pilot is archive-bound, but new runs benefit from the

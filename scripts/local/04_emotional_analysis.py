@@ -16,11 +16,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from llmoji_study.config import (
-    DATA_DIR,
     current_model,
 )
 from llmoji_study.emotional_analysis import (
-    load_emotional_features,
+    load_emotional_features_stack,
     plot_face_cosine_heatmap,
     plot_kaomoji_cosine_heatmap,
     plot_kaomoji_quadrant_alignment,
@@ -64,16 +63,15 @@ def main() -> None:
     print(f"re-labeling kaomoji in {M.emotional_data_path}")
     _relabel_in_place(M.emotional_data_path)
 
-    layer_label = "max" if M.preferred_layer is None else f"L{M.preferred_layer}"
-    print(f"loading hidden-state features (which=h_first, layer={layer_label})...")
-    df, X = load_emotional_features(
-        str(M.emotional_data_path), DATA_DIR,
-        experiment=M.experiment,
+    print("loading hidden-state features (which=h_first, layer-stack across all layers)...")
+    df, X = load_emotional_features_stack(
+        M.short_name,
         which="h_first",
-        layer=M.preferred_layer,
         split_hn=True,
     )
-    print(f"loaded {len(df)} kaomoji-bearing rows; X shape {X.shape}  (HN split into HN-D/HN-S; untagged HN rows dropped)")
+    print(f"loaded {len(df)} kaomoji-bearing rows; X shape {X.shape} "
+          f"(layer-stack: n_rows × n_layers·hidden_dim; "
+          f"HN split into HN-D/HN-S; untagged HN rows dropped)")
     if len(df) == 0:
         print("nothing to plot; the v3 run needs to land hidden-state sidecars first")
         return

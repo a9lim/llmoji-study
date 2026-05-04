@@ -53,7 +53,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from llmoji_study.config import DATA_DIR, INTROSPECTION_CONDITIONS, current_model
-from llmoji_study.emotional_analysis import _use_cjk_font, load_emotional_features
+from llmoji_study.emotional_analysis import _use_cjk_font, load_emotional_features_stack_at
 
 
 # Import script 25's helpers via importlib (filename starts with a
@@ -133,9 +133,10 @@ def _per_condition(
     }
 
 
-def _parse_args(argv: list[str]) -> tuple[str, bool]:
+def _parse_args(argv: list[str]) -> tuple[str, bool, str | None]:
     which = "h_first"
     use_main = False
+    custom_label: str | None = None
     i = 0
     while i < len(argv):
         a = argv[i]
@@ -149,12 +150,16 @@ def _parse_args(argv: list[str]) -> tuple[str, bool]:
             use_main = True
             i += 1
             continue
+        if a == "--custom-label" and i + 1 < len(argv):
+            custom_label = argv[i + 1]
+            i += 2
+            continue
         i += 1
-    return which, use_main
+    return which, use_main, custom_label
 
 
 def main() -> None:
-    which, use_main = _parse_args(sys.argv[1:])
+    which, use_main, custom_label = _parse_args(sys.argv[1:])
 
     M = current_model()
     figdir = M.figures_dir
@@ -169,8 +174,11 @@ def main() -> None:
     else:
         raw_path = DATA_DIR / f"{M.short_name}_introspection_raw.jsonl"
         experiment = f"{M.experiment}_introspection"
-        conditions = INTROSPECTION_CONDITIONS
+        conditions = list(INTROSPECTION_CONDITIONS)
         tag = "introspection"
+        if custom_label:
+            conditions.append("intro_custom")
+            tag = f"introspection_custom_{custom_label}"
 
     if not raw_path.exists():
         raise SystemExit(f"missing {raw_path}; nothing to analyze")
@@ -178,13 +186,37 @@ def main() -> None:
     print(f"model: {M.short_name} ({tag} mode); aggregate: {which}")
     print(f"jsonl: {raw_path}")
     print(f"experiment: {experiment}")
-    print(f"loading {which} at L{M.preferred_layer} ...")
-    df, X = load_emotional_features(
+    print(f"loading {which} (layer-stack) ...")
+    df, X = load_emotional_features_stack_at(
         str(raw_path), DATA_DIR,
         experiment=experiment,
-        which=which, layer=M.preferred_layer,
+        which=which,
         split_hn=False,  # use the 5-class quadrant view for the quadrant classifier
     )
+
+    if custom_label and not use_main:
+        custom_path = (
+            DATA_DIR / f"{M.short_name}_introspection_custom_{custom_label}.jsonl"
+        )
+        if not custom_path.exists():
+            raise SystemExit(
+                f"missing {custom_path} — run scripts/43 with "
+                f"--label {custom_label} first"
+            )
+        custom_experiment = f"{M.experiment}_introspection_custom_{custom_label}"
+        df_c, X_c = load_emotional_features_stack_at(
+            str(custom_path), DATA_DIR,
+            experiment=custom_experiment,
+            which=which,
+            split_hn=False,
+        )
+        df_c["condition"] = "intro_custom"
+        import numpy as _np
+        import pandas as _pd
+        df = _pd.concat([df, df_c], ignore_index=True)
+        X = _np.concatenate([X, X_c], axis=0)
+        print(f"  merged {len(df_c)} custom-{custom_label} rows")
+
     print(f"  rows: {len(df)}, hidden dim: {X.shape[1]}")
 
     summaries = []
@@ -282,7 +314,7 @@ def main() -> None:
 
         fig.suptitle(
             f"{M.short_name}: {tag} kaomoji predictiveness × condition\n"
-            f"({which} at L{M.preferred_layer}; min_n=5 per face for face classifier)"
+            f"({which}, layer-stack; min_n=5 per face for face classifier)"
         )
         fig.tight_layout()
         fig_path = figdir / f"fig_{tag}_predictiveness_{which}.png"

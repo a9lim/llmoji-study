@@ -44,12 +44,12 @@ from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 
-from llmoji_study.config import DATA_DIR, current_model
+from llmoji_study.config import current_model
 from llmoji_study.emotional_analysis import (
     QUADRANT_COLORS,
     QUADRANT_ORDER_SPLIT as QUADRANT_ORDER,
     _use_cjk_font,
-    load_emotional_features,
+    load_emotional_features_stack,
 )
 
 
@@ -256,16 +256,12 @@ def main() -> None:
         print(f"no v3 data at {M.emotional_data_path}")
         sys.exit(1)
 
-    layer_label = "max" if M.preferred_layer is None else f"L{M.preferred_layer}"
     print(f"model: {M.short_name}")
-    print(f"loading v3 hidden-state features (h_first, layer={layer_label})...")
-    df, X = load_emotional_features(
-        str(M.emotional_data_path), DATA_DIR,
-        experiment=M.experiment, which="h_first",
-        layer=M.preferred_layer,
-        split_hn=True,
+    print("loading v3 hidden-state features (h_first, layer-stack)...")
+    df, X = load_emotional_features_stack(
+        M.short_name, which="h_first", split_hn=True,
     )
-    print(f"  {len(df)} kaomoji-bearing rows, X {X.shape}")
+    print(f"  {len(df)} kaomoji-bearing rows, X {X.shape} (layer-stack)")
 
     qualifying = _qualifying_faces(df, min_per_quadrant=3, min_quadrants=2)
     print(f"  {len(qualifying)} cross-quadrant emitters "

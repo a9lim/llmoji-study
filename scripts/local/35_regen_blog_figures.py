@@ -40,7 +40,7 @@ sys.path.insert(0, str(STUDY_ROOT))
 
 from llmoji_study.config import MODEL_REGISTRY  # noqa: E402
 from llmoji_study.emotional_analysis import (  # noqa: E402
-    load_emotional_features,
+    load_emotional_features_stack,
     plot_kaomoji_cosine_heatmap,
 )
 
@@ -49,7 +49,13 @@ BLOG_ASSETS_DIR = (
     STUDY_ROOT.parent / "a9lim.github.io" / "blog-assets" / "introspection-via-kaomoji"
 )
 DATA_DIR = STUDY_ROOT / "data"
-MODELS = ("gemma", "qwen", "ministral")
+# Heatmap is per-model; regenerate for the full v3 main lineup.
+HEATMAP_MODELS = ("gemma", "qwen", "ministral", "gpt_oss_20b", "granite")
+# Layerwise comparison only includes models with v3_layerwise_emergence.tsv;
+# script 21 wasn't re-run on the gpt_oss / granite additions because the
+# layer-stack rep supersedes single-layer silhouette as the canonical
+# read. Keep the 3-model trajectory as a depth-emergence illustration.
+LAYERWISE_MODELS = ("gemma", "qwen", "ministral")
 
 # Theme palettes mirror `shared-tokens.js` light/dark surface + text vars.
 THEMES: dict[str, dict[str, str]] = {
@@ -84,11 +90,14 @@ THEMES: dict[str, dict[str, str]] = {
 }
 
 # Per-model line colors on the layerwise comparison.
-# accent / secondary / extended.green from shared-tokens.js _PALETTE.
+# accent / secondary / extended.green from shared-tokens.js _PALETTE,
+# extended with two more accents for the post-2026-05-04 5-model lineup.
 LINE_PALETTE = {
-    "gemma":     "#E11107",
-    "qwen":      "#488ACB",
-    "ministral": "#009F68",
+    "gemma":       "#E11107",
+    "qwen":        "#488ACB",
+    "ministral":   "#009F68",
+    "gpt_oss_20b": "#D49A1A",
+    "granite":     "#8B5CF6",
 }
 
 
@@ -101,7 +110,7 @@ def with_theme(theme: str) -> None:
 def plot_layerwise(theme: str) -> None:
     with_theme(theme)
     per_model: dict[str, pd.DataFrame] = {}
-    for short in MODELS:
+    for short in LAYERWISE_MODELS:
         M = MODEL_REGISTRY[short]
         tsv = M.figures_dir / "v3_layerwise_emergence.tsv"
         if not tsv.exists():
@@ -148,13 +157,8 @@ def plot_layerwise(theme: str) -> None:
 
 def plot_heatmap(short: str, theme: str) -> None:
     with_theme(theme)
-    M = MODEL_REGISTRY[short]
-    df, X = load_emotional_features(
-        str(M.emotional_data_path), DATA_DIR,
-        experiment=M.experiment,
-        which="h_first",
-        layer=M.preferred_layer,
-        split_hn=True,
+    df, X = load_emotional_features_stack(
+        short, which="h_first", split_hn=True,
     )
     out = BLOG_ASSETS_DIR / f"fig_emo_a_kaomoji_sim_{short}_{theme}.png"
     plot_kaomoji_cosine_heatmap(df, X, str(out), min_count=3)
@@ -171,7 +175,7 @@ def main() -> None:
     for theme in ("light", "dark"):
         print(f"\n=== theme={theme} ===")
         plot_layerwise(theme)
-        for short in MODELS:
+        for short in HEATMAP_MODELS:
             plot_heatmap(short, theme)
 
 

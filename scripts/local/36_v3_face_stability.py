@@ -5,7 +5,7 @@ Idea 8 from the 2026-05-03 face-stability brainstorm. Existing infra
 (Fig B / script 22) tests per-face cluster compactness against a random
 null. This is necessary but not the interesting question. The
 interesting one is: of the total dispersion in hidden-state space at
-h_first @ preferred_layer, how much is explained by which face was
+h_first layer-stack, how much is explained by which face was
 emitted vs which prompt produced the row vs which Russell quadrant the
 prompt belongs to vs which seed was drawn? And — critically — how much
 does face explain *after* prompt-mean is subtracted out?
@@ -51,10 +51,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from llmoji_study.config import DATA_DIR, FIGURES_DIR, MODEL_REGISTRY
+from llmoji_study.config import FIGURES_DIR, MODEL_REGISTRY
 from llmoji_study.emotional_analysis import (
     _use_cjk_font,
-    load_emotional_features,
+    load_emotional_features_stack,
 )
 
 
@@ -135,13 +135,9 @@ def _decompose_one_model(short: str) -> pd.DataFrame:
         print(f"  [{short}] no v3 data at {M.emotional_data_path}; skipping")
         return pd.DataFrame()
 
-    layer_label = "max" if M.preferred_layer is None else f"L{M.preferred_layer}"
-    print(f"\n{short}  (layer={layer_label})")
-    df, X = load_emotional_features(
-        str(M.emotional_data_path), DATA_DIR,
-        experiment=M.experiment, which="h_first",
-        layer=M.preferred_layer,
-        split_hn=True,
+    print(f"\n{short}  (h_first, layer-stack)")
+    df, X = load_emotional_features_stack(
+        short, which="h_first", split_hn=True,
     )
     if len(df) == 0:
         print(f"  [{short}] zero rows after kaomoji filter; skipping")
@@ -260,7 +256,7 @@ def _plot_eta2_grid(summary: pd.DataFrame, out_path: Path) -> None:
         if which == "h_first" else ""
     )
     fig.suptitle(
-        f"v3 hidden-state variance decomposition at {which} @ preferred_layer"
+        f"v3 hidden-state variance decomposition at {which} (layer-stack)"
         + note,
         fontsize=11,
     )

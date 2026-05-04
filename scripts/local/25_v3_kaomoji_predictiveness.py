@@ -1,10 +1,9 @@
 # pyright: reportArgumentType=false, reportAttributeAccessIssue=false, reportCallIssue=false
 """v3 kaomoji predictiveness — how well does each face pin down state?
 
-Two complementary directions, both on h_first at each model's
-preferred_layer (gemma L50, qwen L59, ministral L20 post-2026-05-02
-h_first standardization; kept named ``h_mean`` in the docstring's
-prose for continuity with prior writeups):
+Two complementary directions, both on the h_first layer-stack
+representation (concat of all layers' h_first per row; post-2026-05-04
+the preferred_layer single-pick was retired in favor of full-stack PCA):
 
 (a) hidden → face / quadrant. Multi-class logistic regression on
     PCA(50)-reduced hidden state predicts which canonical face was
@@ -63,11 +62,11 @@ from sklearn.model_selection import (
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-from llmoji_study.config import DATA_DIR, FIGURES_DIR, MODEL_REGISTRY, current_model
+from llmoji_study.config import FIGURES_DIR, MODEL_REGISTRY, current_model
 from llmoji_study.emotional_analysis import (
     QUADRANT_ORDER,
     _use_cjk_font,
-    load_emotional_features,
+    load_emotional_features_stack,
     per_face_dominant_quadrant,
     per_face_quadrant_weights,
     mix_quadrant_color,
@@ -345,14 +344,11 @@ def run_model(short_name: str, *, min_n: int = 5, min_groups: int = 3) -> dict[s
         print(f"[{short_name}] no v3 data at {M.emotional_data_path}; skipping")
         return {}
 
-    layer_label = "max" if M.preferred_layer is None else f"L{M.preferred_layer}"
-    print(f"\n=== {short_name} (h_first, {layer_label}) ===")
-    df, X = load_emotional_features(
-        str(M.emotional_data_path), DATA_DIR,
-        experiment=M.experiment, which="h_first",
-        layer=M.preferred_layer,
+    print(f"\n=== {short_name} (h_first, layer-stack) ===")
+    df, X = load_emotional_features_stack(
+        short_name, which="h_first",
     )
-    print(f"  {len(df)} rows, X {X.shape}, "
+    print(f"  {len(df)} rows, X {X.shape} (layer-stack), "
           f"{df['first_word'].nunique()} unique faces, "
           f"{df['prompt_id'].nunique()} unique prompts")
 
@@ -453,7 +449,7 @@ def run_model(short_name: str, *, min_n: int = 5, min_groups: int = 3) -> dict[s
 
     summary = {
         "model": short_name,
-        "layer": M.preferred_layer,
+        "rep": "h_first.layer-stack",
         "n_rows_total": int(len(df)),
         "n_rows_kept": int(len(df_face)),
         "min_n": min_n,
@@ -470,7 +466,7 @@ def run_model(short_name: str, *, min_n: int = 5, min_groups: int = 3) -> dict[s
     print(f"  wrote {summary_path}")
 
     fig_path = M.figures_dir / "fig_v3_kaomoji_predictiveness.png"
-    _plot_per_face(per_face, df_face, short_name, M.preferred_layer, fig_path,
+    _plot_per_face(per_face, df_face, short_name, "stack", fig_path,
                    face_metrics, quad_metrics, eta)
     print(f"  wrote {fig_path}")
 
@@ -486,7 +482,7 @@ def _plot_per_face(
     per_face: pd.DataFrame,
     df_face: pd.DataFrame,
     short_name: str,
-    layer: int | None,
+    rep_label: str,
     out_path: Path,
     face_metrics: dict,
     quad_metrics: dict,
@@ -541,9 +537,8 @@ def _plot_per_face(
     ax.set_xlim(0, 1.05)
     ax.set_title("(c) within-face consistency")
 
-    layer_str = "max" if layer is None else f"L{layer}"
     fig.suptitle(
-        f"v3 kaomoji predictiveness — {short_name} ({layer_str}, "
+        f"v3 kaomoji predictiveness — {short_name} ({rep_label}, "
         f"leave-prompts-out CV)\n"
         f"hidden→face acc {face_metrics['accuracy']:.2f} (vs majority "
         f"{face_metrics['majority_baseline']:.2f}, uniform "
@@ -583,7 +578,7 @@ def main() -> None:
     if len(summaries) >= 2:
         cross = {
             short: {
-                "layer": s["layer"],
+                "rep": s["rep"],
                 "n_faces_kept": s["n_faces_kept"],
                 "hidden_to_face_accuracy": s["hidden_to_face"]["accuracy"],
                 "hidden_to_face_macro_f1": s["hidden_to_face"]["macro_f1"],

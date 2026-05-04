@@ -30,7 +30,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from llmoji.taxonomy import KAOMOJI_START_CHARS
+from llmoji.taxonomy import KAOMOJI_START_CHARS, is_kaomoji_candidate
 
 
 # Russell-quadrant palette + ordering. Shared with scripts/17_v3_face_scatters.py
@@ -310,7 +310,7 @@ def load_emotional_features(
         ),
     )
     mask = np.asarray([
-        isinstance(s, str) and len(s) > 0 and s[0] in KAOMOJI_START_CHARS
+        isinstance(s, str) and is_kaomoji_candidate(s)
         for s in df["first_word"]
     ])
     df = df.loc[mask].reset_index(drop=True)
@@ -377,7 +377,7 @@ def load_emotional_features_all_layers(
 
     if kaomoji_filter:
         mask = np.asarray([
-            isinstance(s, str) and len(s) > 0 and s[0] in KAOMOJI_START_CHARS
+            isinstance(s, str) and is_kaomoji_candidate(s)
             for s in df["first_word"]
         ])
         df = df.loc[mask].reset_index(drop=True)
@@ -392,6 +392,89 @@ def load_emotional_features_all_layers(
             print(f"  [{short}] dropped {n_before - len(df)} HN-untagged rows for split-mode")
 
     return df, X3, layer_idxs
+
+
+def load_emotional_features_stack_at(
+    jsonl_path: str | Path,
+    data_dir: Path,
+    *,
+    experiment: str,
+    which: str = "h_first",
+    split_hn: bool = False,
+) -> tuple[pd.DataFrame, np.ndarray]:
+    """Path-aware layer-stack loader for non-canonical JSONLs (e.g.
+    introspection pilot runs that write to {short}_introspection_*.jsonl
+    paths). Stacks all layers' hidden states per row → (n_rows,
+    n_layers * hidden_dim). Applies the standard canonicalize +
+    kaomoji-start filter + optional HN split.
+
+    For canonical v3 emission data, prefer `load_emotional_features_stack`
+    (registry-keyed) — it benefits from the all-layers cache.
+    """
+    from .hidden_state_analysis import load_hidden_features_all_layers
+    from llmoji.taxonomy import canonicalize_kaomoji
+
+    df, X3, _ = load_hidden_features_all_layers(
+        Path(jsonl_path), data_dir, experiment, which=which,
+    )
+    if len(df) == 0:
+        return df, X3.reshape(0, 0)
+    df = df.assign(
+        quadrant=df["prompt_id"].str[:2].str.upper(),
+        first_word_raw=df["first_word"],
+        first_word=df["first_word"].map(
+            lambda s: canonicalize_kaomoji(s) if isinstance(s, str) else s,
+        ),
+    )
+    mask = np.asarray([
+        isinstance(s, str) and is_kaomoji_candidate(s)
+        for s in df["first_word"]
+    ])
+    df = df.loc[mask].reset_index(drop=True)
+    X3 = X3[mask]
+    if split_hn:
+        # apply_hn_split takes (df, X) where X is 2D; we have 3D here.
+        # Apply to flattened keep-mask, then re-shape — apply_hn_split
+        # handles row-dropping via positional masks.
+        df_split, X3_split = apply_hn_split(df, X3)
+        df = df_split
+        X3 = X3_split
+    n, n_layers, hidden_dim = X3.shape
+    return df, X3.reshape(n, n_layers * hidden_dim)
+
+
+def load_emotional_features_stack(
+    short: str,
+    *,
+    which: str = "h_first",
+    kaomoji_filter: bool = True,
+    split_hn: bool = False,
+    rebuild: bool = False,
+) -> tuple[pd.DataFrame, np.ndarray]:
+    """Layer-stack loader: row-wise concatenation of all-layers hidden
+    states. Returns (df, X_stack) where X_stack.shape = (n_rows,
+    n_layers * hidden_dim). No layer choice required — the
+    representation is the entire depth of the model.
+
+    Use this for any analysis that previously read at a hardcoded
+    preferred_layer. Rationale: single-layer pick is methodologically
+    arbitrary — silhouette peak is one criterion among many. Layer-stack
+    lets downstream PCA / silhouette / centroid ops integrate
+    across-depth information without committing to a single depth.
+
+    All other behavior matches `load_emotional_features_all_layers`
+    (canonicalize + kaomoji-start filter, optional HN split, cache
+    reuse).
+    """
+    df, X3, _ = load_emotional_features_all_layers(
+        short, which=which, kaomoji_filter=kaomoji_filter,
+        split_hn=split_hn, rebuild=rebuild,
+    )
+    if len(df) == 0:
+        return df, X3.reshape(0, 0)
+    n, n_layers, hidden_dim = X3.shape
+    X_stack = X3.reshape(n, n_layers * hidden_dim)
+    return df, X_stack
 
 
 # ---------------------------------------------------------------------------
@@ -992,7 +1075,7 @@ def prompt_kaomoji_matrix(
     """(N-prompt × top-K kaomoji) emission-count matrix, rows ordered
     by quadrant (HP, LP, HN, LN, NB). Returns (matrix, row_meta)."""
     kao_rows = df[df["first_word"].apply(
-        lambda s: isinstance(s, str) and len(s) > 0 and s[0] in KAOMOJI_START_CHARS
+        lambda s: isinstance(s, str) and is_kaomoji_candidate(s)
     )].copy()
     if len(kao_rows) == 0:
         return pd.DataFrame(), pd.DataFrame()

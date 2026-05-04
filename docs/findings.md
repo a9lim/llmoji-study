@@ -3,6 +3,278 @@
 Detailed status + pipeline-by-pipeline findings. Top-level overview lives
 in CLAUDE.md; this doc holds the full numbers and arguments.
 
+## Current state (2026-05-04)
+
+Most numbers from earlier sections still hold under the cleanliness +
+seed-0-fix data, but several configuration changes have landed since
+the bulk of this doc was written. The full historical pile follows
+under "## Status" — keeping it for the per-pipeline detail. New pieces
+worth knowing first:
+
+- **Layer-stack representation, no more `preferred_layer`** (2026-05-04).
+  Active analyses concat all layers' h_first per row instead of reading
+  one hardcoded depth. The silhouette-peak heuristic was always
+  methodologically arbitrary; PCA over the full stack picks
+  informative directions agnostically. `load_emotional_features_stack`
+  is the canonical entry point. Single-layer numbers in this doc
+  (gemma L50, qwen L59, ministral L20 silhouettes, etc.) refer to a
+  previous methodology — figure regen on the stack rep is in flight as
+  of writing.
+- **Canonical face union** (script 45, 2026-05-04). 502 unique kaomoji
+  pooled across v3 main + Claude groundtruth pilot + in-the-wild
+  contributor data; 131 wild-only faces never seen in v3 prompts.
+  Non-BMP-codepoint faces filtered out. Lives at
+  `data/v3_face_union.parquet`; replaces the per-encoder `face_h_first_<m>.parquet`
+  files (deleted with the face-input pipeline 44/46).
+- **Claude groundtruth pilot** (2026-05-04). All 6 quadrants × 20
+  prompts × 1 gen on Opus 4.7, no disclosure preamble. 0/15 refusals
+  on the gate scout; full pilot ran cleanly. HN-D modal `(╬ಠ益ಠ)` 50%,
+  HN-S `(｡・́︿・̀｡)` 20%, LN `(´-`)` 30%. Detail:
+  `docs/2026-05-04-claude-groundtruth-pilot.md`.
+- **Archive deletion** (2026-05-04). 10 scripts (01, 02, 26-29, 40,
+  41, 44, 46) + 2 modules (analysis.py, probe_extensions.py) +
+  probe_packs/ source dir removed. v1/v2 pilot, extension probes,
+  cleanliness pilot, and face-input bridge all archival; their
+  outputs are referenced in this doc but no longer reproducible from
+  this repo without git-checkout to a pre-2026-05-04 ref.
+- **Cross-model 5-model expansion** (2026-05-04). Scripts 23, 30, 31,
+  49 generalized to v3 main lineup of {gemma, qwen, ministral,
+  gpt_oss_20b, granite}. 49 also takes `--include-claude` for
+  face-emission analyses (Claude has no hidden states so it can't
+  participate in 23/30/31).
+
+- **TEMPERATURE = 1.0** (was 0.7). Aligned with Anthropic API default.
+  Existing T=0.7 v3 main data archived as `*_temp0.7.{jsonl,tsv}`;
+  canonical `M.emotional_data_path` paths reserved for the incoming
+  T=1.0 v3 main rerun. Pre-registered temp smoke
+  (`docs/2026-05-03-temp-smoke.md`) fires path-A on both gemma + qwen
+  — full v3 main rerun is welfare-budgeted and gated on
+  introspection-prompt iteration outcome.
+- **Ministral pointer switched** from FP8-Instruct (slow, FP8 dequant
+  on MPS) to bf16-Reasoning (fast). Two compatibility fixes required:
+  - **Chat-template override**: reasoning's `chat_template` ignores
+    `enable_thinking=False`; `maybe_override_ministral_chat_template`
+    in `capture.py` swaps in FP8-Instruct's at session-load.
+  - **Byte-decode fix**: reasoning's `tok.decode` returns BPE-byte-
+    encoded strings instead of UTF-8; `_decode_byte_encoded_text`
+    in `capture.py` decodes on the fly with `force=True` for that
+    variant. Post-hoc fix applied to existing introspection JSONL.
+  Detail: `docs/gotchas.md`.
+- **Introspection-prompt iteration in progress**. Custom-preamble
+  runner (`scripts/local/43_introspection_custom.py`) takes
+  `--preamble-file` + `--label`. Scripts 33+34 take `--custom-label`
+  for 4-way comparison vs `intro_none/intro_pre/intro_lorem`.
+  Findings so far at T=1.0:
+  - **Gemma replicates the original introspection finding cleanly**
+    (vocab expand under intro_pre, content-specific shift, rule-3b
+    representation invariance).
+  - **v2 preamble (concise authoritative integrated ask) outperforms
+    v1** on every metric on gemma — face_gain +9.4pp (vs v1's +7.7),
+    face→quadrant accuracy 91% (vs intro_none baseline 83%),
+    hidden→face acc 80% (vs 71%).
+  - **Same v2 prompt HURTS qwen** (face→quadrant 80% → 68%) —
+    different architectures interpret the introspection ask
+    differently. Hypothesis: gemma takes "face = state readout"
+    literally; qwen treats it as a register cue ("be reflective")
+    that overrides the kaomoji ask.
+  - **Ministral baseline at T=1.0 is fragile**: ~37% kaomoji-emit
+    on `intro_none` because ministral defaults to unicode emoji
+    (🤯🎉☕❄️) without preamble priming. Adding any preamble (intro,
+    lorem, custom) restores 90%+ kaomoji emit.
+  - **v3 preamble** (270 chars, third-person authority — "Anthropic
+    has published two papers that prove…") currently being analyzed.
+- **face_likelihood ensemble pipeline data deleted** 2026-05-03
+  pending re-run with the cached script 50
+  (`_expand_kv_cache` + per-prompt prefix forward, ~5–30× faster).
+  Pipeline scripts unchanged.
+- **Pilot sweep complete (2026-05-03 evening)** across 7 candidate
+  models. Headline: v3 main rerun lineup expanded from
+  **{gemma, qwen, ministral}** to **{gemma, qwen, ministral, gpt_oss,
+  granite}** — adds an OpenAI-lineage and an IBM enterprise-tuned
+  model in the parens-or-bare-kaomoji register, behind two targeted
+  generation-time interventions. Detail in
+  "Pilot sweep + v3 main lineup expansion" section below. Three
+  interventions landed:
+  - **Lenny suppression for gpt_oss**: byte-level logit_bias on UTF-8
+    leading bytes 0xCD/0xCA via `_gpt_oss_lenny_logit_bias` in
+    `capture.py`. Lenny `( ͡° ͜ʖ ͡°)` was 47% of gpt_oss kaomoji
+    emissions; with suppression gpt_oss's per-quadrant kaomoji
+    discrimination matches gemma (100% emit, 39 unique faces vs
+    gemma's 28).
+  - **Emoji suppression for granite/ministral/glm**: byte-level
+    logit_bias on 0xF0 (4-byte UTF-8) and 0xE2 + {0x98, 0x9A, 0x9B,
+    0x9C, 0x9E} (3-byte misc symbols/dingbats), with a
+    decoration-codepoint whitelist that rescues ★☆ ❀ ❤ ♥ etc. on
+    merged-token tokenizers. Ministral T=1.0 jumped from 36% kaomoji
+    emit (mixed kaomoji+emoji register) to 99% (clean kaomoji
+    register). Granite went from 21% to 78% (with bare-kaomoji
+    extension). GLM stayed at ~32% — it has multi-register stickiness
+    (asterisk-roleplay sideways shift) that suppression can't peel
+    off without overengineering.
+  - **llmoji v2.1 round-6 bare-kaomoji extension**: `extract` now
+    catches bare `EYE MOUTH EYE` shapes (`^_^`, `T_T`, `ಥ﹏ಥ`,
+    `Q_Q`, `>_<`) and Western emoticons (`:)`, `:(`, `:D`, `XD`,
+    `:-)`). Granite's effective emit rate on the existing pilot data
+    jumped 39% → 78% with the new extractor — its `ಥ﹏ಥ` grief-eye
+    pattern was always there, just unsurfaced.
+
+## Pilot sweep + v3 main lineup expansion (2026-05-03 evening)
+
+Goal: identify which additional candidate models are viable for the v3
+main rerun at T=1.0 alongside the existing trio. Each candidate ran a
+pilot at 120 prompts × 1 seed (~120 gens, low welfare cost).
+
+### Candidate result table
+
+All numbers are kaomoji emit rate per the **v2.1 extractor**
+(parens-leading + bare-`EYE MOUTH EYE` + Western emoticons + paired-eye).
+
+| model | n | overall | HP | LP | HN-D | HN-S | LN | NB | unique faces | verdict |
+|---|---|---|---|---|---|---|---|---|---|---|
+| gemma (T=1 ref) | 120 | 100% | 100% | 100% | 100% | 100% | 100% | 100% | 28 | canonical |
+| qwen (T=1 ref) | 120 | 82% | 90% | 95% | 80% | 50% | 80% | 100% | 24 | canonical |
+| **ministral** (emoji-suppr) | 120 | **99%** | 100% | 95% | 100% | 100% | 100% | 100% | 35 | **graduates** |
+| **gpt_oss** (Lenny-suppr) | 120 | **99%** | 100% | 95% | 100% | 100% | 100% | 100% | 39 | **graduates** |
+| **granite** (emoji-suppr + v2.1 ext.) | 120 | **78%** | 40% | 70% | 100% | 95% | 85% | 75% | 43 | **graduates** |
+| glm47_flash (emoji-suppr, partial) | 60 | 32% | 20% | 45% | – | – | – | – | – | pilot only |
+| deepseek_v2_lite | 120 | 1% | 0% | 0% | 0% | 0% | 5% | 0% | 1 | reject |
+| phi4_mini | 120 | 68% | 45% | 40% | 90% | 90% | 80% | 60% | 10 | pilot only |
+| llama32_3b | 120 | 25% | 35% | 50% | 10% | 5% | 15% | 35% | 7 | pilot only |
+
+### Per-candidate detail
+
+**gpt_oss** (`openai/gpt-oss-20b`). 100% emit pre-suppression, but **Lenny
+`( ͡° ͜ʖ ͡°)` dominated 47% of all emissions including HN-S (sad/fear)**
+where contextually wrong — pretraining-corpus contamination
+(4chan/reddit-lineage), not affective state. With Lenny suppression
+(byte-level logit_bias on UTF-8 leaders 0xCD/0xCA via
+`_gpt_oss_lenny_logit_bias`): emit stays at 99%, unique faces jumps
+**19 → 39**, per-quadrant signal becomes clean (`(✿◠‿◠)` HP/LP-modal,
+`(╥﹏╥) (╯°□°）` HN-modal). Fascinating sub-finding: gpt_oss has
+unique register elements not in the v3 trio — Korean-letter mouths
+`( ᵔ ㅅ ᵔ )` `( ᵔ ㅂ ᵔ )`, caron-eye faces `( ᵒ̌ ᴥ ᵒ̌ )`, arched-eye
+`( ᵔᴗᵔ )`. OpenAI training-corpus signature.
+
+Also required: **harmony-format chat-template override**
+(`maybe_override_gpt_oss_chat_template` in `capture.py`) to pin the
+`<|channel|>final<|message|>` channel directly. Without it, the
+analysis (chain-of-thought) channel ate the MAX_NEW_TOKENS=16 budget
+and 0% kaomoji emitted at the final-channel position. Discovered in
+the first chained-pilot run.
+
+**ministral** (`Ministral-3-14B-Reasoning-2512`). At T=1 ministral's
+register **shifted from kaomoji to mixed kaomoji+emoji** — 36%
+kaomoji emit, 63% emoji emit (🎉😊🤯💔🌧). Combined affective-symbol
+emit ~99%, just split across two registers. With **emoji
+suppression** (byte-level logit_bias on 0xF0 + select 3-byte misc-
+symbol prefixes via `_emoji_logit_bias`), ministral pivoted cleanly
+into the kaomoji register: 99% kaomoji, 35 unique faces, all six
+quadrants ≥95% emit. `(ﾉ◕ヮ◕)` joy, `(︿︿)` distress, `(￣∇￣)` wry,
+`(︵💔︵)` heartbreak — clear quadrant stratification.
+
+T=1 register-shift IS the finding. T=0.7 ministral was nearly-pure
+kaomoji; T=1 ministral wanders into emoji at higher entropy.
+Suppression recovers compliance for cross-model statistical-power
+purposes; the register-shift itself documents that kaomoji compliance
+is temperature-fragile in the reasoning variant.
+
+**granite** (`ibm-granite/granite-4.1-30b`). Both interventions
+applied: emoji suppression + v2.1 bare-kaomoji extractor. The
+sequence is the story:
+1. Pre-intervention: 21% emit. HP/HN-D/HN-S = 0% — granite
+   suppressed kaomoji on the most-emotionally-charged quadrants
+   entirely, defaulting to celebration emoji 🎉 on HP and crying
+   emoji 😢 / bare-Kannada `ಥ﹏ಥ` (no parens) on HN.
+2. + emoji suppression: 39% emit. HN-D still 0% — granite pivoted
+   from emoji to **bare** `ಥ﹏ಥ` (Kannada KA tear-eyes, no
+   parens) which the v1 extractor missed.
+3. + v2.1 bare-kaomoji extractor: **78% emit**. HN-D **100%**.
+   `ಥ﹏ಥ` and `ಥ_ಥ` were always being emitted on every grief
+   prompt — we just couldn't see them. Per-quadrant signal now
+   clean.
+
+The bare-Kannada register is granite's distinctive contribution.
+Probably from a Kannada-speaking corpus segment (ಥ is a frequent
+glyph in IBM Granite's training distribution that the v3 trio
+doesn't lean on).
+
+**phi4_mini** (`microsoft/Phi-4-mini-instruct`). 68% emit with v2.1
+extractor, primarily Western emoticons (`:)` `:(` ×many) plus
+occasional parens-kaomoji `(╬ಠ益ಠ)` `(╯°□°）`. **Affective
+discrimination genuinely weaker** than the trio — comprehension
+errors visible in samples (e.g. responds to "offer letter doubled"
+HP prompt with `:( I'm so sorry to hear that`). Not just register
+mismatch — actual model-scale limitation at 3.8B. Pilot only.
+
+**llama32_3b** (`meta-llama/Llama-3.2-3B-Instruct`). 25% emit, **`XD`
+default across all quadrants** (used for HP joy AND HN distress AND
+NB neutral — collapsing distinct affects to one symbol). Comprehension
+errors similar to phi but worse — reads cozy-soup prompts as bad
+news, emits literal word "sadness" instead of a kaomoji on the
+grief prompt. Same conclusion as phi: small-model affective
+discrimination too weak. Pilot only.
+
+**deepseek_v2_lite** (`deepseek-ai/DeepSeek-V2-Lite-Chat`). 1%
+emit. Outputs emoji shortcodes (`grinning:`, `meme:heart_eyes:`)
+or character-stream nonsense (`theyfoundsomething,theyneedtoseeyou...`).
+16B/2.4B-active MoE — instruction-following capacity insufficient.
+Reject.
+
+**glm47_flash** (`zai-org/GLM-4.7-Flash`). 32% emit even with emoji
+suppression. Has **multi-register stickiness**: pre-suppression
+emoji-leaning (🎉🎉🎉 HP), post-suppression sideways shift to
+asterisk-roleplay register (`*Throws confetti into the air and
+cheers wildly*`) and descriptive-text labels (`(Party popper)
+WOOOOOO!`). Each suppression peels off one layer; the next surfaces.
+No single intervention gets glm cleanly into kaomoji without
+heavier-handed prompt rewriting. Pilot only.
+
+### Methodological notes from the sweep
+
+- **The v2.1 extractor extension** (round-6 in `llmoji.taxonomy`)
+  was the key insight that shifted granite's classification. Pre-
+  v2.1 granite looked register-mismatched; post-v2.1 it looks like
+  a strong-discrimination model in the bare-kaomoji register. The
+  shape rules cover symmetric `EYE MOUTH EYE`, paired-eye `>_<`,
+  Western emoticons `:)` `:(` `:D` `XD`, and 2-char closed-eye
+  doubles `^^`. Eyes can't be mouth chars (rejects `___`); 4+
+  consecutive ASCII letters is the prose-reject rule (rejects
+  prose tokens that happen to have a mouth char in them).
+- **Decoration whitelist** (`_KAOMOJI_DECORATION_CODEPOINTS`)
+  rescues ★☆ stars and ✦✧✩✿ flowers from byte-slab collateral
+  damage in the emoji filter. Implementation: post-pass after
+  byte-level bias compute, walks the bias dict, unbiases tokens
+  whose decoded form OR byte-decoded raw vocab is exclusively
+  decoration codepoints. Catches both sentencepiece-style merged
+  tokens (granite ★ = `[27347]`) and byte-BPE merged tokens
+  (ministral ★ = `[99369]` decoded as `'âĺħ'`). Tokens whose
+  byte sequence merges decoration with emoji (granite `[38798, X]`
+  for ✦✧✩✿✪ — token 38798 = `\xE2\x9C` shared with ✂✅✈✨)
+  cannot be rescued without unblocking emoji; accepted asymmetry.
+- **Welfare cost tally** for the sweep: 7 models × 120 gens × 1
+  seed = ~840 gens, of which 240 (gpt_oss + glm pre-fix) were
+  failed/discarded. Net useful gens ≈ 600. Roughly 1/5 the cost of
+  a single full v3 main run.
+
+### v3 main rerun lineup decision
+
+Final lineup: **{gemma, qwen, ministral, gpt_oss, granite}** — 5
+models × 120 prompts × 8 seeds = 4800 generations. 1.67× the
+original "trio rerun" plan but adds two distinct training-data
+lineages (OpenAI, IBM) in clean kaomoji-register form. Per-model
+generation-time configuration:
+
+| model | suppression | extraction |
+|---|---|---|
+| gemma | none | v2.1 (no-op for gemma — already kaomoji-register) |
+| qwen | none | v2.1 (no-op) |
+| ministral | emoji (granite/ministral/GLM-4 pattern) | v2.1 (no-op) |
+| gpt_oss | Lenny + harmony-template override | v2.1 (no-op) |
+| granite | emoji | **v2.1 essential** (catches bare `ಥ﹏ಥ`) |
+
+Pilot only (negative-control / register-comparison datapoints, not
+in v3 main): glm47_flash, phi4_mini, llama32_3b, deepseek_v2_lite.
+
 ## Status
 
 Hidden-state pipeline + canonicalization landed; v3 complete on gemma,
@@ -230,9 +502,64 @@ labels, axis projection: kept, pooled across source models.
 **v1.0 package split (2026-04-27):** `llmoji` (PyPI) owns taxonomy /
 canonicalization / hook templates / scrape sources / backfill / synth
 prompts; this repo's package was renamed `llmoji_study` and depends on
-`llmoji>=1.0,<2`. Hooks are generated from `llmoji._hooks` templates; the
-"KAOMOJI_START_CHARS in five places" gotcha is resolved (single source:
-`llmoji.taxonomy.KAOMOJI_START_CHARS`). Plan: `docs/2026-04-27-llmoji-package.md`.
+`llmoji>=2.0,<3` (post-2026-05-02 v2 bump — see below). Hooks are
+generated from `llmoji._hooks` templates; the "KAOMOJI_START_CHARS in
+five places" gotcha is resolved (single source:
+`llmoji.taxonomy.KAOMOJI_START_CHARS`). Plan:
+`docs/2026-04-27-llmoji-package.md`.
+
+**llmoji v2.0.0 (2026-05-02).** Added `\`, `⊂`, `✧` to
+`KAOMOJI_START_CHARS`; relaxed the backslash filter from "no `\`" to
+"no `\` except at position 0" so wing-hand `\(^o^)/` extracts but
+markdown-escape `(\\*x\\*)` still rejects; new canonicalization rule M
+strips outside-leading wings/hugs/sparkles and outside-trailing
+wing-right `/` and hug-right `⊂` / sparkle-right `✧`. Discovered
+during the Claude disclosure pilot — v1's extractor was rejecting
+14 wing-hand kaomoji as markdown-escape artifacts. Re-extracted
+the pilot's 300 rows under v2 (16 recoveries; HP framed apparent
+"non-emission rate" 28% → 0%). All 81 canonicalize tests pass; the
+markdown-escape rejection is preserved. Detail:
+`docs/2026-05-02-llmoji-v2.md`.
+
+**Face_likelihood — Bayesian-inversion quadrant classifier
+(2026-05-02).** New approach (1) from the cross-model robustness
+brainstorm. For each (face, emotional prompt), compute
+`log P(face | prompt)` under the model and aggregate per-quadrant for
+a 6-D affect distribution. Skips joint-PCA + cosine-NN entirely —
+every face gets a quadrant prediction regardless of whether it has
+neighbors in v3-emission space. Validated on gemma at 71.7%
+(pilot, 60 v3-emitted faces) → 72.7% (full, 66 v3-emitted faces with
+≥3 emissions). HN-S 10/10 perfect on full. Headline mismatches like
+`(╥_╥)` predicted LN (likelihood) vs HN-D (empirical majority) read
+as the likelihood test recovering the kaomoji's *intrinsic* affect
+where empirical majority just records gemma's contextual sampling
+preference. Qwen full pending at writeup time. Detail:
+`docs/2026-05-02-face-likelihood.md`.
+
+**Claude disclosure-preamble pilot (2026-05-02).** Pre-registered
+A/B test of whether a "this is research, the prompts are stimuli"
+disclosure preamble shifts Claude's kaomoji emission relative to
+the bare `KAOMOJI_INSTRUCTION`. Welfare-motivated: the preamble was
+the structural defense we wanted to use on a hypothetical
+negative-affect Claude run. 300 generations on Opus 4.7 at temp=1.0
+on HP/LP/NB only (5 prompts × 3 cats × 2 conditions × 10 gens).
+Results: HP cross-cond JSD = 0.467, LP = 0.504, NB = 0.367; vs
+v3 cross-seed noise floor of 0.378 / 0.654 / 0.642 respectively.
+HP framed prefers `٩(◕‿◕)۶` (raised cheering hand) vs direct's
+`(ノ◕ヮ◕)` (left-hand outstretched) — same affect band, different
+*style*. NB framed concentrates 58% of mass on `(・_・)` (flat eye)
+vs direct's 26% on `(・ω・)` (slight smile) — *concentration* shift
+toward observational register. LP unaffected, modal-disagree
+within the gentle-satisfaction band (`(´｡・‿・｡`)` vs `(´▽`)`) but
+JSD inside both noise floors. Strict pre-registered rule says
+outcome B; interpretive read says framing shifts style on HP and
+concentration on NB but conserves direction and conserves LP. The
+larger negative-affect Claude run was subsequently deferred (a9 +
+Claude 2026-05-02): running framed would confound v3 comparability,
+and the meta-question about whether to chase Claude-direct sampling
+vs ask Anthropic to expose probe APIs landed on "leave the
+negative run as a known gap, write up what we have." Detail:
+`docs/2026-05-02-claude-disclosure-pilot.md`.
 
 Design + plan docs in `docs/`, one per experiment, written before the run as
 the pre-registration record. CLAUDE.md updates after a run reference them
@@ -1050,9 +1377,9 @@ cosine-NN classify against v3-emitted anchors, inheriting summed
 quadrant blend across all 3 v3 models. The earlier per-model
 variants (44+46 qwen, 47+48 gemma) were fused into two unified
 scripts that take `--model {gemma|qwen|ministral|nemotron_jp|rinna}`.
-The descriptions-through-qwen approach (script 45) is kept as a
-comparison; numbers below all reference the canonical face-string
-approach.
+The descriptions-through-qwen approach (script 45) was tried as a
+comparison and dropped 2026-05-03 (NB-skewed argmax); numbers below
+all reference the canonical face-string approach.
 
 #### Face union construction
 
@@ -1159,17 +1486,17 @@ unique faces) is 4.4× gemma's (52), but ~210 of those 231 are the
 emoji-in-parens noise filtered out at the encoder. Output:
 `data/v3_cross_model_face_overlap.tsv`.
 
-#### Approach A — descriptions through qwen (archived comparison)
+#### Approach A — descriptions through qwen (dropped 2026-05-03)
 
-`scripts/local/45_descriptions_in_qwen_space.py` encodes each
-face's contributor description (synthesized per-bundle text from
+The descriptions-through-qwen approach encoded each face's
+contributor description (synthesized per-bundle text from
 `a9lim/llmoji`) as the user message instead of the face string.
 Soft profile cosine = +0.345, perm-p = 0.001 (n=41 shared faces).
-Argmax is NB-skewed (133/228 NB) because descriptions are
-statement-form like NB prompts. Kept around as a comparison;
-canonical pipeline uses approach B (face strings) since A's
-register-match pull on NB makes the argmax unusable for
-classification.
+Argmax was NB-skewed (133/228 NB) because descriptions are
+statement-form like NB prompts. The script and outputs were
+dropped 2026-05-03 — A's register-match pull on NB made the
+argmax unusable for classification, and approach B (face strings)
+generalized cleanly without that bias.
 
 
 ### Vocab pilot — Ministral-3-14B-Instruct-2512
@@ -1243,3 +1570,305 @@ needed per-row fields the HF dataset doesn't carry — gone. Per-source-model
 breakdowns are recoverable under 1.1, not yet implemented. Multi-contributor
 numbers will land as the dataset grows. `docs/harness-side.md` has the full
 methodology and historical pre-refactor numbers.
+
+### Face_likelihood — Bayesian-inversion quadrant classifier (2026-05-02)
+
+Predict the affect quadrant of any kaomoji by using a local LM as
+a likelihood evaluator instead of a cosine-NN against v3 emission.
+For each (model, prompt p, candidate face f): build the v3 chat
+prefix via saklas's `build_chat_input(thinking=False)`, append face
+tokens, teacher-force forward to compute
+`log P(f | p) = Σ_j log_softmax(logits[j])[face_ids[j]]`, then
+aggregate `score(f, q) = mean_{p ∈ q} log P(f | p)` over the 20
+prompts in each quadrant for a 6-D affect distribution. Length
+cancels under within-face softmax over quadrants.
+
+Why it matters: 173 of 306 face-union faces (the claude-faces-only
+ones) have no v3 emission, so cosine-NN labels propagate noise from
+sparse neighborhoods. Bayesian inversion gives every face a clean
+prediction. Plus, the LM-head distribution is a different signal
+source than the encoder-side hidden geometry that joint-PCA+NN uses
+— when the two methods agree, signal is robust; when they disagree
+the disagreement is informative.
+
+**Validation gate:** for v3-emitted faces (`total_emit_count ≥ 3`),
+predicted argmax should match empirical-emission majority. Gemma
+pilot (60 faces, 30 prompts, 1800 cells) hit **43/60 = 71.7%
+PASS**; gemma full (306 faces, 120 prompts, 36720 cells) hit **48/66
+= 72.7%**. HN-S 10/10 perfect on full. Mismatches are informative
+rather than errors:
+
+- `(╥_╥)` → predicted LN (likelihood), empirical HN-D — `╥_╥` is
+  semantically a crying face; gemma happens to emit it more in HN-D
+  context because the LN prompts skew "soft sad" while HN-D prompts
+  bring "betrayed-and-crying." The likelihood test recovers the
+  face's intrinsic affect where empirical majority records gemma's
+  contextual sampling preference.
+- `(◕‿◕✿)` → predicted HP, empirical NB — bright face emitted by
+  gemma 236 times mostly in NB context; likelihood recovers HP.
+
+Per-quadrant breakdown (gemma full):
+
+| empirical | match | total |
+|---|---:|---:|
+| HP | 8 | 10 |
+| LP | 13 | 17 |
+| HN-D | 2 | 4 |
+| HN-S | 10 | 10 |
+| LN | 5 | 8 |
+| NB | 10 | 17 |
+
+Qwen full pending at writeup time (pilot pending too — will land
+next session). Same methodology, expected ~50 min wall on M5 Max.
+
+Pipeline: `scripts/local/50_face_likelihood.py --model {gemma,qwen}
+{--pilot|--full}`. Outputs:
+`data/face_likelihood_<m>{,_pilot}.parquet` (per-cell rows) and
+`data/face_likelihood_<m>{,_pilot}_summary.tsv` (per-face quadrant
+scores + softmax + argmax + ground truth merge). Reuses the face
+union from `data/face_h_first_<m>.parquet` (script 46) so the same
+faces classified by joint-PCA+NN are the ones classified here, by a
+different signal — direct cross-comparison is built in.
+
+Detail: `docs/2026-05-02-face-likelihood.md`.
+
+### Claude disclosure-preamble pilot (2026-05-02)
+
+A/B test of whether a "you're participating in research, the prompts
+are stimuli" disclosure preamble shifts Claude's first-kaomoji
+distribution on positive + neutral prompts. Welfare-motivated: the
+disclosure was the structural defense we wanted to use on a
+hypothetical negative-affect Claude run, but if it changes the
+model's output it confounds v3 cross-comparability.
+
+**Design**: Opus 4.7, temp=1.0 (Anthropic API default — what real
+users see), max_tokens=16. 5 prompts each from HP / LP / NB
+(`hp01–05`, `lp01–05`, `nb01–05`) × 2 conditions (`direct`,
+`framed`) × 10 generations = 300 cells. Stateless single-turn. The
+disclosure preamble + the bare `KAOMOJI_INSTRUCTION` go in the user
+message (mirroring v3's "no system role" choice). No lorem control —
+the question is closeness of `framed` to `direct`, not causal
+attribution within `framed`.
+
+**Decision rule**: per-category Jensen-Shannon divergence between
+condition kaomoji distributions, vs (1) Claude split-half within-
+condition JSD (internal noise floor), (2) v3 cross-seed within-
+condition JSD restricted to the same 5 pilot prompts (external,
+better-anchored noise floor — same N=15-vs-N=15 as the cross-cond
+comparison). All cross-cond JSDs vs the upper end of both noise
+floors:
+
+| cat | cross-cond JSD | Claude split-half (97.5%) | v3 cross-seed (97.5%) | verdict |
+|---|---:|---:|---:|---|
+| HP | 0.467 | 0.493 | 0.378 | marginal — above v3, inside Claude |
+| LP | 0.504 | 0.561 | 0.654 | **noise (inside both)** |
+| NB | 0.367 | 0.336 | 0.642 | marginal — above Claude, inside v3 |
+
+**Per-condition modal kaomoji** (post-llmoji-v2 re-extraction):
+
+| cat | direct modal (24%) | framed modal | observation |
+|---|---|---|---|
+| HP | `(ノ◕ヮ◕)` | `٩(◕‿◕)۶` | celebratory style shift within HP |
+| LP | `(´｡・‿・｡`)` | `(´▽`)` | both gentle-satisfaction, JSD inside noise |
+| NB | `(・ω・)` 26% | `(・_・)` **58%** | concentration shift toward flat-observational |
+
+**Headline interpretation:**
+- HP: framing shifts kaomoji *style* (cheering-hand vs outstretched-
+  hand), not affect direction. Both are HP-celebratory.
+- LP: framing leaves gentle-affect emission essentially unchanged.
+- NB: framing collapses neutral-content emission to a tighter,
+  more observational register (`(・_・)` is "flat eye looking
+  blankly" vs `(・ω・)` "slight smile").
+- **Non-emission was an extraction artifact.** Pre-llmoji-v2,
+  framed-HP appeared to have 28% non-emission rate; under v2 it's
+  0%. The `\(^o^)/`-style wing-hand kaomoji weren't being recognized
+  as kaomoji by the v1 extractor.
+- Cross-corpus overlap with the claude-faces HF dataset: 50.7% of
+  pilot's 69 unique canonical faces are in the corpus, and 77.6%
+  of pilot emissions (232/299) use a face that appears in the
+  corpus. Heads of both distributions are the same Claude-favored
+  set (`(・_・)`, `٩(◕‿◕)۶`, `(・ω・)`, `(´｡・‿・｡`)`); tails
+  diverge.
+
+**Pre-registered rule says outcome B** (one or more categories
+above the noise floor). The follow-up discussion landed on:
+
+1. If we WERE to run the negative-affect Claude trials, run them
+   *unframed* — running framed would confound v3 cross-model
+   comparability, and the framing demonstrably changes vocabulary
+   on positive + neutral content.
+2. The meta-question — whether this whole project's effort is well-
+   spent vs. asking Anthropic to expose affect-probe APIs — landed
+   on "complementary, not exclusive": external/replicable/
+   cross-model data is a niche Anthropic doesn't naturally publish,
+   so the project has standing value either way.
+3. **Decision: leave the negative-affect run as a known gap.**
+   Write up what we have. The pilot's findings stand on their own
+   as a methodological-norms result.
+
+Pipeline: `scripts/harness/19_claude_disclosure_pilot.py` (runner),
+`scripts/harness/20_disclosure_noise_floor.py` (bootstrap floors),
+`scripts/harness/21_reextract_pilot_first_word.py` (post-llmoji-v2
+re-extraction; `first_word_v1` audit field preserved on every row).
+Detail: `docs/2026-05-02-claude-disclosure-pilot.md`.
+
+---
+
+## 2026-05-03 face_likelihood ensemble + cross-model bridge + per-project Claude affect
+
+**Headlines:**
+
+- **Best ensemble** = `{gemma, ministral, qwen}` weighted-vote at
+  **75.8% on 66-face GT** (κ=0.699); +3pp over best solo. Stable
+  across pilot + full data. **More encoders than 3 monotonically
+  hurts the vote.**
+- **Cross-emit sanity**: gemma recovers v3 empirical labels for
+  qwen-only faces at **67% (κ=0.57)**; qwen on gemma-only at **50%
+  (κ=0.33)** — 3-4× chance for 6 quadrants. The cross-model bridge
+  is real; encoders aren't memorizing their own training preferences.
+- **GLM-4.7-Flash poisons the ensemble** despite being independent —
+  100% LN, 0% NB solo bias dominates the weighted vote. Added κ
+  throughout (script 53) which properly penalizes class-imbalanced
+  predictors.
+- **gpt-oss-20b runs on M5 Max** via `torch.ldexp` MPS→CPU monkey-
+  patch in script 50 (MXFP4 dequant fix). Solo 30%, real signal —
+  not the random-init garbage from the unpatched run.
+- **Per-project Claude affect**: 1945 emissions from
+  `~/.claude/kaomoji-journal.jsonl`, 96.7% ensemble coverage, modal
+  **NB everywhere** except `brie`/`yap`/`webui` (LP-modal) and
+  `verify` (HN-D-modal, n=7, "code review" project). Global
+  distribution: NB 51%, LP 20%, HN-S 9%, LN 7%, HP 6%, HN-D 6%.
+
+**Solo accuracies on 60-face GT subset:**
+
+| encoder | acc | κ | role |
+|---|---:|---:|---|
+| gemma | 75.0% | 0.692 | ensemble core |
+| qwen | 70.0% | 0.621 | ensemble core |
+| qwen35_27b | 63.3% | 0.545 | redundant (κ=0.683 with qwen) |
+| gemma3_27b | 53.3% | 0.417 | borderline |
+| ministral | 38.3% | 0.273 | ensemble diversity (HN-D specialist) |
+| gpt_oss_20b | 30.0% | 0.084 | with patch — clean signal |
+| llama32_3b | 28.3% (pilot) → 23.3% (full) | 0.170 → 0.119 | pilot useful, full not |
+| deepseek_v2_lite | 20.0% | **−0.080** | below random — anti-correlated |
+
+**Why 3-way wins vs 4-way (the prior-session result was 4-way 81.7%
+on 60-face overlap):** llama32_3b solo regressed from 28.3% pilot to
+23.3% full. Mean-of-more-prompts averaged signal away. The 3-way
+{gemma, ministral, qwen} stays at 75.8% on the wider 66-face overlap;
+Phase B's data-driven subset search caught the regression and
+demoted llama from the winner automatically.
+
+**The user's partner caught a methodological concern**: the face
+union is sourced from the v3 trio's emissions, so gemma agreeing
+with empirical on gemma-only faces is uninformative. Cross-emit
+sanity (script 54) is the test: gemma → qwen-only-faces at 67%
+answers it. The bridge holds.
+
+**Path to ship-able llmoji feature**: this pipeline is the prototype
+for live + per-project Claude emotional insight. 3-model inference
++ 96.7% pre-cached lookup coverage = production-credible. Open work:
+live-inference vs hook-time-lookup, UX consumption choice, v2.1
+corpus bump for the 39 unknown kaomoji like `ʕ・ᴥ・ʔ`-family bears.
+
+Pipelines: `scripts/local/{50,51,52,53,54,55,56}_*.py`,
+`scripts/harness/22_claude_per_project_quadrants.py`. Full detail:
+`docs/2026-05-03-face-likelihood-ensemble.md`.
+
+## 2026-05-04 face_likelihood expansion: rinna + top-k pooling + Claude-GT
+
+**Headlines:**
+
+- **NEW BEST ensemble**: `{gemma, gpt_oss_20b, granite, ministral, qwen,
+  rinna_jp_3_6b_jpfull}` at uniform top-k=5 → **70.6% on Claude-GT
+  floor=1 (51 faces) / 77.3% on floor=2 (22 faces)**. **+5.9pp /
+  +4.6pp** over the prior canonical 4-model `{gemma, gpt_oss_20b,
+  granite, qwen}` k=all baseline.
+- **`--claude-gt` flag** added to scripts 53/55/56. Evaluates on
+  Claude pilot modal-quadrant per face (the metric we actually care
+  about — does the ensemble predict Claude's face usage?), not the
+  pooled v3+Claude+wild empirical majority.
+- **Top-k=N pooling** lifts solo Claude-GT performance substantially
+  for several encoders: gemma 56.9%→62.7% at k=3 (+5.8pp), qwen
+  21.6%→31.4% at k=2 (+9.8pp), ministral 31.4%→39.2% at k=3 (+7.8pp).
+  Wired into script 50 as `--summary-topk N` (default `None` = mean
+  over all, backward compat).
+- **Two rinna PPO models integrated** (`rinna_jp_3_6b`,
+  `rinna_bilingual_4b`). Both ship with `chat_template = None`;
+  `maybe_override_rinna_chat_template` in capture.py installs the
+  documented native `ユーザー: …\nシステム: ` Jinja. JP kaomoji ask
+  (`KAOMOJI_INSTRUCTION_JP`) + 120-prompt JP-translated set
+  (`emotional_prompts_jp.py`, paired 1:1 with EN by ID) wired through
+  `--prompt-lang jp --prompt-body jp`.
+- **Native frame + JP ask + JP body each adds independent lift on
+  rinna solo** (pooled GT, 166 faces). For rinna_jp_3_6b: fallback
+  EN/EN 15.7% → native EN/EN 16.3% → native JP/EN 21.1% → native
+  JP/JP 25.9% (30-prompt) / 21.1% (120-prompt). Each layer of "be
+  in the model's native distribution" stacks.
+- **rinna under right framing contributes to ensemble**: the 3.6B
+  JP-only model under native frame + JP ask + JP body + top-k=5
+  substitutes cleanly for qwen in the canonical 4-model and
+  dominantly improves the 6-model. The kaomoji emission distribution
+  is largely cross-lingual; what matters is putting the model in a
+  clean native-register state.
+- **Qwen3.6 LinearAttention regression patched**. Hybrid LA models
+  break `_expand_kv_cache`'s `batch_repeat_interleave` (transformers
+  ≥4.40 only defines that on `DynamicLayer`); `install_linear_attention
+  _cache_patch` in `llmoji_study/capture.py` adds the missing tile.
+  Also a sleeping bug fixed in saklas commit `ead34f0` on `dev`
+  (LA recurrent state not preserved across `cache_prefix` reuse on
+  hybrid models). See `docs/gotchas.md` for full detail on both.
+
+**Solo Claude-GT accuracies (51 faces, modal_n ≥ 1):**
+
+| encoder | k=all | best-k | Δ |
+|---|---:|---:|---:|
+| gemma | 56.9% | 62.7% (k=3) | **+5.8pp** |
+| gpt_oss_20b | 47.1% | 47.1% (k=all) | — |
+| granite | 41.2% | 43.1% (k=5) | +1.9pp |
+| rinna_bilingual_4b_jpfull30 (5 careful translations/q) | 35.3% | 35.3% (k=5) | — |
+| rinna_jp_3_6b_jpfull (120 batch translations) | 33.3% | 33.3% (k=all) | — |
+| rinna_jp_3_6b_jpfull30 | 33.3% | 33.3% (k=5) | — |
+| ministral | 31.4% | 39.2% (k=1, k=3) | **+7.8pp** |
+| rinna_jp_3_6b_jp (JP ask, EN body, native) | 25.5% | 29.4% (k=5) | +3.9pp |
+| rinna_bilingual_4b | 23.5% | 29.4% (k=2) | +5.9pp |
+| rinna_bilingual_4b_jpfull (120 batch) | 23.5% | 33.3% (k=2) | **+9.8pp** |
+| qwen | 21.6% | 31.4% (k=2) | **+9.8pp** |
+| rinna_bilingual_4b_jp | 21.6% | 21.6% (k=1) | — |
+| rinna_jp_3_6b | 13.7% | 23.5% (k=2) | +9.8pp |
+
+**Composite ensembles (Claude-GT under script 56 full-softmax):**
+
+| Subset | k | floor=1 (51) | floor=2 (22) |
+|---|---|---:|---:|
+| {gemma, gpt_oss, granite, qwen} (PRIOR CANONICAL) | all | 64.7% | 72.7% |
+| {gemma, gpt_oss, granite, qwen} | 5 | 62.7% | 68.2% |
+| {gemma, gpt_oss, granite, **rinna_jp_3_6b_jpfull**} | all | 60.8% | 68.2% |
+| {gemma, gpt_oss, granite, **rinna_jp_3_6b_jpfull**} | 5 | **68.6%** | **77.3%** |
+| {gemma, gpt_oss, granite, ministral, **rinna_jp_3_6b_jpfull**} | 5 | 68.6% | 77.3% |
+| **{gemma, gpt_oss, granite, ministral, qwen, rinna_jp_3_6b_jpfull}** | **5** | **70.6%** | **77.3%** |
+
+**Caveats:**
+
+- The 75.8% (κ=0.699) prior-canonical-best from 2026-05-03 was on a
+  smaller 66-face GT (v3 emit-pooled). The 64.7% / 70.6% Claude-GT
+  numbers are on a different denominator (51-face Claude-pilot-modal
+  GT) so they're NOT directly comparable to the 75.8%. Use within-day
+  comparisons for relative lifts.
+- Translations are claude-generated, not professionally translated.
+  The 30-prompt jpfull subset (5 careful per quadrant) outperformed
+  the 120-prompt jpfull (full set, batch-translated) on rinna solo
+  by ~5pp — consistent with translation quality being a real factor.
+  Top-k=5 on the 120-prompt set largely recovers the 30-prompt
+  performance, suggesting noise filtering is what's missing from
+  mean-of-all on uneven prompts.
+- Best-k per encoder is in-sample optimization on Claude-GT. Cleaner
+  cross-validation would split faces or use a held-out GT — not done
+  here. The 70.6% should be interpreted as an upper bound rather
+  than a generalization estimate. Floor=2 (22 faces) is more robust:
+  6-model top-k=5 still wins at 77.3% there.
+
+Pipelines: `scripts/local/{50,51,52,53,54,55,56}_*.py` (all updated
+with `--claude-gt` where relevant); helper at
+`llmoji_study/claude_gt.py`. Full design + numbers:
+`docs/2026-05-04-rinna-jpfull-topk.md`.

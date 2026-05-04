@@ -10,7 +10,7 @@ authors = [{ name = "a9lim", email = "mx@a9l.im" }]
 # bundle-and-upload side is in the `llmoji` package; depend on it
 # directly so all six study scripts can `from llmoji import …`.
 dependencies = [
-    "llmoji>=1.0,<2",
+    "llmoji>=2.0,<3",
     "saklas>=1.4.6",
     "anthropic",
     "huggingface_hub",  # snapshot the contributor-submitted kaomoji corpus

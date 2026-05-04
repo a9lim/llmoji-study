@@ -4,7 +4,7 @@
 In 2D the PCs don't visually map cleanly onto the canonical probes
 (happy.sad / angry.calm / fearful.unflinching) — that mismatch is what
 prompted this whole face-stability thread. This script builds the 3D
-analogue: top-3 PCs of h_first @ preferred_layer, then rotated so the
+analogue: top-3 PCs of the h_first layer-stack, then rotated so the
 3 probes align as cleanly as possible with the canonical x/y/z axes
 of the plot.
 
@@ -53,11 +53,11 @@ import pandas as pd
 import plotly.graph_objects as go
 from sklearn.decomposition import PCA
 
-from llmoji_study.config import DATA_DIR, FIGURES_DIR, MODEL_REGISTRY, PROBES
+from llmoji_study.config import FIGURES_DIR, MODEL_REGISTRY, PROBES
 from llmoji_study.emotional_analysis import (
     QUADRANT_COLORS,
     QUADRANT_ORDER_SPLIT,
-    load_emotional_features,
+    load_emotional_features_stack,
     load_rows,
 )
 
@@ -212,7 +212,7 @@ def _plot_one_model(
         ))
 
     title = (
-        f"{short}: h_first @ preferred_layer, top-3 PCs rotated so probes "
+        f"{short}: h_first layer-stack, top-3 PCs rotated so probes "
         f"≈ canonical axes<br>"
         f"<span style='font-size:11px'>"
         f"x = happy.sad direction, y = angry.calm, z = fearful.unflinching; "
@@ -240,13 +240,9 @@ def _per_model(short: str) -> tuple[list[dict], None] | tuple[None, None]:
         print(f"  [{short}] no v3 data; skipping")
         return None, None
 
-    layer_label = "max" if M.preferred_layer is None else f"L{M.preferred_layer}"
-    print(f"\n{short}  (h_first, layer={layer_label})")
-    df, X = load_emotional_features(
-        str(M.emotional_data_path), DATA_DIR,
-        experiment=M.experiment, which="h_first",
-        layer=M.preferred_layer,
-        split_hn=True,
+    print(f"\n{short}  (h_first, layer-stack)")
+    df, X = load_emotional_features_stack(
+        short, which="h_first", split_hn=True,
     )
     if len(df) == 0:
         print(f"  [{short}] no kaomoji-bearing rows")

@@ -1,2 +1,0 @@
-condition	n_rows_kept	n_faces_kept	hidden_to_face_acc	hidden_to_face_macroF1	majority_baseline	uniform_baseline	hidden_to_quadrant_acc	face_to_hidden_top5_weighted_eta2	face_to_hidden_top5_eta2_norm	face_centroid_r2_full_hidden	quadrant_centroid_r2_full_hidden	face_gain_over_quadrant_pp
-kaomoji_prompted	955	19	0.6994764397905759	0.49501029760874293	0.2198952879581152	0.05263157894736842	1.0	0.3085248974937256	0.5297661035579305	0.3516896050586793	0.3572316260631665	-0.5542021004487196
