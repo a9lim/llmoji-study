@@ -342,18 +342,33 @@ def load_emotional_features_all_layers(
     The ``$LLMOJI_WHICH`` environment variable overrides ``which`` and
     auto-renames the cache so each aggregate gets its own file.
     """
-    from .config import DATA_DIR, MODEL_REGISTRY
+    from .config import DATA_DIR, resolve_model
     from .hidden_state_analysis import load_hidden_features_all_layers
     from llmoji.taxonomy import canonicalize_kaomoji
 
-    M = MODEL_REGISTRY[short]
+    # ``resolve_model`` honors LLMOJI_OUT_SUFFIX iff ``short`` matches
+    # the active ``$LLMOJI_MODEL`` — cross-model loads stay on canonical
+    # registry paths.
+    M = resolve_model(short)
     if not M.emotional_data_path.exists():
         raise FileNotFoundError(
             f"no v3 data at {M.emotional_data_path}; "
             f"run LLMOJI_MODEL={short} python scripts/local/03_emotional_run.py"
         )
 
-    cache_path = DATA_DIR / "cache" / f"v3_{short}_h_mean_all_layers.npz"
+    # Cache filename: ``v3{_<suffix>}_<short>_h_mean_all_layers.npz``.
+    # When LLMOJI_OUT_SUFFIX is set on the active model, the suffix is
+    # inserted between the v3-version and short_name so primed and
+    # unprimed runs don't share cache state. Back-compat: unsuffixed
+    # caches keep their original names (``v3_gemma_h_mean_all_layers.npz``
+    # etc.). Reading the env directly here (rather than parsing
+    # ``M.experiment``) avoids the registered-experiment-already-contains-
+    # short_name double-naming for non-gemma models (e.g. qwen's
+    # registered experiment is ``v3_qwen``).
+    import os as _os
+    _suffix = _os.environ.get("LLMOJI_OUT_SUFFIX", "")
+    _suffix_part = f"_{_suffix}" if _suffix and short == _os.environ.get("LLMOJI_MODEL", "gemma") else ""
+    cache_path = DATA_DIR / "cache" / f"v3{_suffix_part}_{short}_h_mean_all_layers.npz"
     if rebuild and cache_path.exists():
         cache_path.unlink()
         meta = cache_path.with_suffix(".meta.jsonl")

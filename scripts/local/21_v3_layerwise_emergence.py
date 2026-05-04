@@ -36,7 +36,7 @@ import pandas as pd
 from sklearn.decomposition import PCA
 from sklearn.metrics import silhouette_score
 
-from llmoji_study.config import FIGURES_DIR, MODEL_REGISTRY, current_model
+from llmoji_study.config import FIGURES_DIR, MODEL_REGISTRY, current_model, resolve_model
 from llmoji_study.emotional_analysis import (
     QUADRANT_COLORS,
     QUADRANT_ORDER_SPLIT,
@@ -282,7 +282,7 @@ def main() -> None:
 
     per_model_metrics: dict[str, pd.DataFrame] = {}
     for short in candidates:
-        M = MODEL_REGISTRY[short]
+        M = resolve_model(short)
         print(f"\n=== {short} ===")
         print(f"loading multi-layer h_mean tensor (cached at "
               f"data/cache/v3_{short}_h_mean_all_layers.npz)...")

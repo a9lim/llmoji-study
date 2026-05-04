@@ -42,7 +42,7 @@ import pandas as pd
 from scipy.spatial.distance import jensenshannon
 from scipy.stats import spearmanr
 
-from llmoji_study.config import FIGURES_DIR, MODEL_REGISTRY
+from llmoji_study.config import FIGURES_DIR, MODEL_REGISTRY, resolve_model
 from llmoji_study.emotional_analysis import (
     _use_cjk_font,
     load_emotional_features_stack,
@@ -143,7 +143,7 @@ def _plot_pair_scatter(
 
 
 def _per_model(short: str) -> dict | None:
-    M = MODEL_REGISTRY[short]
+    M = resolve_model(short)
     if not M.emotional_data_path.exists():
         print(f"  [{short}] no v3 data; skipping")
         return None

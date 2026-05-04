@@ -36,7 +36,6 @@ Env vars:
 
 from __future__ import annotations
 
-import dataclasses
 import json
 import os
 import sys
@@ -161,28 +160,17 @@ def _emission_rate_by_quadrant(path: Path) -> dict[str, tuple[int, int]]:
 
 def main() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    # ``current_model()`` honors ``LLMOJI_OUT_SUFFIX`` natively (since
+    # 2026-05-04 late evening): redirects emotional_data_path,
+    # emotional_summary_path, experiment, and figures_dir at the
+    # suffixed variant. Used originally by the 2026-05-03 temp-smoke
+    # pilot ("temp1_pilot"); now by every variant run that doesn't
+    # want to clobber canonical v3 main.
     M = current_model()
-    # Optional output-path / experiment suffix override. Used by the
-    # 2026-05-03 temp-smoke pilot ("temp1_pilot") so its data lands at
-    # data/{short}_temp1_pilot.jsonl + sidecars under data/hidden/v3_*_temp1_pilot/
-    # instead of clobbering v3 main.
     out_suffix = os.environ.get("LLMOJI_OUT_SUFFIX")
     if out_suffix:
-        # Build paths like data/<short>_<suffix>.jsonl regardless of the
-        # registered name — gemma's default-model path drops the "gemma_"
-        # prefix (`emotional_raw.jsonl`) so we can't naive-replace.
-        new_jsonl = M.emotional_data_path.parent / f"{M.short_name}_{out_suffix}.jsonl"
-        new_summary = (
-            M.emotional_summary_path.parent / f"{M.short_name}_{out_suffix}_summary.tsv"
-        )
-        new_experiment = f"{M.experiment}_{out_suffix}"
-        M = dataclasses.replace(
-            M,
-            emotional_data_path=new_jsonl,
-            emotional_summary_path=new_summary,
-            experiment=new_experiment,
-        )
-        print(f"  output suffix: '_{out_suffix}' (sidecars under {new_experiment}/)")
+        print(f"  output suffix: '_{out_suffix}' (sidecars under {M.experiment}/, "
+              f"figures under {M.figures_dir.relative_to(M.figures_dir.parents[2])}/)")
     # Optional system-preamble injection. Used 2026-05-04 to run a
     # full v3 main under the canonical introspection preamble (v2)
     # at 120×8 = 960 rows — the v2-primed reference dataset that

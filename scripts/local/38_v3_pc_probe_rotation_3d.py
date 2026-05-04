@@ -53,7 +53,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from sklearn.decomposition import PCA
 
-from llmoji_study.config import FIGURES_DIR, MODEL_REGISTRY, PROBES
+from llmoji_study.config import FIGURES_DIR, MODEL_REGISTRY, PROBES, resolve_model
 from llmoji_study.emotional_analysis import (
     QUADRANT_COLORS,
     QUADRANT_ORDER_SPLIT,
@@ -235,7 +235,7 @@ def _plot_one_model(
 
 
 def _per_model(short: str) -> tuple[list[dict], None] | tuple[None, None]:
-    M = MODEL_REGISTRY[short]
+    M = resolve_model(short)  # honors LLMOJI_OUT_SUFFIX for active model
     if not M.emotional_data_path.exists():
         print(f"  [{short}] no v3 data; skipping")
         return None, None

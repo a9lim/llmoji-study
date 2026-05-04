@@ -51,7 +51,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from llmoji_study.config import FIGURES_DIR, MODEL_REGISTRY
+from llmoji_study.config import FIGURES_DIR, MODEL_REGISTRY, resolve_model
 from llmoji_study.emotional_analysis import (
     _use_cjk_font,
     load_emotional_features_stack,
@@ -130,7 +130,7 @@ def _build_labels(df: pd.DataFrame) -> dict[str, np.ndarray]:
 
 
 def _decompose_one_model(short: str) -> pd.DataFrame:
-    M = MODEL_REGISTRY[short]
+    M = resolve_model(short)
     if not M.emotional_data_path.exists():
         print(f"  [{short}] no v3 data at {M.emotional_data_path}; skipping")
         return pd.DataFrame()

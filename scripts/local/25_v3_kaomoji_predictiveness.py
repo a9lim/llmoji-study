@@ -62,7 +62,7 @@ from sklearn.model_selection import (
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-from llmoji_study.config import FIGURES_DIR, MODEL_REGISTRY, current_model
+from llmoji_study.config import FIGURES_DIR, MODEL_REGISTRY, current_model, resolve_model
 from llmoji_study.emotional_analysis import (
     QUADRANT_ORDER,
     _use_cjk_font,
@@ -339,7 +339,7 @@ def _within_face_consistency(
 
 
 def run_model(short_name: str, *, min_n: int = 5, min_groups: int = 3) -> dict[str, Any]:
-    M = MODEL_REGISTRY[short_name]
+    M = resolve_model(short_name)  # honors LLMOJI_OUT_SUFFIX for active model
     if not M.emotional_data_path.exists():
         print(f"[{short_name}] no v3 data at {M.emotional_data_path}; skipping")
         return {}

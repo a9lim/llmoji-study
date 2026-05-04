@@ -540,14 +540,63 @@ MODEL_REGISTRY: dict[str, ModelPaths] = {
 }
 
 
+def resolve_model(short: str) -> ModelPaths:
+    """Lookup ``short`` in MODEL_REGISTRY, applying ``LLMOJI_OUT_SUFFIX``
+    iff ``short`` matches the currently-active ``$LLMOJI_MODEL``.
+
+    This is the canonical entry point for ANY caller that wants to load
+    model paths by short_name and have suffix routing work. Cross-model
+    iterators (e.g. script 21's per-layer emergence sweep, script 38's
+    multi-model 3D plot) call this with each model's short_name and get
+    the active model's suffix-redirected paths only when relevant —
+    other models keep registry semantics untouched.
+
+    For "just give me the active model", use ``current_model()`` (a
+    thin wrapper around this).
+    """
+    import dataclasses
+    if short not in MODEL_REGISTRY:
+        raise KeyError(
+            f"unknown model {short!r}; known: {sorted(MODEL_REGISTRY)}"
+        )
+    M = MODEL_REGISTRY[short]
+    active = os.environ.get("LLMOJI_MODEL", "gemma")
+    out_suffix = os.environ.get("LLMOJI_OUT_SUFFIX")
+    if out_suffix and short == active:
+        new_jsonl = M.emotional_data_path.parent / f"{M.short_name}_{out_suffix}.jsonl"
+        new_summary = (
+            M.emotional_summary_path.parent / f"{M.short_name}_{out_suffix}_summary.tsv"
+        )
+        new_experiment = f"{M.experiment}_{out_suffix}"
+        # Redirect figures to figures/local/<short>_<suffix>/ so analysis
+        # outputs from primed/variant runs don't clobber the canonical
+        # figures/local/<short>/ tree. Matches the data-file naming
+        # convention (e.g. data/gemma_intro_v7_primed.jsonl ↔
+        # figures/local/gemma_intro_v7_primed/).
+        new_figures = M.figures_dir.parent / f"{M.short_name}_{out_suffix}"
+        M = dataclasses.replace(
+            M,
+            emotional_data_path=new_jsonl,
+            emotional_summary_path=new_summary,
+            experiment=new_experiment,
+            figures_dir=new_figures,
+        )
+    return M
+
+
 def current_model() -> ModelPaths:
     """Resolve the active model from `$LLMOJI_MODEL`. Defaults to
     'gemma' (back-compat). Raises KeyError on an unrecognized name so
-    typos fail loudly."""
+    typos fail loudly.
+
+    Honors `$LLMOJI_OUT_SUFFIX`: when set, redirects all model paths
+    (emotional_data_path / emotional_summary_path / experiment /
+    figures_dir) at the suffixed variant — e.g. with
+    ``LLMOJI_OUT_SUFFIX=intro_v7_primed`` on gemma,
+    ``M.emotional_data_path`` becomes
+    ``data/gemma_intro_v7_primed.jsonl`` and sidecar dirs land under
+    ``data/hidden/v3_intro_v7_primed/``. Thin wrapper around
+    ``resolve_model``.
+    """
     name = os.environ.get("LLMOJI_MODEL", "gemma")
-    if name not in MODEL_REGISTRY:
-        raise KeyError(
-            f"unknown LLMOJI_MODEL={name!r}; "
-            f"known: {sorted(MODEL_REGISTRY)}"
-        )
-    return MODEL_REGISTRY[name]
+    return resolve_model(name)
