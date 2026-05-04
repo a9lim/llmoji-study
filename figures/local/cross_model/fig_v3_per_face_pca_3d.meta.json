@@ -1,0 +1,7 @@
+{
+  "gemma": "69 faces \u00b7 PC1+2+3 = 65.7% \u00b7 layer-stack",
+  "qwen": "143 faces \u00b7 PC1+2+3 = 61.5% \u00b7 layer-stack",
+  "ministral": "102 faces \u00b7 PC1+2+3 = 49.7% \u00b7 layer-stack",
+  "gpt_oss_20b": "149 faces \u00b7 PC1+2+3 = 44.1% \u00b7 layer-stack",
+  "granite": "101 faces \u00b7 PC1+2+3 = 61.0% \u00b7 layer-stack"
+}
