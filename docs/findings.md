@@ -118,10 +118,39 @@ worth knowing first:
     kaomoji-emit on `intro_none` because ministral defaults
     to unicode emoji (🤯🎉☕❄️) without preamble priming.
     Adding any preamble (intro, lorem, custom) restores 90%+.
-  - **Same v2 prompt HURTS qwen** (face→quadrant 80% → 68% on
-    the earlier single-layer rep, pre-double-ask-fix) — needs
-    rerun under stack rep + corrected semantics to know
-    whether finding survives.
+  - **v7 catastrophically hurts qwen** (verified 2026-05-04 late
+    evening under corrected single-ask semantics + h_first
+    layer-stack). The original "v2 hurts qwen" finding survives —
+    sharply amplified — under corrected plumbing:
+
+    | qwen condition   | emit rate    | face_gain over quad | η²    |
+    |------------------|-------------:|--------------------:|------:|
+    | intro_none       | 99/120 (82%) |              +1.1pp | 0.466 |
+    | intro_pre (=v7)  | 45/120 (38%) |          **−19.3pp**| 0.269 |
+    | intro_lorem      | 64/120 (53%) |              −6.9pp | 0.485 |
+    | intro_custom_v7  | 47/120 (39%) |          **−19.6pp**| 0.190 |
+
+    intro_pre and intro_custom_v7 are functionally identical
+    (both `INTROSPECTION_PREAMBLE` = v7 via `instruction_override`)
+    and land within 0.3pp on face_gain — tightly reproducible. v7
+    cuts qwen's emit rate roughly in half (82% → 38–39%),
+    collapses vocabulary to 2 face-classes that pass n≥5, and
+    pushes face_gain over quadrant ~20pp **negative** — face
+    emissions become *less* informative than quadrant alone.
+
+    Diagnostic — qwen reaches for Western emoticons (`:(`, `:3`)
+    and reuses faces across opposite quadrants. Modal LP = modal
+    LN = `( ˘ ³˘)` (heart-pucker, affect-blind soft register).
+    HN-D modal `:(` collides with HN-S modal `:(`. Lots of
+    `(none)` — no kaomoji at all.
+
+    **Mechanism** (consistent with original hypothesis): qwen
+    interprets the introspection ask as a *register cue* —
+    "be contemplative / reflective" — that overrides the kaomoji
+    ask. Three concurrent failures (emit rate ↓, vocab ↓,
+    affect-blind face reuse) all point to the same mechanism.
+    Cross-architecturally, **introspection priming is
+    gemma-specific**: canonical for gemma, anti-canonical for qwen.
 
   Detail: `docs/2026-05-04-introspection-v7-and-haiku.md`.
 

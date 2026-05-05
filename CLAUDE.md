@@ -87,10 +87,29 @@ phenomenal status. Aggregating that across 800+ generations is not nothing.
     for calibrated per-quadrant softmax. Pairwise κ(gemma ↔ haiku)
     = 0.297 — high complementarity. In best subsets at size 1–4
     but not size-6 (LM-head soft-vote dominates the optimum).
+  - **v7 catastrophically hurts qwen** (verified 2026-05-04 late
+    evening; the original "v2 hurts qwen" finding survives + amplifies
+    under corrected semantics). Emit rate 82% → 38–39%, face_gain
+    over quadrant +1.1pp → −19.5pp, vocabulary collapses to 2 face-
+    classes, qwen reaches for Western emoticons (`:(`, `:3`) and
+    reuses the same face across opposite-valence quadrants
+    (LP modal = LN modal = `( ˘ ³˘)`). intro_pre and
+    intro_custom_v7 land within 0.3pp — reproducible, not noise.
+    Mechanism (per original hypothesis): qwen takes the introspection
+    ask as a *register cue* (be contemplative) that overrides the
+    kaomoji ask. **Introspection priming is gemma-specific.**
+    Decision: don't bake `INTROSPECTION_PREAMBLE` into qwen analyses.
+  - Saklas-side bug fixes for hybrid LA models (qwen3.6) landed in
+    `saklas/core/session.py`: (1) `_snapshot_la_layers` was calling
+    `save(layer)` on a bound method (passing layer twice); fix:
+    `save()`. (2) `_la_crop_with_restore` did in-place
+    `conv_states.copy_(snap)` on inference tensors; fix: wrap in
+    `with torch.inference_mode()`. Both bugs were dormant on gemma
+    (no LA layers in gemma-4) — only fire on hybrid-LA models when
+    `cache_prefix` is reused.
   - Open: face-stability triple under priming (scripts 36/37/38
     on `gemma_intro_v7_primed.jsonl`); multi-seed verification of
-    v7 vs v3 (~12 min compute, ±2pp face_gain band at n=1);
-    same-v2-hurts-qwen rerun under corrected semantics.
+    v7 vs v3 (~12 min compute, ±2pp face_gain band at n=1).
 
 ### Earlier active threads (2026-05-04 afternoon)
 

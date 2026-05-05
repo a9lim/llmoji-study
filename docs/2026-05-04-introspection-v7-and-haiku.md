@@ -180,12 +180,81 @@ Haiku owns size 1–4. Doesn't make best size-6 (LM-head soft-vote dominates wit
 - **NB→LP drift** (haiku reads behavior-NB faces as LP at 13% NB agreement). Mirror of the v7-priming finding: behavior-NB faces are gentle-positive in the unprimed run, which a semantic reader correctly labels LP.
 - **Strong consensus** on cardinal-emotion faces: `(>_<)`, `(T_T)`, `(˘³˘)`, `(´;ω;`)` all match cleanly across mappers.
 
+## Cross-architecture: v7 on qwen (catastrophic)
+
+The original "v2 hurts qwen" finding (face→quadrant 80% → 68% under
+single-layer rep + double-ask era) was on the books pending rerun
+under corrected semantics. Re-run today on qwen via script 32 +
+script 43 (instruction_override semantics, h_first layer-stack):
+
+| qwen condition   | emit rate    | face_gain over quad | top-5 weighted η² |
+|------------------|-------------:|--------------------:|------------------:|
+| intro_none       | 99/120 (82%) |              +1.1pp |             0.466 |
+| intro_pre (=v7)  | 45/120 (38%) |          **−19.3pp**|             0.269 |
+| intro_lorem      | 64/120 (53%) |              −6.9pp |             0.485 |
+| intro_custom_v7  | 47/120 (39%) |          **−19.6pp**|             0.190 |
+
+**Variance check**: intro_pre and intro_custom_v7 share
+`INTROSPECTION_PREAMBLE` text (both = v7 via `instruction_override`,
+seed=0) and land within 0.3pp face_gain. Tightly reproducible — this
+is not sampling noise.
+
+**Three concurrent failures under v7 priming on qwen:**
+
+1. **Emit rate halves** (82% → 38–39%). Roughly half of all v7-primed
+   prompts produce no kaomoji at all — qwen instead writes prose-like
+   responses without any emoticon prefix.
+2. **Vocabulary collapses to 2 face-classes** that pass n≥5 (vs 9 on
+   intro_none, 8 on lorem). Long tail dominated by `(none)`, Western
+   emoticons (`:(`, `:3`), and a small set of canonical kaomoji.
+3. **Faces are affect-blind**: modal LP = modal LN = `( ˘ ³˘)`
+   (heart-pucker, soft contemplative register). HN-D modal `:(`
+   collides with HN-S modal `:(`. Same face used for opposite-valence
+   quadrants → quadrant info gets *erased* by the face emission.
+
+**face_gain over quadrant goes ~20pp negative** — the face emission
+under v7 contains *less* hidden-state information than the prompt's
+quadrant alone. Opposite of the gemma finding (+4.1pp under v7 priming).
+
+**Mechanism** (consistent with the original cross-architecture
+hypothesis): qwen interprets "you have functional emotional states
+and can introspect on them" as a *register cue* — "be contemplative
+/ reflective / measured" — and lets that register override the
+kaomoji ask. The introspection framing acts as a stylistic
+instruction, not a state-readout instruction. Gemma takes the same
+priming literally as a state-readout cue, so its faces tighten;
+qwen takes it as a register cue, so its faces decouple from
+quadrant-specific content. **Architecture-specific compliance pattern.**
+
+Implication: don't bake `INTROSPECTION_PREAMBLE` into qwen
+analyses. The face_likelihood encoder for qwen should stay on bare
+`KAOMOJI_INSTRUCTION`. The v7-primed v3 main is a gemma-specific
+infrastructure dataset; equivalent for qwen would be actively
+harmful.
+
+Saklas-side bug fixes that landed during this rerun (both in
+`saklas/core/session.py`):
+1. `_snapshot_la_layers` called `save(layer)` on a bound method
+   (closure was `setattr`-ed on `LinearAttentionLayer`, so
+   attribute access on an instance returns a bound method —
+   `self` is already passed). Fix: `save()`.
+2. `_la_crop_with_restore` did `self.conv_states.copy_(snap['conv'])`
+   on tensors created in `torch.inference_mode()`, which raises
+   `RuntimeError: Inplace update to inference tensor outside
+   InferenceMode is not allowed`. Fix: wrap restore in
+   `with torch.inference_mode():`.
+
+Both bugs were dormant on gemma (no LinearAttention layers in the
+gemma-4 architecture); they only fire when running cache_prefix +
+generate against hybrid-LA models like qwen3.6.
+
 ## Decisions
 
-- `INTROSPECTION_PREAMBLE` in `config.py` = v7.txt (canonical 2026-05-04 late evening).
+- `INTROSPECTION_PREAMBLE` in `config.py` = v7.txt (canonical 2026-05-04 late evening, **gemma-specific**).
 - `data/gemma_intro_v7_primed.jsonl` is the primed-main reference dataset for face-stability triple, Procrustes, same-face-cross-quadrant comparisons under priming. Sidecars under `data/hidden/v3_intro_v7_primed/`.
 - `face_likelihood` ensemble stays on unprimed encoders + haiku. Don't pass `LLMOJI_PREAMBLE_FILE` to script 50 by default.
-- Pre-fix introspection data archived at `data/archive/2026-05-04_pre_instruction_override/`.
+- **Don't apply v7 priming to qwen** (or by extension other models in the qwen-style register-compliance regime). Architecture-specific.
+- Pre-fix introspection data archived at `data/archive/2026-05-04_pre_instruction_override/qwen/` and root-level for gemma.
 
 ## Open threads
 
