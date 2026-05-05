@@ -49,13 +49,13 @@ LLMOJI_MODEL=ministral, 5 quadrants × 20 prompts (full v3 set) × 1 generation 
 Pipeline reuses existing wiring; no script changes expected:
 
 ```
-LLMOJI_MODEL=ministral python scripts/99_hidden_state_smoke.py     # smoke
-LLMOJI_MODEL=ministral python scripts/03_emotional_run.py          # 100 gens
-LLMOJI_MODEL=ministral python scripts/04_emotional_analysis.py     # fig A/B/C + summary
-LLMOJI_MODEL=ministral python scripts/21_v3_layerwise_emergence.py # layer sweep
-LLMOJI_MODEL=ministral python scripts/22_v3_same_face_cross_quadrant.py
-LLMOJI_MODEL=ministral python scripts/24_v3_pca3plus.py
-python scripts/23_v3_cross_model_alignment.py                      # all three models
+LLMOJI_MODEL=ministral python scripts/90_hidden_state_smoke.py     # smoke
+LLMOJI_MODEL=ministral python scripts/harness/00_emit.py          # 100 gens
+LLMOJI_MODEL=ministral python scripts/harness/10_emit_analysis.py     # fig A/B/C + summary
+LLMOJI_MODEL=ministral python scripts/20_v3_layerwise_emergence.py # layer sweep
+LLMOJI_MODEL=ministral python scripts/21_v3_same_face_cross_quadrant.py
+LLMOJI_MODEL=ministral python scripts/23_v3_pca3plus.py
+python scripts/22_v3_cross_model_alignment.py                      # all three models
 LLMOJI_MODEL=ministral python scripts/26_register_extension_probes.py
 LLMOJI_MODEL=ministral python scripts/27_v3_extension_probe_rescore.py
 LLMOJI_MODEL=ministral python scripts/28_v3_extension_probe_figures.py
@@ -63,13 +63,13 @@ LLMOJI_MODEL=ministral python scripts/28_v3_extension_probe_figures.py
 
 Note: script 03 currently runs the full 800. Need a one-line gate
 (`LLMOJI_PILOT=1` or similar) to drop to 1 gen / prompt for this
-run. Add to `scripts/03_emotional_run.py` before running, document
+run. Add to `scripts/harness/00_emit.py` before running, document
 in CLAUDE.md, remove or keep gated for future pilots.
 
 ## Pre-registered decision rules
 
 Existing baselines pulled from
-`figures/local/cross_model/v3_cross_model_summary.json` and
+`figures/local/v3_cross_model_summary.json` and
 `docs/findings.md`:
 
 - gemma silhouette at L31 (preferred): **0.184**
@@ -186,16 +186,16 @@ divergence override or substitute for the geometric decision.
 
 ## Changes / artifact paths
 
-- New: `data/ministral_emotional_raw.jsonl`,
-  `data/ministral_emotional_summary.tsv`,
-  `data/hidden/ministral_emotional/<uuid>.npz`
+- New: `data/local/ministral/emotional_raw.jsonl`,
+  `data/local/ministral/emotional_summary.tsv`,
+  `data/local/hidden/ministral_emotional/<uuid>.npz`
 - New figures: `figures/local/ministral/fig_emo_*.png`,
   `fig_v3_*.png`
-- Updated: `figures/local/cross_model/v3_cross_model_summary.json`
-  (extended to triplet), `figures/local/cross_model/fig_v3_*.png`
+- Updated: `figures/local/v3_cross_model_summary.json`
+  (extended to triplet), `figures/local/fig_v3_*.png`
   (gemma+qwen+ministral overlays)
 - Required code change: pilot-N gate in
-  `scripts/03_emotional_run.py` (e.g., env var
+  `scripts/harness/00_emit.py` (e.g., env var
   `LLMOJI_PILOT_GENS=1`). Defaults to existing 8 if unset.
 - CLAUDE.md status update: append ministral pilot result to the
   status section once analysis lands.
@@ -203,8 +203,8 @@ divergence override or substitute for the geometric decision.
 ## Sequence
 
 1. a9 reads + signs off on this doc (or pushes back / revises).
-2. Add `LLMOJI_PILOT_GENS` gate to `scripts/03_emotional_run.py`.
-3. Smoke: `LLMOJI_MODEL=ministral python scripts/99_hidden_state_smoke.py`.
+2. Add `LLMOJI_PILOT_GENS` gate to `scripts/harness/00_emit.py`.
+3. Smoke: `LLMOJI_MODEL=ministral python scripts/90_hidden_state_smoke.py`.
    Verifies model loads, hooks register, sidecars write. ~5 min.
 4. Pilot: 100-gen run + analyses listed above. ~15-30 min compute,
    plus analysis time.
@@ -217,8 +217,8 @@ divergence override or substitute for the geometric decision.
 
 Pilot ran cleanly. 100 generations, 95 with usable `first_word`
 (5 rows had empty first_word; standard non-emission rate). Per-row
-`.npz` sidecars at `data/hidden/v3_ministral/`; multi-layer
-`h_mean` cache at `data/cache/v3_ministral_h_mean_all_layers.npz`
+`.npz` sidecars at `data/local/hidden/ministral/`; multi-layer
+`h_mean` cache at `data/local/cache/ministral_h_mean_all_layers.npz`
 (100 rows × 36 layers × 5120-dim).
 
 Per-quadrant face distribution showed clean Russell-circumplex

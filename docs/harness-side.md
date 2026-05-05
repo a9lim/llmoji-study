@@ -56,25 +56,25 @@ Contributor side, in the `llmoji` package:
 
 Research side, in this repo:
 
-4. `scripts/06_claude_hf_pull.py` snapshot-downloads
+4. `scripts/60_corpus_pull.py` snapshot-downloads
    `a9lim/llmoji`, walks every bundle, canonicalizes each kaomoji
    form again (in case contributors have different package
    versions), and pools by canonical form across contributors.
-   Output: `data/claude_descriptions.jsonl`, one row per canonical
+   Output: `data/harness/claude_descriptions.jsonl`, one row per canonical
    form with the union of per-bundle synthesized descriptions
    plus per-contributor counts and provider mix.
-5. `scripts/07_claude_kaomoji_basics.py` prints descriptive stats
+5. `scripts/61_corpus_basics.py` prints descriptive stats
    (top kaomoji, contributor and bundle counts, provider mix,
    coverage histogram).
-6. `scripts/15_claude_faces_embed_description.py` embeds every
+6. `scripts/62_corpus_embed.py` embeds every
    per-bundle synthesized description with
    `sentence-transformers/all-MiniLM-L6-v2`, weighted-means by
    per-bundle count across contributors, L2-normalizes. Output:
-   `data/claude_faces_embed_description.parquet`.
-7. `scripts/16_eriskii_replication.py` projects onto eriskii's 21
+   `data/harness/claude_faces_embed_description.parquet`.
+7. `scripts/64_eriskii_replication.py` projects onto eriskii's 21
    axes, runs t-SNE plus KMeans(k=15), asks Haiku for short
    cluster labels, and writes the comparison markdown.
-8. `scripts/18_claude_faces_pca.py` runs PCA on the same
+8. `scripts/63_corpus_pca.py` runs PCA on the same
    embeddings as a parity-with-eriskii visualization.
 
 ## Privacy
@@ -110,7 +110,7 @@ emissions, 174 canonical kaomoji):
   (top-2 cumulative 27.7%). HDBSCAN finds 2 dense clusters and
   88 noise points at `min_cluster_size=5`; the dense KMeans
   panel is the eriskii-parity reference.
-- See `data/eriskii_comparison.md` for the full per-axis writeup
+- See `data/harness/eriskii_comparison.md` for the full per-axis writeup
   on the live corpus, and `figures/harness/eriskii_clusters_tsne.png`
   and `figures/harness/claude_faces_pca.png` for the visualizations.
 
@@ -152,12 +152,12 @@ fields aren't in the bundle:
 If we want either of these analyses back, the right move is a
 separate research-side scrape of a single contributor's local
 journal, not adding fields to the public dataset. That's what
-`scripts/local_per_project_axes.py` does for the per-project axis
+`scripts/65_per_project_axes.py` does for the per-project axis
 breakdown — see the next section.
 
 ### Per-provider per-project axes (single-contributor side script)
 
-`scripts/local_per_project_axes.py` reads `~/.claude/kaomoji-journal.jsonl`
+`scripts/65_per_project_axes.py` reads `~/.claude/kaomoji-journal.jsonl`
 and `~/.codex/kaomoji-journal.jsonl` directly via the
 `llmoji.sources.journal` adapter, embeds each emission's
 `assistant_text` with MiniLM, projects onto the same 21 eriskii
@@ -346,11 +346,11 @@ pip install -e .
 
 export ANTHROPIC_API_KEY=...    # Haiku cluster-labeling
 
-python scripts/06_claude_hf_pull.py            # snapshot a9lim/llmoji into data/hf_dataset/
-python scripts/07_claude_kaomoji_basics.py     # printout: top kaomoji, providers, contributors
-python scripts/15_claude_faces_embed_description.py  # per-canonical embeddings
-python scripts/16_eriskii_replication.py       # axes, clusters, narrative writeup
-python scripts/18_claude_faces_pca.py          # PCA panel
+python scripts/60_corpus_pull.py            # snapshot a9lim/llmoji into data/harness/hf_dataset/
+python scripts/61_corpus_basics.py     # printout: top kaomoji, providers, contributors
+python scripts/62_corpus_embed.py  # per-canonical embeddings
+python scripts/64_eriskii_replication.py       # axes, clusters, narrative writeup
+python scripts/63_corpus_pca.py          # PCA panel
 ```
 
 If you want to contribute to the dataset rather than just

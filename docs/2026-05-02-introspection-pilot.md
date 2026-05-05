@@ -253,16 +253,16 @@ sustained affect-loaded computation per prompt.
 New:
 
 - `docs/2026-05-02-introspection-pilot.md` — this doc.
-- `scripts/32_introspection_pilot.py` — runs all three conditions
+- `scripts/30_introspection_pilot.py` — runs all three conditions
   in one pass. Wraps `run_sample` with a per-condition
   `extra_preamble` override and `override_max_tokens=16`. Output:
-  `data/{short_name}_introspection_raw.jsonl` +
-  `data/hidden/{experiment}_introspection/<uuid>.npz`.
-- `scripts/33_introspection_analysis.py` — paired PCA(2) + KL +
+  `data/local/{short}/introspection_raw.jsonl` +
+  `data/local/hidden/{experiment}_introspection/<uuid>.npz`.
+- `scripts/31_introspection_analysis.py` — paired PCA(2) + KL +
   rule-3b recompute. Output:
   `figures/local/{short_name}/fig_introspection_pca_pair.png`,
   `fig_introspection_kaomoji_dist.png`,
-  `data/{short_name}_introspection_summary.tsv`.
+  `data/local/{short}/introspection_summary.tsv`.
 
 Updated:
 
@@ -275,7 +275,7 @@ Updated:
   inside the user message when set. Keeps the pilot a thin
   override on existing machinery; doesn't touch the main-run
   default behavior.
-- `scripts/03_emotional_run.py` — leave alone for now. Early-stop
+- `scripts/harness/00_emit.py` — leave alone for now. Early-stop
   policy doesn't apply to existing main runs (we want to keep
   cross-comparability with the 2400 existing generations); the
   new behavior is opt-in via the pilot script's lower
@@ -307,7 +307,7 @@ a9 signed off 2026-05-02:
 Pilot ran cleanly. 369/369 rows (3 conditions × 123 prompts × 1 gen),
 **100% kaomoji emission rate** across all conditions (vs ~95% on the
 v3 main run — early-stop tightens emission discipline). Per-row
-sidecars at `data/hidden/v3_introspection/`. Extension probes
+sidecars at `data/local/hidden/introspection/`. Extension probes
 rescored via `scripts/27 --jsonl ... --experiment v3_introspection`;
 12 extension probes plus 5 core = 17 total.
 

@@ -2,14 +2,14 @@
   "model": "gemma",
   "rep": "h_first.layer-stack",
   "n_rows_total": 958,
-  "n_rows_kept": 881,
+  "n_rows_kept": 882,
   "min_n": 5,
-  "n_faces_total": 74,
+  "n_faces_total": 72,
   "n_faces_kept": 31,
   "hidden_to_face": {
-    "accuracy": 0.5584562996594779,
-    "macro_f1": 0.19232125842312608,
-    "majority_baseline": 0.1963677639046538,
+    "accuracy": 0.562358276643991,
+    "macro_f1": 0.20288850529799143,
+    "majority_baseline": 0.1961451247165533,
     "uniform_baseline": 0.03225806451612903,
     "n_classes": 31,
     "n_splits": 3,
@@ -18,30 +18,30 @@
       "(\uff61\u30fb\u0301\ufe3f\u30fb\u0300\uff61)": 0.8728323699421965,
       "(\u256f\u00b0\u25a1\u00b0)": 1.0,
       "(\u2299_\u2299)": 0.6842105263157895,
-      "(\u0e51\u02c3\u203f\u02c2)": 0.9324324324324325,
+      "(\u0e51\u02c3\u203f\u02c2)": 0.9459459459459459,
       "(\uff61\u256f\ufe35\u2570\uff61)": 0.2765957446808511,
-      "(\u30fb_\u30fb)": 0.2727272727272727,
-      "(\u02d9\ua4b3\u02d9)": 0.5454545454545454,
+      "(\u30fb_\u30fb)": 0.38636363636363635,
+      "(\u02d9\ua4b3\u02d9)": 0.4772727272727273,
       "(\uff61\u25d5\u203f\u25d5\uff61)": 0.27586206896551724,
       "(\u203f\u203f\u203f)": 0.19230769230769232,
       "(\u00b4\u25bd`)": 0.32,
-      "(\uff61\u2665\u203f\u2665\uff61)": 0.4,
+      "(\uff61\u2665\u203f\u2665\uff61)": 0.3,
       "(\u2299\ufe4f\u2299)": 0.0,
       "(\uff61\u30fb\u0300\u203f-)": 0.125,
       "(\uff61\u203f\u203f\u203f\uff61)": 0.0,
       "(\u02d8\u03c9\u02d8)": 0.14285714285714285,
       "(\uff61\u02c3\u203f\u02c2)": 0.15384615384615385,
-      "(\u02d8\u25bd\u02d8)": 0.0,
+      "(\u02d8\u25bd\u02d8)": 0.23076923076923078,
       "(\u02d8\u203f\u02d8)": 0.0,
       "(\uff61\u30fb\u03c9\u30fb\uff61)": 0.09090909090909091,
       "(\u273f\u25e0\u203f\u25e0)": 0.0,
       "(\u2565\ufe4f\u2565)": 0.0,
       "(\ud83c\udf3f\u203f\ud83c\udf3f)": 0.0,
       "(\u25d5\u203f\u25d5)": 0.0,
+      "(\u2267\u25bd\u2266)": 0.0,
       "(\uff9f\u25bd\uff9f)": 0.0,
       "(\u00b4\u03c9`)": 0.0,
       "(\uff89\u25d5\u30ee\u25d5)": 0.0,
-      "(\u3064\u2267\u25bd\u2266)": 0.0,
       "(\u02c3\ud83d\ude80\u02c2)": 0.0,
       "(\uff61\u02c3\u203f\u02c2\uff61)": 0.0,
       "(\u02f6\u1d54\u203f\u1d54\u02f6)": 0.0,
@@ -68,48 +68,48 @@
     "pcs": [
       {
         "pc": 1,
-        "explained_variance_ratio": 0.2890456020832062,
-        "eta_squared": 0.9342163801193237
+        "explained_variance_ratio": 0.28924131393432617,
+        "eta_squared": 0.9346073865890503
       },
       {
         "pc": 2,
-        "explained_variance_ratio": 0.18707142770290375,
-        "eta_squared": 0.8508289456367493
+        "explained_variance_ratio": 0.18739865720272064,
+        "eta_squared": 0.8509233593940735
       },
       {
         "pc": 3,
-        "explained_variance_ratio": 0.10983628034591675,
-        "eta_squared": 0.7947379946708679
+        "explained_variance_ratio": 0.10966508090496063,
+        "eta_squared": 0.794825553894043
       },
       {
         "pc": 4,
-        "explained_variance_ratio": 0.0657387375831604,
-        "eta_squared": 0.6983186602592468
+        "explained_variance_ratio": 0.06563275307416916,
+        "eta_squared": 0.698548436164856
       },
       {
         "pc": 5,
-        "explained_variance_ratio": 0.049567654728889465,
-        "eta_squared": 0.6744080781936646
+        "explained_variance_ratio": 0.0494939386844635,
+        "eta_squared": 0.6742671132087708
       }
     ],
-    "weighted_eta2_top_k": 0.5958234007655117,
-    "topk_explained_variance": 0.7012596726417542,
-    "weighted_eta2_normalized": 0.8496473189752268
+    "weighted_eta2_top_k": 0.5961733642950016,
+    "topk_explained_variance": 0.7014317512512207,
+    "weighted_eta2_normalized": 0.8499378068237455
   },
   "centroid_approximation_quality": {
-    "n_rows": 881,
+    "n_rows": 882,
     "n_features": 301056,
     "face": {
-      "r2": 0.6274557813005546,
-      "mean_centered_cosine": 0.7834811844423236,
-      "median_centered_cosine": 0.8398540019989014,
-      "mean_error_over_baseline": 0.5928247570991516
+      "r2": 0.6278915743044005,
+      "mean_centered_cosine": 0.7837627171963778,
+      "median_centered_cosine": 0.8399823904037476,
+      "mean_error_over_baseline": 0.59242844581604
     },
     "quadrant": {
-      "r2": 0.5862067471042143,
-      "mean_centered_cosine": 0.7549038835537961,
-      "median_centered_cosine": 0.7689315676689148,
-      "mean_error_over_baseline": 0.6359753608703613
+      "r2": 0.586589374389825,
+      "mean_centered_cosine": 0.7552002039220598,
+      "median_centered_cosine": 0.768747866153717,
+      "mean_error_over_baseline": 0.6356673240661621
     }
   }
 }

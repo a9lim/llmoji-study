@@ -1,26 +1,26 @@
 # Claude per-project quadrants — ensemble predictions
 
 **Mode:** `ensemble`
-**Total emissions:** 3119  (unique kaomoji: 274)
+**Total emissions:** 3134  (unique kaomoji: 275)
 
 **Resolution sources:**
 
 | source | unique faces | emissions | share of total |
 |---|---:|---:|---:|
-| ensemble | 209 | 2995 | 96.0% |
-| unknown | 65 | 124 | 4.0% |
+| ensemble | 209 | 3006 | 95.9% |
+| unknown | 66 | 128 | 4.1% |
 
 ## Global distribution (all known emissions)
 
 | quadrant | count | share |
 |---|---:|---:|
 | HP | 71 | 2.4% |
-| LP | 506 | 16.9% |
+| LP | 507 | 16.9% |
 | HN-D | 89 | 3.0% |
-| HN-S | 418 | 14.0% |
-| LN | 351 | 11.7% |
-| NB | 1560 | 52.1% |
-| (unknown) | 124 | 4.0% of total |
+| HN-S | 418 | 13.9% |
+| LN | 353 | 11.7% |
+| NB | 1568 | 52.2% |
+| (unknown) | 128 | 4.1% of total |
 
 ## Per project (≥5 total emissions)
 
@@ -28,7 +28,7 @@ Cells = % of known emissions in each quadrant. Bold = modal quadrant. `gt` / `pr
 
 | project | n | gt | pred | ? | HP | LP | HN-D | HN-S | LN | NB | modal |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| llmoji-study | 1504 | 0 | 1436 | 68 | 1% | 14% | 1% | 14% | 10% | **60%** | NB (60%) |
+| llmoji-study | 1519 | 0 | 1447 | 72 | 1% | 14% | 1% | 14% | 10% | **60%** | NB (60%) |
 | llmoji | 420 | 0 | 416 | 4 | 2% | 24% | 2% | 15% | 13% | **45%** | NB (45%) |
 | saklas | 357 | 0 | 351 | 6 | 3% | 14% | 8% | 18% | 11% | **47%** | NB (47%) |
 | a9lim.github.io | 170 | 0 | 164 | 6 | 4% | 23% | 4% | 9% | 15% | **45%** | NB (45%) |
@@ -73,7 +73,7 @@ Cells = % of known emissions in each quadrant. Bold = modal quadrant. `gt` / `pr
 |---|---:|
 | `(◕‿◕✿)` | 124 |
 | `(｡・̀‿-)` | 74 |
-| `(｡・‿・｡)` | 45 |
+| `(｡・‿・｡)` | 46 |
 | `(´∀`)` | 39 |
 | `(´▽`)` | 23 |
 | `(‿‿‿)` | 21 |
@@ -120,14 +120,14 @@ Cells = % of known emissions in each quadrant. Bold = modal quadrant. `gt` / `pr
 | `(´-`)` | 15 |
 | `(¬‿¬)` | 14 |
 | `(´-ω-`)` | 13 |
+| `(◞‸◟)` | 9 |
 | `(;´д`)` | 8 |
 | `(;￣д￣)` | 8 |
-| `(◞‸◟)` | 7 |
 
 ### NB
 | kaomoji | count |
 |---|---:|
-| `(◕‿◕)` | 764 |
+| `(◕‿◕)` | 768 |
 | `(・‿・)` | 273 |
 | `(◠‿◠)` | 59 |
 | `(・_・)` | 54 |
@@ -135,5 +135,5 @@ Cells = % of known emissions in each quadrant. Bold = modal quadrant. `gt` / `pr
 | `(・ω・)` | 40 |
 | `(๑・̀ㅂ・́)` | 39 |
 | `(✿◠‿◠)` | 26 |
+| `(◕ω◕)` | 26 |
 | `(・∀・)` | 24 |
-| `(◕ω◕)` | 22 |

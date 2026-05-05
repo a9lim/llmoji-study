@@ -9,7 +9,7 @@ every v3 analysis script.
 After `session.generate()`,
 `llmoji_study.hidden_capture.read_after_generate(session)` reads saklas's
 per-token last-position buckets and writes `(h_first, h_last, h_mean[, per_token])`
-per probe layer to `data/hidden/<experiment>/<row_uuid>.npz`. The default
+per probe layer to `data/local/hidden/<experiment>/<row_uuid>.npz`. The default
 since the 2026-05-02 perf batch is the three aggregates only — ~700 KB
 per row vs the earlier ~20–70 MB with the full per-token trace included
 (60× shrink; gates on `run_sample(store_full_trace=...)`). Smoke (`99`)
@@ -82,7 +82,7 @@ Effect on form counts:
   word-joiner-decorated → n=16, `(´・ω・`)` ↔ `(´･ω･`)` → n=17.
 - Ministral pilot: 9 → 9 (no merges available at this N).
 - Claude-faces: contributor-side canonicalization in `llmoji analyze`
-  before upload; `06_claude_hf_pull.py` re-canonicalizes on the way in
+  before upload; `60_corpus_pull.py` re-canonicalizes on the way in
   (in case bundles were produced under different package versions). The
   pre-refactor 160 → 144 row collapse no longer applies — corpus arrives
   canonical.

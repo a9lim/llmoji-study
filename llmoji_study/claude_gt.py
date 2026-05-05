@@ -10,7 +10,7 @@ mostly reflects v3 prompt distribution.
 
 Run layout (post 2026-05-04 sequential-run scaling protocol):
 
-    data/claude-runs/
+    data/harness/claude-runs/
         run-0.jsonl        # original 120-gen pilot, block-staged
         run-0_summary.tsv
         run-1.jsonl        # subsequent runs: 120 gens, no block stage
@@ -18,7 +18,7 @@ Run layout (post 2026-05-04 sequential-run scaling protocol):
         ...
 
 Sequential runs are numbered; saturation is checked between runs by
-``scripts/harness/25_groundtruth_compare_runs.py``. The GT map is the
+``scripts/harness/10_emit_analysis.py``. The GT map is the
 union over all runs on disk — every additional run can only add or
 sharpen face-quadrant evidence.
 
@@ -38,8 +38,8 @@ from llmoji.taxonomy import canonicalize_kaomoji
 
 from llmoji_study.config import DATA_DIR
 
-CLAUDE_RUNS_DIR = DATA_DIR / "claude-runs"
-CLAUDE_RUNS_INTROSPECTION_DIR = DATA_DIR / "claude-runs-introspection"
+CLAUDE_RUNS_DIR = DATA_DIR / "harness" / "claude-runs"
+CLAUDE_RUNS_INTROSPECTION_DIR = DATA_DIR / "harness" / "claude-runs-introspection"
 
 # Backward-compat alias. Prefer CLAUDE_RUNS_DIR / load_all_runs going
 # forward; this points at run-0 specifically and exists only so older
@@ -123,7 +123,7 @@ def _load_face_per_quadrant_counts(
 
     ``include_introspection``: when True (default), also pool the
     introspection-arm runs in
-    ``data/claude-runs-introspection/``. The introspection arm uses a
+    ``data/harness/claude-runs-introspection/``. The introspection arm uses a
     different preamble but the same affective prompts, so the per-face
     per-quadrant emission counts are validly poolable for
     distribution-shape estimation. Set False for a "naturalistic-only,
@@ -229,7 +229,7 @@ def load_claude_gt_distribution(
     distribution-vs-distribution comparison.
 
     ``include_introspection``: when True (default), pools the
-    introspection-arm runs (data/claude-runs-introspection/) into the
+    introspection-arm runs (data/harness/claude-runs-introspection/) into the
     GT alongside naturalistic. Both arms emit kaomoji on the same
     affective prompts; pooling is honest for distribution-shape
     estimation. Set False if you want a deployment-shaped GT (no

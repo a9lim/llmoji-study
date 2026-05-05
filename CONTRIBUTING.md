@@ -94,7 +94,7 @@ You need:
    Add `your_short_name` to the `LLMOJI_MODEL` env-var docstring.
 2. **Smoke test.** Verifies the wiring:
    ```
-   LLMOJI_MODEL=your_short_name python scripts/local/99_hidden_state_smoke.py
+   LLMOJI_MODEL=your_short_name python scripts/local/90_hidden_state_smoke.py
    ```
    Generates 5 samples across quadrants, checks probe round-trip to
    ~1e-7 tolerance, validates sidecar shapes. ~5 min.
@@ -107,22 +107,21 @@ You need:
    models for cross-model CKA:
    ```
    LLMOJI_MODEL=your_short_name LLMOJI_PILOT_GENS=1 \
-     python scripts/local/03_emotional_run.py
+     python scripts/local/00_emit.py
    ```
    ~25 minutes on M5 Max-class hardware for a 14B model.
 5. **Pilot analysis.** The chain auto-discovers any model with v3
    data on disk:
    ```
-   python scripts/local/21_v3_layerwise_emergence.py    # silhouette → identify preferred_layer
-   python scripts/local/23_v3_cross_model_alignment.py  # gemma↔qwen↔your_model CKA
-   python scripts/local/30_rule3_dominance_check.py     # rule 3b verdict
+   python scripts/local/20_v3_layerwise_emergence.py    # silhouette → identify preferred_layer
+   python scripts/local/22_v3_cross_model_alignment.py  # gemma↔qwen↔your_model CKA
    ```
    Update `preferred_layer` in your `ModelPaths` entry from the
    layer-sweep peak.
 6. **Gating.** Apply your pre-registered thresholds. If pass, write
    the supplementary design doc and run main (N=800):
    ```
-   LLMOJI_MODEL=your_short_name python scripts/local/03_emotional_run.py
+   LLMOJI_MODEL=your_short_name python scripts/local/00_emit.py
    ```
    ~3 hours for a 14B model. Resumable — if it dies, just rerun.
 7. **Document.** Add a "Pilot v3 — your-model" section to

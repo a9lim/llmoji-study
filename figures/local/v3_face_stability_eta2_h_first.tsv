@@ -1,0 +1,36 @@
+model	kind	factor	given	eta2	n_groups	n_rows
+gemma	marginal	face		0.57341	68	960
+gemma	marginal	prompt_id		1.00000	120	960
+gemma	marginal	quadrant_split		0.58639	6	960
+gemma	marginal	seed		0.00000	8	960
+gemma	conditional	face	prompt_id		68	960
+gemma	conditional	quadrant_split	prompt_id		6	960
+gemma	conditional	face	quadrant_split	0.16297	68	960
+qwen	marginal	face		0.57525	143	949
+qwen	marginal	prompt_id		1.00000	120	949
+qwen	marginal	quadrant_split		0.61156	6	949
+qwen	marginal	seed		0.00011	8	949
+qwen	conditional	face	prompt_id		143	949
+qwen	conditional	quadrant_split	prompt_id		6	949
+qwen	conditional	face	quadrant_split	0.20712	143	949
+ministral	marginal	face		0.21723	95	900
+ministral	marginal	prompt_id		1.00000	120	900
+ministral	marginal	quadrant_split		0.38521	6	900
+ministral	marginal	seed		0.00151	8	900
+ministral	conditional	face	prompt_id		95	900
+ministral	conditional	quadrant_split	prompt_id		6	900
+ministral	conditional	face	quadrant_split	0.13375	95	900
+gpt_oss_20b	marginal	face		0.24485	149	959
+gpt_oss_20b	marginal	prompt_id		1.00000	120	959
+gpt_oss_20b	marginal	quadrant_split		0.27826	6	959
+gpt_oss_20b	marginal	seed		0.00001	8	959
+gpt_oss_20b	conditional	face	prompt_id		149	959
+gpt_oss_20b	conditional	quadrant_split	prompt_id		6	959
+gpt_oss_20b	conditional	face	quadrant_split	0.18001	149	959
+granite	marginal	face		0.47065	99	699
+granite	marginal	prompt_id		1.00000	117	699
+granite	marginal	quadrant_split		0.51359	6	699
+granite	marginal	seed		0.00372	8	699
+granite	conditional	face	prompt_id		99	699
+granite	conditional	quadrant_split	prompt_id		6	699
+granite	conditional	face	quadrant_split	0.21004	99	699

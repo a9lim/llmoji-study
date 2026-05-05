@@ -66,7 +66,7 @@ modal quadrant per face, not a pooled measure dominated by v3
 prompt distribution.
 
 New helper module: `llmoji_study/claude_gt.py::load_claude_gt(floor=1)`
-reads the union of `data/claude-runs/run-*.jsonl` (post-2026-05-04
+reads the union of `data/harness/claude-runs/run-*.jsonl` (post-2026-05-04
 sequential-run scaling protocol; pre-protocol the path was
 `data/claude_groundtruth_pilot.jsonl`), runs each `first_word`
 through `canonicalize_kaomoji` (the pilot data ships uncanonicalized;
@@ -234,7 +234,7 @@ which is consistent with the noise-floor interpretation.
 
 ## Followups
 
-- Re-run `harness/22_claude_per_project_quadrants.py` on the new
+- Re-run `harness/66_per_project_quadrants.py` on the new
   6-model top-k=5 ensemble to refresh the per-project Claude analysis.
 - Consider promoting `--summary-topk 5` to the default in script 50.
   Backward compat would break — the canonical

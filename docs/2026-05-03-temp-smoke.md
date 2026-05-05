@@ -2,7 +2,7 @@
 
 **Status:** EXECUTED 2026-05-03 — gemma + qwen pilots fired path-A
 (temp doesn't materially shift kaomoji distribution at h_first).
-Verdict captured in `data/temp_smoke_verdict.md`; full v3 main rerun
+Verdict captured in `data/local/temp_smoke_verdict.md`; full v3 main rerun
 at T=1.0 followed and now lives at `data/{gemma,qwen,ministral,
 gpt_oss_20b,granite}_emotional_raw.jsonl` (legacy T=0.7 archived as
 `*_temp0.7.{jsonl,tsv}`).
@@ -75,7 +75,7 @@ output: data/{gemma,qwen}_temp1_pilot.jsonl  (suffix to avoid
 ## Comparison data
 
 **T=0.7 baseline**: existing seed=0 rows from
-`data/{short}_emotional_raw.jsonl` (the v3 main runs). Restricting
+`data/local/{short}/emotional_raw.jsonl` (the v3 main runs). Restricting
 to seed=0 gives an apples-to-apples 1-seed marginal at T=0.7 — same
 N as the smoke, no double-counting.
 
@@ -172,22 +172,22 @@ plus a one-line override for the output path suffix:
 ```bash
 LLMOJI_MODEL=gemma LLMOJI_PILOT_GENS=1 \
     LLMOJI_OUT_SUFFIX=temp1_pilot \
-    .venv/bin/python scripts/local/03_emotional_run.py
+    .venv/bin/python scripts/local/00_emit.py
 
 LLMOJI_MODEL=qwen LLMOJI_PILOT_GENS=1 \
     LLMOJI_OUT_SUFFIX=temp1_pilot \
-    .venv/bin/python scripts/local/03_emotional_run.py
+    .venv/bin/python scripts/local/00_emit.py
 ```
 
-Followed by `scripts/local/42_temp_smoke_compare.py` (to be
+Followed by `scripts/local/92_temp_smoke.py` (to be
 written) which:
 
 1. Loads `data/{short}_temp1_pilot.jsonl` (T=1.0) and seed=0
-   subset of `data/{short}_emotional_raw.jsonl` (T=0.7).
+   subset of `data/local/{short}/emotional_raw.jsonl` (T=0.7).
 2. Computes per-quadrant marginal face distributions for both.
 3. Computes cross-seed JSD floor from seeds 0..7 of v3 main.
 4. Evaluates all 3 gates per quadrant per model.
-5. Writes `data/temp_smoke_verdict.md` with path classification
+5. Writes `data/local/temp_smoke_verdict.md` with path classification
    per cell + overall recommendation.
 
 The `LLMOJI_OUT_SUFFIX` env var requires a small patch to script

@@ -1,6 +1,6 @@
 """Pipeline primitives for the eriskii-replication experiment.
 
-Three primitives consumed by ``scripts/16_eriskii_replication.py``:
+Three primitives consumed by ``scripts/64_eriskii_replication.py``:
 
   - :func:`compute_axis_vectors` — embed each ``(positive, negative)``
     anchor pair, return the L2-normalized difference per axis.

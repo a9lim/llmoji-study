@@ -43,7 +43,7 @@ LLMOJI_PILOT_GENS=1, gemma + qwen + ministral, sequential
 ## Pre-registered gates
 
 All comparisons against the prior 800-row main-run sidecars at
-`data/hidden/v3{,_qwen,_ministral}_pre_cleanliness/` (preserved on
+`data/local/hidden/v3{,_qwen,_ministral}_pre_cleanliness/` (preserved on
 disk, just out of the canonical loader path). For apples-to-apples
 N, prior-data baselines are computed on a 1-seed-per-prompt
 subsample of the 800-row data unless noted.
@@ -149,7 +149,7 @@ trial we've run.
 - `llmoji_study/analysis.py` — docstring updated ("5-axis"
   → generic "per-row probe-score").
 - Prior data backed up to `data/*_pre_cleanliness*` and
-  `data/hidden/v3{,_qwen,_ministral}_pre_cleanliness/` so the pilot
+  `data/local/hidden/v3{,_qwen,_ministral}_pre_cleanliness/` so the pilot
   doesn't conflict with the resume-skip logic on overlapping
   `(prompt_id, seed)` keys.
 - This doc.

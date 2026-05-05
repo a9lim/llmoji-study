@@ -1,10 +1,10 @@
 {
   "model": "qwen",
   "rep": "h_first.layer-stack",
-  "n_rows_total": 948,
+  "n_rows_total": 949,
   "n_rows_kept": 813,
   "min_n": 5,
-  "n_faces_total": 142,
+  "n_faces_total": 143,
   "n_faces_kept": 43,
   "hidden_to_face": {
     "accuracy": 0.2656826568265683,
@@ -61,9 +61,9 @@
     }
   },
   "hidden_to_quadrant": {
-    "accuracy": 0.9852320675105485,
-    "macro_f1": 0.9840413234578899,
-    "majority_baseline": 0.33544303797468356,
+    "accuracy": 0.9852476290832455,
+    "macro_f1": 0.9840752764330192,
+    "majority_baseline": 0.3350895679662803,
     "uniform_baseline": 0.2,
     "n_classes": 5,
     "n_splits": 5,
@@ -71,8 +71,8 @@
     "per_class_recall": {
       "HN": 1.0,
       "HP": 1.0,
+      "LN": 0.9493670886075949,
       "LP": 1.0,
-      "LN": 0.9490445859872612,
       "NB": 0.9617834394904459
     }
   },
@@ -80,33 +80,33 @@
     "pcs": [
       {
         "pc": 1,
-        "explained_variance_ratio": 0.3118034899234772,
-        "eta_squared": 0.8516659736633301
+        "explained_variance_ratio": 0.3118036687374115,
+        "eta_squared": 0.8516660928726196
       },
       {
         "pc": 2,
-        "explained_variance_ratio": 0.17737026512622833,
-        "eta_squared": 0.7257518172264099
+        "explained_variance_ratio": 0.17737030982971191,
+        "eta_squared": 0.7257517576217651
       },
       {
         "pc": 3,
-        "explained_variance_ratio": 0.09686422348022461,
-        "eta_squared": 0.6225400567054749
+        "explained_variance_ratio": 0.09686434268951416,
+        "eta_squared": 0.622540295124054
       },
       {
         "pc": 4,
-        "explained_variance_ratio": 0.06706634908914566,
-        "eta_squared": 0.48711004853248596
+        "explained_variance_ratio": 0.06706639379262924,
+        "eta_squared": 0.48710983991622925
       },
       {
         "pc": 5,
-        "explained_variance_ratio": 0.04216725751757622,
-        "eta_squared": 0.36613228917121887
+        "explained_variance_ratio": 0.0421672984957695,
+        "eta_squared": 0.3661327064037323
       }
     ],
-    "weighted_eta2_top_k": 0.5026885613353965,
-    "topk_explained_variance": 0.6952716112136841,
-    "weighted_eta2_normalized": 0.7230103361445902
+    "weighted_eta2_top_k": 0.5026889103547745,
+    "topk_explained_variance": 0.6952720284461975,
+    "weighted_eta2_normalized": 0.7230104042560002
   },
   "centroid_approximation_quality": {
     "n_rows": 813,

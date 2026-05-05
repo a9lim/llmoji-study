@@ -228,11 +228,11 @@ sneaks under the noise floor.
 
 ## Outputs
 
-- `data/claude_disclosure_pilot.jsonl` — one row per generation:
+- `data/harness/claude_disclosure_pilot.jsonl` — one row per generation:
   `prompt_id`, `quadrant`, `condition`, `seed`, `prompt_text`,
   `response_text`, `first_word` (canonicalized first kaomoji),
   `model_id`, `ts`, `error?` (only on failed cells).
-- `data/claude_disclosure_pilot_summary.tsv` — per (category × condition)
+- `data/harness/claude_disclosure_pilot_summary.tsv` — per (category × condition)
   modal kaomoji + count distribution + JSD vs the matched
   category-other-condition cell.
 - `logs/claude_disclosure_pilot.log` — tee'd stdout for the run.
@@ -349,9 +349,9 @@ follow-up discussion resolved as:
 
 ### Outputs on disk
 
-- `data/claude_disclosure_pilot.jsonl` — 300 rows, post-v2 first_word
+- `data/harness/claude_disclosure_pilot.jsonl` — 300 rows, post-v2 first_word
   + `first_word_v1` audit field
-- `data/claude_disclosure_pilot_summary.tsv` — per (category × condition)
+- `data/harness/claude_disclosure_pilot_summary.tsv` — per (category × condition)
 - `logs/claude_disclosure_pilot.log` — v0 (N=3) tee'd output
 - `logs/claude_disclosure_pilot_n10.log` — N=10 resume output
 - `logs/disclosure_noise_floor.log` /

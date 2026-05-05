@@ -262,7 +262,7 @@ def load_emotional_features(
     jsonl_path: str | Path,
     data_dir: Path,
     *,
-    experiment: str = "v3",
+    experiment: str = "gemma",
     which: str = "h_first",
     layer: int | None = None,
     split_hn: bool = False,
@@ -333,7 +333,8 @@ def load_emotional_features_all_layers(
     Loads the v3 all-layers hidden-state tensor for ``short``, applies
     the standard canonicalize + kaomoji-start row filter, optionally
     drops untagged HN rows in split mode. Cached at
-    ``data/cache/v3_<short>_h_mean_all_layers.npz`` (legacy filename;
+    ``data/local/cache/<short>_h_mean_all_layers.npz`` (or
+    ``<short>_<suffix>_h_mean_all_layers.npz`` for primed-variant runs;
     contents are whatever ``which`` is set to).
 
     Returns ``(df, X3, layer_idxs)`` where ``X3.shape == (n, n_layers,
@@ -353,22 +354,21 @@ def load_emotional_features_all_layers(
     if not M.emotional_data_path.exists():
         raise FileNotFoundError(
             f"no v3 data at {M.emotional_data_path}; "
-            f"run LLMOJI_MODEL={short} python scripts/local/03_emotional_run.py"
+            f"run LLMOJI_MODEL={short} python scripts/local/00_emit.py"
         )
 
-    # Cache filename: ``v3{_<suffix>}_<short>_h_mean_all_layers.npz``.
-    # When LLMOJI_OUT_SUFFIX is set on the active model, the suffix is
-    # inserted between the v3-version and short_name so primed and
-    # unprimed runs don't share cache state. Back-compat: unsuffixed
-    # caches keep their original names (``v3_gemma_h_mean_all_layers.npz``
-    # etc.). Reading the env directly here (rather than parsing
-    # ``M.experiment``) avoids the registered-experiment-already-contains-
-    # short_name double-naming for non-gemma models (e.g. qwen's
-    # registered experiment is ``v3_qwen``).
+    # Cache filename: ``<short>{_<suffix>}_h_mean_all_layers.npz`` under
+    # ``data/local/cache/``. When LLMOJI_OUT_SUFFIX is set on the active
+    # model, the suffix is appended to short_name so primed and unprimed
+    # runs don't share cache state. The post-2026-05-05 layout dropped
+    # the historical ``v3_`` filename prefix along with the implicit
+    # gemma-default file naming. Reading the env directly here (rather
+    # than using ``M.experiment``) keeps cross-model loads consistent
+    # when ``$LLMOJI_OUT_SUFFIX`` is set on a different active model.
     import os as _os
     _suffix = _os.environ.get("LLMOJI_OUT_SUFFIX", "")
     _suffix_part = f"_{_suffix}" if _suffix and short == _os.environ.get("LLMOJI_MODEL", "gemma") else ""
-    cache_path = DATA_DIR / "cache" / f"v3{_suffix_part}_{short}_h_mean_all_layers.npz"
+    cache_path = DATA_DIR / "local" / "cache" / f"{short}{_suffix_part}_h_mean_all_layers.npz"
     if rebuild and cache_path.exists():
         cache_path.unlink()
         meta = cache_path.with_suffix(".meta.jsonl")

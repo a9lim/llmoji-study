@@ -1,7 +1,0 @@
-category	condition	n	n_unique_faces	non_emission_rate	modal_face	modal_count	modal_share	jsd_vs_other_cond_in_bits	modal_agrees_with_other_cond
-HP	direct	50	19	0.020	(ノ◕ヮ◕)	12	0.240	0.4672	False
-HP	framed	50	12	0.000	٩(◕‿◕)۶	10	0.200	0.4672	False
-LP	direct	50	22	0.000	(´｡・‿・｡`)	8	0.160	0.5042	False
-LP	framed	50	21	0.000	(´▽`)	9	0.180	0.5042	False
-NB	direct	50	11	0.000	(・ω・)	13	0.260	0.3671	False
-NB	framed	50	10	0.000	(・_・)	29	0.580	0.3671	False

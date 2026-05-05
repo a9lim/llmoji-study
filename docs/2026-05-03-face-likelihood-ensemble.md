@@ -371,8 +371,8 @@ Open questions before building:
 
 - `data/face_likelihood_<m>{,_pilot}_summary.tsv` — per-face per-encoder
   quadrant prediction + softmax (one TSV per encoder per mode)
-- `data/face_likelihood_subset_search.tsv` — every subset's accuracy + κ
-- `data/face_likelihood_subset_search.md` — top-K subsets, per-encoder κ,
+- `data/local/face_likelihood_subset_search.tsv` — every subset's accuracy + κ
+- `data/local/face_likelihood_subset_search.md` — top-K subsets, per-encoder κ,
   pairwise κ matrix, per-size best, encoder inclusion frequency
 - `data/face_likelihood_cross_emit_sanity.{tsv,md}` — accuracy + κ per
   (encoder × emit-origin) partition
@@ -399,16 +399,16 @@ Open questions before building:
   late evening; subsumed by 53 (which evaluates singletons + every
   subset including the original three-way) under the soft-everywhere
   methodology shift
-- `scripts/local/53_face_likelihood_subset_search.py` — exhaustive
+- `scripts/52_subset_search.py` — exhaustive
   2^N − 1 subset search by mean JSD + similarity (refactored
   2026-05-04 from hard-accuracy + κ to distribution-vs-distribution)
-- `scripts/local/54_cross_emit_sanity.py` — per-(encoder × emit-origin)
+- `scripts/local/51_cross_emit_sanity.py` — per-(encoder × emit-origin)
   accuracy and κ
-- `scripts/local/55_topk_pooling.py` — top-k per-prompt aggregation
+- `scripts/53_topk_pooling.py` — top-k per-prompt aggregation
   experiment
-- `scripts/local/56_ensemble_predict.py` — final per-face ensemble
+- `scripts/54_ensemble_predict.py` — final per-face ensemble
   predictions for a winning subset
-- `scripts/harness/22_claude_per_project_quadrants.py` — applies
+- `scripts/66_per_project_quadrants.py` — applies
   ensemble predictions to a9's `~/.claude/kaomoji-journal.jsonl`,
   outputs per-project + global quadrant histograms
 

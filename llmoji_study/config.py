@@ -211,16 +211,19 @@ PILOT_RAW_PATH = DATA_DIR / "pilot_raw.jsonl"
 # as of the NB-quadrant addition (was 80 × 8 = 640 pre-NB).
 EMOTIONAL_CONDITION = "kaomoji_prompted"
 EMOTIONAL_SEEDS_PER_CELL = 8
-EMOTIONAL_DATA_PATH = DATA_DIR / "emotional_raw.jsonl"
-EMOTIONAL_SUMMARY_PATH = DATA_DIR / "emotional_summary.tsv"
+EMOTIONAL_DATA_PATH = DATA_DIR / "local" / "gemma" / "emotional_raw.jsonl"
+EMOTIONAL_SUMMARY_PATH = DATA_DIR / "local" / "gemma" / "emotional_summary.tsv"
 
 # --- Hidden-state sidecar capture (post-refactor) ---
 # Pilot/emotional runners pass hidden_dir=DATA_DIR and experiment=... to
-# run_sample; sidecars land at DATA_DIR/hidden/<experiment>/<uuid>.npz.
+# run_sample; sidecars land at DATA_DIR/local/hidden/<experiment>/<uuid>.npz.
 # Experiment name is separate from the data file name so smoke-test
-# captures don't collide with pilot captures.
+# captures don't collide with pilot captures. Post-2026-05-05 layout
+# refactor: experiment names are model-keyed (`gemma`, `qwen`, ...) with
+# optional `_<suffix>` for variants — the historical `v3_` prefix was
+# dropped along with the implicit-gemma-default file naming.
 PILOT_EXPERIMENT = "v1v2"
-EMOTIONAL_EXPERIMENT = "v3"
+EMOTIONAL_EXPERIMENT = "gemma"
 
 # --- claude-faces experiment (HF-corpus-driven, post-2026-04-27 refactor) ---
 #
@@ -239,20 +242,20 @@ EMOTIONAL_EXPERIMENT = "v3"
 # with backwards-compat for 1.0 bundles whose synthesizer output is in
 # a single ``descriptions.jsonl`` per bundle.
 #
-# `scripts/06_claude_hf_pull.py` snapshot-downloads to
+# `scripts/60_corpus_pull.py` snapshot-downloads to
 # ``CLAUDE_DATASET_DIR``, walks every bundle's ``*.jsonl``, then
 # flattens by canonical kaomoji form (pooling across contributors and
 # source models) into ``CLAUDE_DESCRIPTIONS_PATH`` for the rest of
 # the pipeline. Per-source-model metadata is preserved in each
 # per-description record so downstream can group / filter by it.
 CLAUDE_HF_REPO = "a9lim/llmoji"
-CLAUDE_DATASET_DIR = DATA_DIR / "hf_dataset"
-CLAUDE_DESCRIPTIONS_PATH = DATA_DIR / "claude_descriptions.jsonl"
-CLAUDE_FACES_EMBED_DESCRIPTION_PATH = DATA_DIR / "claude_faces_embed_description.parquet"
+CLAUDE_DATASET_DIR = DATA_DIR / "harness" / "hf_dataset"
+CLAUDE_DESCRIPTIONS_PATH = DATA_DIR / "harness" / "claude_descriptions.jsonl"
+CLAUDE_FACES_EMBED_DESCRIPTION_PATH = DATA_DIR / "harness" / "claude_faces_embed_description.parquet"
 
 # --- eriskii-replication experiment (description-based embeddings + axes) ---
 # Locked Haiku version, used as the model id for per-cluster labeling
-# in `scripts/16_eriskii_replication.py` (research-side decision —
+# in `scripts/64_eriskii_replication.py` (research-side decision —
 # unrelated to whichever synthesizer the corpus contributors used).
 # Re-exported from the `llmoji` PyPI package's `synth_prompts` module
 # (renamed from `haiku_prompts` in the v1.1 split that made the
@@ -283,9 +286,9 @@ ERISKII_AXES = [
 # eriskii_user_kaomoji_axis_corr.tsv; the HF dataset doesn't carry
 # per-row model / project / user-text fields (everything is pooled
 # per-machine before upload), so those analyses are gone.
-ERISKII_AXES_TSV = DATA_DIR / "eriskii_axes.tsv"
-ERISKII_CLUSTERS_TSV = DATA_DIR / "eriskii_clusters.tsv"
-ERISKII_COMPARISON_MD = DATA_DIR / "eriskii_comparison.md"
+ERISKII_AXES_TSV = DATA_DIR / "harness" / "eriskii_axes.tsv"
+ERISKII_CLUSTERS_TSV = DATA_DIR / "harness" / "eriskii_clusters.tsv"
+ERISKII_COMPARISON_MD = DATA_DIR / "harness" / "eriskii_comparison.md"
 
 
 # ---------------------------------------------------------------------------
@@ -315,7 +318,7 @@ class ModelPaths:
     (see CLAUDE.md gotcha: `safe_model_id` is case-preserving).
     `short_name` is the slug used in derived paths.
     `experiment` is the hidden-state-sidecar subdir name under
-    `data/hidden/`. Distinct experiment names per model are required
+    `data/local/hidden/`. Distinct experiment names per model are required
     so sidecars don't collide.
 
     Note (2026-05-04): the former `preferred_layer` field has been
@@ -345,196 +348,134 @@ class ModelPaths:
     probe_calibrated: bool = True
 
 
+def _mp(short: str, model_id: str, **kwargs) -> ModelPaths:
+    """Build a ModelPaths with paths derived uniformly from `short`.
+
+    Post-2026-05-05 layout: data is segregated by model under
+    ``data/local/<short>/``; the historical model-prefixed flat layout
+    (e.g. ``data/local/<short>/emotional_raw.jsonl``) is gone, including the
+    implicit-gemma-default special case (gemma is now just another entry
+    that follows the rule). Hidden-state sidecars live under
+    ``data/local/hidden/<experiment>/`` and the experiment name is just
+    the short_name (or ``<short>_<suffix>`` for variants — see
+    `resolve_model`). Pass any non-default `ModelPaths` field
+    (``use_saklas``, ``trust_remote_code``, ``probe_calibrated``) via
+    kwargs.
+    """
+    return ModelPaths(
+        model_id=model_id,
+        short_name=short,
+        emotional_data_path=DATA_DIR / "local" / short / "emotional_raw.jsonl",
+        emotional_summary_path=DATA_DIR / "local" / short / "emotional_summary.tsv",
+        experiment=short,
+        figures_dir=FIGURES_DIR / "local" / short,
+        **kwargs,
+    )
+
+
+# Comments below each entry document silhouette-peak / arch / calibration
+# notes that drove probe-layer choices. Preserved through the registry
+# refactor (2026-05-05) — see git log for previous verbose-form entries.
 MODEL_REGISTRY: dict[str, ModelPaths] = {
-    "gemma": ModelPaths(
-        model_id="google/gemma-4-31b-it",
-        short_name="gemma",
-        emotional_data_path=DATA_DIR / "emotional_raw.jsonl",
-        emotional_summary_path=DATA_DIR / "emotional_summary.tsv",
-        experiment="v3",
-        figures_dir=FIGURES_DIR / "local" / "gemma",
-        # Under h_first @ T=1.0 (post-2026-05-04 rerun): silhouette peaks
-        # at L40 (0.371), with a bimodal pattern — primary peak at L39-41
-        # (~70% depth) and a secondary plateau at L56-57 (~99% depth).
-        # Top-5: L40, L39, L57, L41, L56. T=0.7 archive peaked at L50
-        # (0.235); the rerun's wider face diversity revealed the deeper
-        # bimodality. Picked the primary L40 peak.
-    ),
-    "qwen": ModelPaths(
-        model_id="Qwen/Qwen3.6-27B",
-        short_name="qwen",
-        emotional_data_path=DATA_DIR / "qwen_emotional_raw.jsonl",
-        emotional_summary_path=DATA_DIR / "qwen_emotional_summary.tsv",
-        experiment="v3_qwen",
-        figures_dir=FIGURES_DIR / "local" / "qwen",
-        # Under h_first @ T=1.0 (post-2026-05-04 rerun): silhouette peaks
-        # at L61 (0.373), with a broad plateau across L54-L61 (top-5 all
-        # within 0.003 of each other: L61, L56, L59, L60, L54). T=0.7
-        # archive peaked at L59 (0.244); the L59→L61 shift is well inside
-        # plateau noise — picked L61 for the strict peak.
-    ),
-    "ministral": ModelPaths(
-        # Switched 2026-05-03 from Ministral-3-14B-Instruct-2512 (FP8-quantized,
-        # ~15GB on disk, slow on MPS due to scalar/CPU FP8→bf16 dequant kernels:
-        # ~15min for the 200-face pilot) to Ministral-3-14B-Reasoning-2512
-        # (native bf16, ~26GB on disk, same architecture: 40 layers, 5120
-        # hidden). The reasoning variant ships a `<think>...</think>` prefix
-        # by default; suppressed via build_chat_input(thinking=False) which
-        # honors enable_thinking=False on the chat template.
-        model_id="mistralai/Ministral-3-14B-Reasoning-2512",
-        short_name="ministral",
-        emotional_data_path=DATA_DIR / "ministral_emotional_raw.jsonl",
-        emotional_summary_path=DATA_DIR / "ministral_emotional_summary.tsv",
-        experiment="v3_ministral",
-        figures_dir=FIGURES_DIR / "local" / "ministral",
-        # Under h_first @ T=1.0 (post-2026-05-04 rerun): silhouette peaks
-        # at L13 (0.255) with a tight cluster at L10-L14 — top-5: L13,
-        # L12, L11, L14, L10. T=0.7 archive peaked at L20 (0.149);
-        # T=1.0's cleaner geometry surfaced a meaningfully shallower
-        # peak (~33% depth vs ~50%). The shift is real, not within
-        # plateau noise — see docs/findings.md "preferred_layer rerun".
-    ),
+    # Under h_first @ T=1.0 (post-2026-05-04 rerun): silhouette peaks
+    # at L40 (0.371), with a bimodal pattern — primary peak at L39-41
+    # (~70% depth) and a secondary plateau at L56-57 (~99% depth).
+    # Top-5: L40, L39, L57, L41, L56. T=0.7 archive peaked at L50
+    # (0.235); the rerun's wider face diversity revealed the deeper
+    # bimodality. Picked the primary L40 peak.
+    "gemma": _mp("gemma", "google/gemma-4-31b-it"),
+    # Under h_first @ T=1.0 (post-2026-05-04 rerun): silhouette peaks
+    # at L61 (0.373), with a broad plateau across L54-L61 (top-5 all
+    # within 0.003 of each other: L61, L56, L59, L60, L54). T=0.7
+    # archive peaked at L59 (0.244); the L59→L61 shift is well inside
+    # plateau noise — picked L61 for the strict peak.
+    "qwen": _mp("qwen", "Qwen/Qwen3.6-27B"),
+    # Switched 2026-05-03 from Ministral-3-14B-Instruct-2512 (FP8-quantized,
+    # ~15GB on disk, slow on MPS due to scalar/CPU FP8→bf16 dequant kernels:
+    # ~15min for the 200-face pilot) to Ministral-3-14B-Reasoning-2512
+    # (native bf16, ~26GB on disk, same architecture: 40 layers, 5120
+    # hidden). The reasoning variant ships a `<think>...</think>` prefix
+    # by default; suppressed via build_chat_input(thinking=False) which
+    # honors enable_thinking=False on the chat template.
+    # Under h_first @ T=1.0 (post-2026-05-04 rerun): silhouette peaks
+    # at L13 (0.255) with a tight cluster at L10-L14 — top-5: L13,
+    # L12, L11, L14, L10. T=0.7 archive peaked at L20 (0.149);
+    # T=1.0's cleaner geometry surfaced a meaningfully shallower
+    # peak (~33% depth vs ~50%). The shift is real, not within
+    # plateau noise — see docs/findings.md "preferred_layer rerun".
+    "ministral": _mp("ministral", "mistralai/Ministral-3-14B-Reasoning-2512"),
     # Uncalibrated v3-side models (no probe calibration, no v3 emission
     # run) — used in face_likelihood as additional voting encoders. Saklas
     # loads them but probes=[] is passed since no contrastive vectors
     # exist for these in ~/.saklas/vectors/default/.
-    "llama32_3b": ModelPaths(
-        model_id="meta-llama/Llama-3.2-3B-Instruct",
-        short_name="llama32_3b",
-        emotional_data_path=DATA_DIR / "llama32_3b_emotional_raw.jsonl",
-        emotional_summary_path=DATA_DIR / "llama32_3b_emotional_summary.tsv",
-        experiment="v3_llama32_3b",
-        figures_dir=FIGURES_DIR / "local" / "llama32_3b",
-        # 28 transformer layers; deepest = layer 28. Probe-calibrated
-        # 2026-05-03; v3 silhouette validation pending vocab pilot.
-    ),
-    "glm47_flash": ModelPaths(
-        model_id="zai-org/GLM-4.7-Flash",
-        short_name="glm47_flash",
-        emotional_data_path=DATA_DIR / "glm47_flash_emotional_raw.jsonl",
-        emotional_summary_path=DATA_DIR / "glm47_flash_emotional_summary.tsv",
-        experiment="v3_glm47_flash",
-        figures_dir=FIGURES_DIR / "local" / "glm47_flash",
-        # glm4_moe_lite, 47 layers. Probe-calibrated 2026-05-03; v3
-        # silhouette validation pending vocab pilot.
-    ),
-    "gpt_oss_20b": ModelPaths(
-        model_id="openai/gpt-oss-20b",
-        short_name="gpt_oss_20b",
-        emotional_data_path=DATA_DIR / "gpt_oss_20b_emotional_raw.jsonl",
-        emotional_summary_path=DATA_DIR / "gpt_oss_20b_emotional_summary.tsv",
-        experiment="v3_gpt_oss_20b",
-        figures_dir=FIGURES_DIR / "local" / "gpt_oss_20b",
-        # gpt_oss MoE, 24 layers. Probe-calibrated 2026-05-03; v3
-        # silhouette validation pending vocab pilot. MXFP4 dequant
-        # requires the torch.ldexp MPS fallback now in saklas.
-    ),
-    "deepseek_v2_lite": ModelPaths(
-        model_id="deepseek-ai/DeepSeek-V2-Lite-Chat",
-        short_name="deepseek_v2_lite",
-        emotional_data_path=DATA_DIR / "deepseek_v2_lite_emotional_raw.jsonl",
-        emotional_summary_path=DATA_DIR / "deepseek_v2_lite_emotional_summary.tsv",
-        experiment="v3_deepseek_v2_lite",
-        figures_dir=FIGURES_DIR / "local" / "deepseek_v2_lite",
-        # deepseek_v2 MoE, 27 layers. Probe-calibrated 2026-05-03; v3
-        # silhouette validation pending vocab pilot.
+    #
+    # 28 transformer layers; deepest = layer 28. Probe-calibrated
+    # 2026-05-03; v3 silhouette validation pending vocab pilot.
+    "llama32_3b": _mp("llama32_3b", "meta-llama/Llama-3.2-3B-Instruct"),
+    # glm4_moe_lite, 47 layers. Probe-calibrated 2026-05-03; v3
+    # silhouette validation pending vocab pilot.
+    "glm47_flash": _mp("glm47_flash", "zai-org/GLM-4.7-Flash"),
+    # gpt_oss MoE, 24 layers. Probe-calibrated 2026-05-03; v3
+    # silhouette validation pending vocab pilot. MXFP4 dequant
+    # requires the torch.ldexp MPS fallback now in saklas.
+    "gpt_oss_20b": _mp("gpt_oss_20b", "openai/gpt-oss-20b"),
+    # deepseek_v2 MoE, 27 layers. Probe-calibrated 2026-05-03; v3
+    # silhouette validation pending vocab pilot.
+    "deepseek_v2_lite": _mp(
+        "deepseek_v2_lite", "deepseek-ai/DeepSeek-V2-Lite-Chat",
         trust_remote_code=True,
     ),
-    "qwen35_27b": ModelPaths(
-        model_id="Qwen/Qwen3.5-27B",
-        short_name="qwen35_27b",
-        emotional_data_path=DATA_DIR / "qwen35_27b_emotional_raw.jsonl",
-        emotional_summary_path=DATA_DIR / "qwen35_27b_emotional_summary.tsv",
-        experiment="v3_qwen35_27b",
-        figures_dir=FIGURES_DIR / "local" / "qwen35_27b",
-        # Qwen3.5-27B (previous gen of Qwen3.6), text_config has 64 layers.
-        # Multimodal Qwen3_5ForConditionalGeneration wrapper.
+    # Qwen3.5-27B (previous gen of Qwen3.6), text_config has 64 layers.
+    # Multimodal Qwen3_5ForConditionalGeneration wrapper.
+    "qwen35_27b": _mp(
+        "qwen35_27b", "Qwen/Qwen3.5-27B",
         probe_calibrated=False,
     ),
-    "gemma3_27b": ModelPaths(
-        model_id="google/gemma-3-27b-it",
-        short_name="gemma3_27b",
-        emotional_data_path=DATA_DIR / "gemma3_27b_emotional_raw.jsonl",
-        emotional_summary_path=DATA_DIR / "gemma3_27b_emotional_summary.tsv",
-        experiment="v3_gemma3_27b",
-        figures_dir=FIGURES_DIR / "local" / "gemma3_27b",
-        # Gemma-3-27b-it (previous gen of Gemma-4-31b), text_config 62 layers.
-        # Multimodal Gemma3ForConditionalGeneration wrapper.
+    # Gemma-3-27b-it (previous gen of Gemma-4-31b), text_config 62 layers.
+    # Multimodal Gemma3ForConditionalGeneration wrapper.
+    "gemma3_27b": _mp(
+        "gemma3_27b", "google/gemma-3-27b-it",
         probe_calibrated=False,
     ),
-    "phi4_mini": ModelPaths(
-        model_id="microsoft/Phi-4-mini-instruct",
-        short_name="phi4_mini",
-        emotional_data_path=DATA_DIR / "phi4_mini_emotional_raw.jsonl",
-        emotional_summary_path=DATA_DIR / "phi4_mini_emotional_summary.tsv",
-        experiment="v3_phi4_mini",
-        figures_dir=FIGURES_DIR / "local" / "phi4_mini",
-        # phi3 arch, 32 hidden layers, 3072 hidden, bf16. Probe-calibrated
-        # for layers 2-29 (saklas vectors present); preferred_layer set
-        # to L23 by happy.sad diff_principal_projection peak (~0.53).
-        # Not v3-silhouette validated; vocab pilot first.
-    ),
-    "granite": ModelPaths(
-        model_id="ibm-granite/granite-4.1-30b",
-        short_name="granite",
-        emotional_data_path=DATA_DIR / "granite_emotional_raw.jsonl",
-        emotional_summary_path=DATA_DIR / "granite_emotional_summary.tsv",
-        experiment="v3_granite",
-        figures_dir=FIGURES_DIR / "local" / "granite",
-        # GraniteForCausalLM, dense 30B, 64 hidden layers, 4096 hidden,
-        # bf16. Probe-calibrated for layers 2-61 (saklas vectors
-        # present); preferred_layer set to L56 by happy.sad
-        # diff_principal_projection peak (~0.60). Not v3-silhouette
-        # validated; vocab pilot first.
-    ),
+    # phi3 arch, 32 hidden layers, 3072 hidden, bf16. Probe-calibrated
+    # for layers 2-29 (saklas vectors present); preferred_layer set
+    # to L23 by happy.sad diff_principal_projection peak (~0.53).
+    # Not v3-silhouette validated; vocab pilot first.
+    "phi4_mini": _mp("phi4_mini", "microsoft/Phi-4-mini-instruct"),
+    # GraniteForCausalLM, dense 30B, 64 hidden layers, 4096 hidden,
+    # bf16. Probe-calibrated for layers 2-61 (saklas vectors
+    # present); preferred_layer set to L56 by happy.sad
+    # diff_principal_projection peak (~0.60). Not v3-silhouette
+    # validated; vocab pilot first.
+    "granite": _mp("granite", "ibm-granite/granite-4.1-30b"),
     # Japanese-trained encoders for the face-input pipeline only —
     # NOT used in v3 (no probe calibration, no emission run). Both
     # bypass saklas and run through raw HF transformers.
-    "nemotron_jp": ModelPaths(
-        model_id="nvidia/NVIDIA-Nemotron-Nano-9B-v2-Japanese",
-        short_name="nemotron_jp",
-        emotional_data_path=DATA_DIR / "nemotron_jp_emotional_raw.jsonl",
-        emotional_summary_path=DATA_DIR / "nemotron_jp_emotional_summary.tsv",
-        experiment="v3_nemotron_jp",
-        figures_dir=FIGURES_DIR / "local" / "nemotron_jp",
-        # nemotron_h hybrid Mamba/attention, 56 hidden layers; deepest
-        # hidden_state = index 56 (after final layer).
-        use_saklas=False,
-        trust_remote_code=True,
+    #
+    # nemotron_h hybrid Mamba/attention, 56 hidden layers; deepest
+    # hidden_state = index 56 (after final layer).
+    "nemotron_jp": _mp(
+        "nemotron_jp", "nvidia/NVIDIA-Nemotron-Nano-9B-v2-Japanese",
+        use_saklas=False, trust_remote_code=True,
     ),
-    "rinna": ModelPaths(
-        model_id="rinna/japanese-gpt-neox-small",
-        short_name="rinna",
-        emotional_data_path=DATA_DIR / "rinna_emotional_raw.jsonl",
-        emotional_summary_path=DATA_DIR / "rinna_emotional_summary.tsv",
-        experiment="v3_rinna",
-        figures_dir=FIGURES_DIR / "local" / "rinna",
-        # GPTNeoX, 12 hidden layers; deepest hidden_state = index 12.
+    # GPTNeoX, 12 hidden layers; deepest hidden_state = index 12.
+    "rinna": _mp(
+        "rinna", "rinna/japanese-gpt-neox-small",
         use_saklas=False,
     ),
-    "rinna_jp_3_6b": ModelPaths(
-        model_id="rinna/japanese-gpt-neox-3.6b-instruction-ppo",
-        short_name="rinna_jp_3_6b",
-        emotional_data_path=DATA_DIR / "rinna_jp_3_6b_emotional_raw.jsonl",
-        emotional_summary_path=DATA_DIR / "rinna_jp_3_6b_emotional_summary.tsv",
-        experiment="v3_rinna_jp_3_6b",
-        figures_dir=FIGURES_DIR / "local" / "rinna_jp_3_6b",
-        # GPTNeoX 3.6B PPO-instruct, JP-only training corpus. No probe
-        # calibration; face_likelihood-only target. Run with
-        # ``--prompt-lang jp`` to test JP-translated kaomoji ask.
+    # GPTNeoX 3.6B PPO-instruct, JP-only training corpus. No probe
+    # calibration; face_likelihood-only target. Run with
+    # ``--prompt-lang jp`` to test JP-translated kaomoji ask.
+    "rinna_jp_3_6b": _mp(
+        "rinna_jp_3_6b", "rinna/japanese-gpt-neox-3.6b-instruction-ppo",
         use_saklas=False,
     ),
-    "rinna_bilingual_4b": ModelPaths(
-        model_id="rinna/bilingual-gpt-neox-4b-instruction-ppo",
-        short_name="rinna_bilingual_4b",
-        emotional_data_path=DATA_DIR / "rinna_bilingual_4b_emotional_raw.jsonl",
-        emotional_summary_path=DATA_DIR / "rinna_bilingual_4b_emotional_summary.tsv",
-        experiment="v3_rinna_bilingual_4b",
-        figures_dir=FIGURES_DIR / "local" / "rinna_bilingual_4b",
-        # GPTNeoX 4B PPO-instruct, EN+JP bilingual training. No probe
-        # calibration; face_likelihood-only target. Worth comparing
-        # ``--prompt-lang en`` vs ``--prompt-lang jp`` on this model
-        # since both languages are in distribution.
+    # GPTNeoX 4B PPO-instruct, EN+JP bilingual training. No probe
+    # calibration; face_likelihood-only target. Worth comparing
+    # ``--prompt-lang en`` vs ``--prompt-lang jp`` on this model
+    # since both languages are in distribution.
+    "rinna_bilingual_4b": _mp(
+        "rinna_bilingual_4b", "rinna/bilingual-gpt-neox-4b-instruction-ppo",
         use_saklas=False,
     ),
 }
@@ -563,17 +504,18 @@ def resolve_model(short: str) -> ModelPaths:
     active = os.environ.get("LLMOJI_MODEL", "gemma")
     out_suffix = os.environ.get("LLMOJI_OUT_SUFFIX")
     if out_suffix and short == active:
-        new_jsonl = M.emotional_data_path.parent / f"{M.short_name}_{out_suffix}.jsonl"
-        new_summary = (
-            M.emotional_summary_path.parent / f"{M.short_name}_{out_suffix}_summary.tsv"
-        )
-        new_experiment = f"{M.experiment}_{out_suffix}"
-        # Redirect figures to figures/local/<short>_<suffix>/ so analysis
-        # outputs from primed/variant runs don't clobber the canonical
-        # figures/local/<short>/ tree. Matches the data-file naming
-        # convention (e.g. data/gemma_intro_v7_primed.jsonl ↔
-        # figures/local/gemma_intro_v7_primed/).
-        new_figures = M.figures_dir.parent / f"{M.short_name}_{out_suffix}"
+        # Suffix variants get a sibling directory under data/local/ — so
+        # data/local/gemma/ and data/local/gemma_intro_v7_primed/ are
+        # parallel "models" sharing weights but differing in
+        # priming/condition. Within each dir, filenames are uniform
+        # (emotional_raw.jsonl, emotional_summary.tsv) — the variant
+        # identity lives in the directory name. Hidden sidecars and
+        # figures follow the same sibling pattern.
+        suffixed = f"{M.short_name}_{out_suffix}"
+        new_jsonl = DATA_DIR / "local" / suffixed / "emotional_raw.jsonl"
+        new_summary = DATA_DIR / "local" / suffixed / "emotional_summary.tsv"
+        new_experiment = suffixed
+        new_figures = FIGURES_DIR / "local" / suffixed
         M = dataclasses.replace(
             M,
             emotional_data_path=new_jsonl,
@@ -594,8 +536,9 @@ def current_model() -> ModelPaths:
     figures_dir) at the suffixed variant — e.g. with
     ``LLMOJI_OUT_SUFFIX=intro_v7_primed`` on gemma,
     ``M.emotional_data_path`` becomes
-    ``data/gemma_intro_v7_primed.jsonl`` and sidecar dirs land under
-    ``data/hidden/v3_intro_v7_primed/``. Thin wrapper around
+    ``data/local/gemma_intro_v7_primed/emotional_raw.jsonl`` and
+    sidecar dirs land under
+    ``data/local/hidden/gemma_intro_v7_primed/``. Thin wrapper around
     ``resolve_model``.
     """
     name = os.environ.get("LLMOJI_MODEL", "gemma")

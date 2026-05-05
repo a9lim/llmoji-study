@@ -15,8 +15,8 @@ Public surface:
     backbone, kept identical to the eriskii pipeline so axis vectors
     line up.
   - :func:`load_descriptions` — read
-    ``data/claude_descriptions.jsonl`` (the flat per-canonical output
-    of ``scripts/06_claude_hf_pull.py``).
+    ``data/harness/claude_descriptions.jsonl`` (the flat per-canonical output
+    of ``scripts/60_corpus_pull.py``).
   - :func:`embed_descriptions` — for each kaomoji, embed every
     per-bundle / per-source-model description, then weighted-mean by
     per-bundle count and L2-renormalize. Returns
@@ -42,7 +42,7 @@ EMBED_DIM = 384
 
 def load_descriptions(path: Path) -> list[dict]:
     """Read the flat per-canonical-form JSONL emitted by
-    ``scripts/06_claude_hf_pull.py``.
+    ``scripts/60_corpus_pull.py``.
 
     Each row carries ``kaomoji`` (canonical), ``count_total``,
     ``n_contributors``, ``n_bundles``, ``n_source_models``,

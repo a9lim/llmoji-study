@@ -1,10 +1,10 @@
 {
   "model": "granite",
   "rep": "h_first.layer-stack",
-  "n_rows_total": 703,
+  "n_rows_total": 699,
   "n_rows_kept": 585,
   "min_n": 5,
-  "n_faces_total": 101,
+  "n_faces_total": 99,
   "n_faces_kept": 24,
   "hidden_to_face": {
     "accuracy": 0.39829059829059826,
@@ -42,9 +42,9 @@
     }
   },
   "hidden_to_quadrant": {
-    "accuracy": 0.9800853485064012,
-    "macro_f1": 0.9833497531009259,
-    "majority_baseline": 0.4310099573257468,
+    "accuracy": 0.9899856938483548,
+    "macro_f1": 0.9882639729222568,
+    "majority_baseline": 0.4334763948497854,
     "uniform_baseline": 0.2,
     "n_classes": 5,
     "n_splits": 5,
@@ -52,7 +52,7 @@
     "per_class_recall": {
       "HN": 1.0,
       "LN": 0.9453125,
-      "NB": 0.9369369369369369,
+      "NB": 1.0,
       "LP": 1.0,
       "HP": 1.0
     }
@@ -62,32 +62,32 @@
       {
         "pc": 1,
         "explained_variance_ratio": 0.291290819644928,
-        "eta_squared": 0.7735464572906494
+        "eta_squared": 0.7735459208488464
       },
       {
         "pc": 2,
-        "explained_variance_ratio": 0.11051936447620392,
-        "eta_squared": 0.6001225113868713
+        "explained_variance_ratio": 0.1105194091796875,
+        "eta_squared": 0.6001226902008057
       },
       {
         "pc": 3,
-        "explained_variance_ratio": 0.07876409590244293,
-        "eta_squared": 0.31872671842575073
+        "explained_variance_ratio": 0.07876407355070114,
+        "eta_squared": 0.31872686743736267
       },
       {
         "pc": 4,
-        "explained_variance_ratio": 0.06924789398908615,
-        "eta_squared": 0.23403605818748474
+        "explained_variance_ratio": 0.06924781203269958,
+        "eta_squared": 0.23403578996658325
       },
       {
         "pc": 5,
-        "explained_variance_ratio": 0.03378356248140335,
-        "eta_squared": 0.2699379324913025
+        "explained_variance_ratio": 0.03378358483314514,
+        "eta_squared": 0.2699405550956726
       }
     ],
-    "weighted_eta2_top_k": 0.34208233111613207,
-    "topk_explained_variance": 0.5836057066917419,
-    "weighted_eta2_normalized": 0.5861531633322744
+    "weighted_eta2_top_k": 0.342082282938301,
+    "topk_explained_variance": 0.5836056470870972,
+    "weighted_eta2_normalized": 0.5861531406450711
   },
   "centroid_approximation_quality": {
     "n_rows": 585,

@@ -1,6 +1,6 @@
 """Stacked-bar chart for per-project Russell-quadrant histograms.
 
-Used by ``scripts/harness/22_claude_per_project_quadrants.py`` for all
+Used by ``scripts/66_per_project_quadrants.py`` for all
 three resolution modes (``gt-priority`` / ``ensemble`` / ``gt-only``).
 One row per project sorted by total emissions descending, plus a
 ``(global)`` row at the top. Bar segments share-of-known per quadrant;
@@ -20,7 +20,7 @@ QUADRANTS_SPLIT = ["HP", "LP", "HN-D", "HN-S", "LN", "NB"]
 
 def _use_cjk_font() -> None:
     """Same fallback chain as
-    ``scripts/harness/16_eriskii_replication.py``; keep these in sync."""
+    ``scripts/harness/64_eriskii_replication.py``; keep these in sync."""
     import matplotlib
     import matplotlib.font_manager as fm
 

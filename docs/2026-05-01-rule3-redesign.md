@@ -187,8 +187,8 @@ Strong enough to commit to the supplementary 23-prompt run.
 ### Final verdict — balanced 20 D / 20 S (160 / 160 rows per model)
 
 **RULE 3b CONFIRMED — all three models clean PASS.** Auto-generated
-verdict block at `figures/local/cross_model/rule3_dominance_check.md`;
-TSV at `data/rule3_dominance_check.tsv`. Per-model:
+verdict block at `figures/local/rule3_dominance_check.md`;
+TSV at `data/local/rule3_dominance_check.tsv`. Per-model:
 
 | model | t0 | tlast | mean | verdict |
 | --- | ---: | ---: | ---: | --- |

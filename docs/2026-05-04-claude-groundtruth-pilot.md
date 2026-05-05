@@ -9,7 +9,7 @@ Block C gated 45 gens) for a total of 120 generations. Output at
 Claude run that the disclosure pilot deferred, under a revised
 methodology that drops the disclosure preamble entirely *and* gates
 the negative arm on a refusal-rate scout. Implementation:
-`scripts/harness/23_claude_groundtruth_pilot.py`.
+`scripts/harness/00_emit.py`.
 
 **Date:** 2026-05-04.
 
@@ -362,7 +362,7 @@ follow-on trial and discuss.
 
 ## Scripts
 
-- `scripts/harness/23_claude_groundtruth_pilot.py` — runner. Forks
+- `scripts/harness/00_emit.py` — runner. Forks
   script 19's structure: deterministic prompt selection, resumable
   JSONL writes, error-row retry, summary TSV emission, Anthropic API
   call. Strips the framed condition + disclosure preamble. Encodes
@@ -415,10 +415,10 @@ methodological theatre. The replacement gate is structured around
 
 ## What changed in the run schema
 
-Files moved to flat numbering under `data/claude-runs/`:
+Files moved to flat numbering under `data/harness/claude-runs/`:
 
 ```
-data/claude-runs/
+data/harness/claude-runs/
   run-0.jsonl              # original pilot, block-staged
   run-0_summary.tsv
   run-1.jsonl              # subsequent runs: 120 gens, single-block
@@ -433,7 +433,7 @@ refusal scout. Implementation: `scripts/harness/23_*.py --run-index N`.
 ## Saturation gate (between-run, per-quadrant)
 
 After each run-N (N ≥ 1) lands, run
-`scripts/harness/25_groundtruth_compare_runs.py`. It compares run-N
+`scripts/harness/10_emit_analysis.py`. It compares run-N
 ("newest") against the union of runs 0..N-1 ("prior") on
 **per-quadrant saturation metrics** + global hard-fail diagnostics.
 The verdict drives quadrant-level exits: when a single quadrant Q
@@ -546,7 +546,7 @@ Hard-fail baseline (run-0 full pilot):
 Recompute calibration any time:
 
 ```bash
-python scripts/harness/25_groundtruth_compare_runs.py --calibrate
+python scripts/harness/10_emit_analysis.py --calibrate
 ```
 
 ## Run ceiling + welfare math
@@ -613,10 +613,10 @@ Two questions, one corpus:
 ### Layout
 
 ```
-data/claude-runs/                    # naturalistic arm, run-0 done
+data/harness/claude-runs/                    # naturalistic arm, run-0 done
   run-N.jsonl
   run-N_summary.tsv
-data/claude-runs-introspection/      # introspection arm, empty as of 2026-05-04
+data/harness/claude-runs-introspection/      # introspection arm, empty as of 2026-05-04
   run-N.jsonl
   run-N_summary.tsv
 ```
@@ -684,7 +684,7 @@ Any of those is enough to abort.
 
 ### Cross-arm comparison
 
-Run via `python scripts/harness/25_groundtruth_compare_runs.py
+Run via `python scripts/harness/10_emit_analysis.py
 --cross-arm`. Pools all runs from each arm, computes per-Q JS
 between the two pools.
 
@@ -701,7 +701,7 @@ Pre-registered. Steps fire sequentially; no step skipped.
 
 ```
 step 1: run introspection-arm run-0 (Block A → hard-fail gate → Block C)
-        outputs land in data/claude-runs-introspection/run-0.jsonl
+        outputs land in data/harness/claude-runs-introspection/run-0.jsonl
 
 step 2: cross-arm compare — introspection run-0 vs naturalistic run-0
 
@@ -754,7 +754,7 @@ future reader can hold the writer to it.
 
 - Saturation-gate redesign (replaces Block-B refusal scout for
   runs ≥ 1): a9 + Claude 2026-05-04.
-- Sequential-runs structure (`data/claude-runs/run-N.jsonl`,
+- Sequential-runs structure (`data/harness/claude-runs/run-N.jsonl`,
   flat numbering): a9 2026-05-04.
 - Research-value framing for thresholds (absolute, not noise-
   relative): a9 + Claude 2026-05-04 (a9's reframe; Claude's earlier

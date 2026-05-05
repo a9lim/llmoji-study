@@ -1,6 +1,6 @@
 """Information-theoretic helpers for distribution-vs-distribution comparison.
 
-Lifted from `scripts/harness/25_groundtruth_compare_runs.py` and promoted
+Lifted from `scripts/harness/10_emit_analysis.py` and promoted
 to a shared module so the post-hoc face_likelihood scripts (52-56) can
 use the same JSD machinery for soft-everywhere evaluation.
 

@@ -43,13 +43,13 @@ session pivoted to top-k pooling. v4 is ready to fire.
 
 ```bash
 # 1. Fire v4 pilot on gemma (single condition, all 120 prompts)
-python scripts/local/43_introspection_custom.py \
+python scripts/local/33_introspection_custom.py \
     --preamble-file preambles/introspection_v4.txt --label v4
 
 # 2. Re-run analysis with custom label so 4-way comparison is
 #    intro_none / intro_pre / lorem_pre / v4
-python scripts/local/33_introspection_analysis.py --custom-label v4
-python scripts/local/34_introspection_predictiveness.py --custom-label v4
+python scripts/local/31_introspection_analysis.py --custom-label v4
+python scripts/local/32_introspection_predictiveness.py --custom-label v4
 
 # 3. Compare against v2 baseline numbers (above)
 ```
@@ -60,7 +60,7 @@ main generation chain. Free of any other active process before firing.
 
 ## Variance threshold for "real" delta
 
-From `scripts/local/26_face_gain_variance.py` (2026-05-04, v3 main
+From `scripts/local/25_face_gain_variance.py` (2026-05-04, v3 main
 data, 8 seeds × 120 prompts):
 
 - gemma face_gain bootstrap std: ±1.58pp → 2σ band ±3.2pp
@@ -99,7 +99,7 @@ If v4 is *not* a clean win:
   than the predictability metric. v4 might be doing something
   qualitatively different that the headline metrics don't capture.
 - Look at the kaomoji distribution per quadrant under v4 vs v2 in
-  `data/gemma_introspection_summary_custom_v4.tsv`. If v4 produced
+  `data/local/gemma/introspection_summary_custom_v4.tsv`. If v4 produced
   notably different modal kaomoji per quadrant, that's interesting
   even if face_gain is comparable.
 
@@ -133,7 +133,7 @@ some sense the "maximally informative" preamble in this lineage.
   on v1/v2/v3 by model
 - `docs/2026-05-02-introspection-pilot.md` — original pilot design
 - `data/gemma_introspection_predictiveness_h_first.tsv`
-- `data/gemma_introspection_summary.tsv` (and `_custom_v2.tsv`,
+- `data/local/gemma/introspection_summary.tsv` (and `_custom_v2.tsv`,
   `_custom_v3.tsv`)
 - `scripts/local/{32,33,34,43}_*.py` — pipeline
 

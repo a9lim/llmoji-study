@@ -11,7 +11,7 @@ __pycache__/
 # hidden-state sidecars — ~50 MB per generation × ~1500 generations
 # = way too big for git. Regenerable from the pilot/emotional runners
 # with the model cached. Local-only by design.
-data/hidden/
+data/local/hidden/
 
 # local envs
 .venv/
@@ -27,22 +27,20 @@ logs/
 .claude/
 
 # Snapshot of the contributor-submitted HF dataset
-# (a9lim/llmoji); regenerable via scripts/06_claude_hf_pull.py.
-data/hf_dataset/
+# (a9lim/llmoji); regenerable via scripts/harness/06_claude_hf_pull.py.
+data/harness/hf_dataset/
 
 # Multi-layer h_mean tensors for the v3 follow-on analyses
 # (scripts 21, 23). ~800 MB per model (npz compression doesn't help
 # with dense float32 hidden states); one-shot rebuild from the
-# data/hidden/<experiment>/*.npz sidecars via the loader's
+# data/local/hidden/<experiment>/*.npz sidecars via the loader's
 # cache_path arg.
-data/cache/
+data/local/cache/
 
-# Pre-cleanliness archive of v3 main-run sidecars + JSONLs
-# (~130 GB). Same reason as data/hidden/ — too big for git, only
-# needed for gate-check / face-PCA pre-vs-post comparison scripts.
-data/archive/
+# Per-script ad-hoc outputs that aren't part of the experimental record:
+data/local/phase_timing_smoke/
 
 # Working backups of JSONLs from the seed-0 cache-mode-mismatch
 # fix (2026-05-03). Kept locally during the fix verification, not
 # part of the experimental record.
-data/*.bak.*
+data/**/*.bak.*

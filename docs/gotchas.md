@@ -126,7 +126,7 @@ matches the raw `prompt_id`-keyed counts in the JSONL.
 ### Stale all-layers cache when analysis runs mid-generation
 
 `load_hidden_features_all_layers` writes a cache at
-`data/cache/v3_<short>_h_<which>_all_layers.npz` (+ `.meta.jsonl`)
+`data/local/cache/v3_<short>_h_<which>_all_layers.npz` (+ `.meta.jsonl`)
 keyed only on `(short, which)` — not on jsonl row count. If an
 analysis script (04, 22, 24, 25, 36, 37, 38…) fires while the
 generation chain is *still running*, the cache freezes at the partial
@@ -149,7 +149,7 @@ rows. The cache may legitimately be *smaller* than the jsonl
 asymmetric guard is correct.
 
 **Manual fix if you hit a pre-2026-05-04 cache**: delete
-`data/cache/v3_<short>_h_*_all_layers.npz` + the matching
+`data/local/cache/v3_<short>_h_*_all_layers.npz` + the matching
 `.meta.jsonl` and rerun the analysis chain.
 
 ### Mistral reasoning's `chat_template` ignores `enable_thinking=False`
@@ -318,7 +318,7 @@ matching needed since CCA learns the joint subspace).
 
 ### Re-extracting pilot data after canonicalization rule changes
 
-`first_word` is baked at write time. `04_emotional_analysis.py` calls
+`first_word` is baked at write time. `10_emit_analysis.py` calls
 `_relabel_in_place` at start of every run, which re-extracts via
 `llmoji.taxonomy.extract` and drops legacy `kaomoji` /
 `kaomoji_label` fields if present. For other JSONLs do it manually:
@@ -403,8 +403,8 @@ per-glyph fallback via `rcParams["font.family"] = [...]`. The canonical
 `_use_cjk_font` helper lives in `llmoji_study.emotional_analysis`;
 `analysis.py` imports it (single source of truth post-2026-05-04
 dedupe). Scripts that work outside the
-emotional-analysis pipeline (`scripts/harness/16_eriskii_replication.py`,
-`scripts/harness/18_claude_faces_pca.py`) keep local copies for now —
+emotional-analysis pipeline (`scripts/harness/64_eriskii_replication.py`,
+`scripts/harness/63_corpus_pca.py`) keep local copies for now —
 **keep in sync**. The helper registers a project-local monochrome emoji
 font (`data/fonts/NotoEmoji-Regular.ttf`, 1.9MB, committed) and configure
 the chain `Noto Sans CJK JP → Arial Unicode MS → DejaVu Sans → DejaVu Serif
@@ -448,16 +448,16 @@ CKA, probe scores) are robust. Post-fix should match or strengthen
 the signal. Cross-version compatibility verified: 2.0.0 reproduces
 1.4.6 probe scores within 5e-7 on existing sidecars.
 
-### `06_claude_hf_pull.py` doesn't garbage-collect remote-deleted bundles
+### `60_corpus_pull.py` doesn't garbage-collect remote-deleted bundles
 
 `huggingface_hub.snapshot_download(local_dir=...)` only adds and updates;
 never removes files deleted on the remote since the last pull. So a bundle
-the dataset owner deleted on HF lingers in `data/hf_dataset/` and shows up
+the dataset owner deleted on HF lingers in `data/harness/hf_dataset/` and shows up
 in every subsequent pull as if part of the corpus — including in `06` flat
 output and every figure built from it. Symptom: an unfamiliar `submitter_id`
 or `_pre_1_1`-tagged source model that doesn't appear in
 `HfApi.list_repo_files`. Fix:
-`rm -rf data/hf_dataset && python scripts/harness/06_claude_hf_pull.py`. Cache is
+`rm -rf data/harness/hf_dataset && python scripts/harness/60_corpus_pull.py`. Cache is
 gitignored and regenerable. Hit 2026-04-28 when the legacy 1.0 bundle had
 been dropped from HF but kept reappearing in `07` output from a stale cache.
 

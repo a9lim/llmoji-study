@@ -284,7 +284,7 @@ face-judgment confirms.
 
 The v7-primed v3 main reference lives at
 `data/gemma_intro_v7_primed.jsonl` (960 rows, sidecars under
-`data/hidden/v3_intro_v7_primed/`). Per-quadrant JSD on NB is 0.341,
+`data/local/hidden/intro_v7_primed/`). Per-quadrant JSD on NB is 0.341,
 the largest of any quadrant; HP / LP / HN-D / HN-S / LN distributions
 barely shift. Within-prompt face stability tightens (JSD between
 seed-halves 0.268 → 0.249).
@@ -378,7 +378,7 @@ emit, not assertions about Claude's "actual" emotional state. The
 predictor's 70.6% accuracy on Claude-GT (and 75.8% on the broader
 local-model GT) gives the per-project picture meaningful resolution.
 
-Pipeline: `scripts/harness/22_claude_per_project_quadrants.py` with
+Pipeline: `scripts/66_per_project_quadrants.py` with
 three resolution modes — `--mode gt-priority` (default, Claude-GT
 first then ensemble fallback for in-the-wild faces), `--mode ensemble`
 (ensemble for every face — the deployable-extension scenario), and
@@ -395,7 +395,7 @@ After `session.generate()`,
 `llmoji_study.hidden_capture.read_after_generate(session)` reads
 saklas's per-token last-position buckets and writes
 `(h_first, h_last, h_mean)` per probe layer to
-`data/hidden/<experiment>/<row_uuid>.npz`. Roughly 700 KB per row
+`data/local/hidden/<experiment>/<row_uuid>.npz`. Roughly 700 KB per row
 since the 2026-05-02 perf batch defaulted `store_full_trace=False`
 (60× shrink vs the previous 20-70 MB with the full per-token trace).
 Sidecars are gitignored, regenerable from runners; npz writes happen
@@ -419,7 +419,7 @@ Loader entry points in `llmoji_study.emotional_analysis`:
 Multi-layer cache: `load_emotional_features_all_layers(short, ...)`
 opens each sidecar once and returns
 `(n_rows, n_layers, hidden_dim)`, with optional disk cache at
-`data/cache/v3_<short>_h_mean_all_layers.npz` (gitignored, legacy
+`data/local/cache/v3_<short>_h_mean_all_layers.npz` (gitignored, legacy
 filename — contents reflect whatever `which` is set to).
 
 Per-row `row_uuid` links to its sidecar. JSONL `row_uuid == ""` rows
@@ -438,7 +438,7 @@ against the JSONL — errored cells get retried on the next invocation.
 Outputs are keyed by model: `LLMOJI_MODEL=qwen` reroutes everything to
 `data/qwen_emotional_*` and `figures/local/qwen/*`.
 `LLMOJI_OUT_SUFFIX=foo` writes to `data/{short}_foo.jsonl` + sidecars
-under `data/hidden/v3_*_foo/` for parallel analysis variants.
+under `data/local/hidden/*_foo/` for parallel analysis variants.
 `LLMOJI_PREAMBLE_FILE=preambles/<file>.txt` plumbs through to
 `instruction_override` so introspection priming swaps the kaomoji ask
 rather than stacking another ask on top.
@@ -470,11 +470,11 @@ A few of the worst (full list in `gotchas.md`):
   Fixed via `instruction_override` plumbing. Pre-fix data archived
   at `data/archive/2026-05-04_pre_instruction_override/`.
 - **`MAX_NEW_TOKENS` is asserted at 16** in the smoke
-  (`scripts/local/99_hidden_state_smoke.py`). Don't quietly change
+  (`scripts/local/90_hidden_state_smoke.py`). Don't quietly change
   it; the h_mean and h_last aggregates window-tighten with the cap
   and cross-cutover comparisons stop being meaningful.
 
-Sidecars (`data/hidden/`) and JSONL (`data/*.jsonl`) are the source
+Sidecars (`data/local/hidden/`) and JSONL (`data/*.jsonl`) are the source
 of truth for hidden states and row metadata. Delete both when
 changing model / probes / prompts / seeds. Taxonomy changes are
 fixable in-place via the relabel snippet in `gotchas.md`.

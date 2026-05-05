@@ -26,8 +26,10 @@ ground-truth empirical-emission distributions over quadrants. Under
 self-consistency, the predicted argmax should usually match the
 empirical-emission majority.
 
-Reads the canonical face union from ``data/v3_face_union.parquet``
-(built by ``45_build_face_union.py``). Must be regenerated whenever
+Reads the canonical face union from ``data/v3_face_union.parquet``  (kept at
+data/ root because the union pools v3 local emit + Claude pilot + wild
+contributor faces — genuinely cross-platform)
+(built by ``40_face_union.py``). Must be regenerated whenever
 the v3 main lineup changes; encoder-invariant per face.
 
 Always runs the full 120 prompts × 573 faces — batching makes that
@@ -41,11 +43,11 @@ Usage:
   python scripts/local/50_face_likelihood.py --model rinna_bilingual_4b --prompt-lang en
 
 Outputs:
-  data/face_likelihood_<model>{,_jp}.parquet
+  data/local/<model>/face_likelihood{,_jp}.parquet
     — one row per (face, prompt_id), columns:
       first_word, prompt_id, quadrant, log_prob, n_face_tokens,
       log_prob_per_token
-  data/face_likelihood_<model>{,_jp}_summary.tsv
+  data/local/<model>/face_likelihood{,_jp}_summary.tsv
     — one row per face, columns:
       first_word, n_prompts_<q> per quadrant,
       mean_log_prob_<q> per quadrant,
@@ -154,7 +156,7 @@ def _load_face_union(model_short: str) -> pd.DataFrame:
     The face list and total_emit_* columns are encoder-invariant — they
     come from v3 emission distributions, not from any one model's
     encoded vectors. The canonical union is built by
-    ``45_build_face_union.py``. ``model_short`` is unused here; kept for
+    ``40_face_union.py``. ``model_short`` is unused here; kept for
     call-site compatibility.
     """
     del model_short  # no longer used (was per-encoder before refactor)
@@ -162,7 +164,7 @@ def _load_face_union(model_short: str) -> pd.DataFrame:
     if not p.exists():
         raise SystemExit(
             f"missing {p} — run "
-            f"`python scripts/local/45_build_face_union.py` first"
+            f"`python scripts/40_face_union.py` first"
         )
     df = pd.read_parquet(p)
     keep = ["first_word", "is_claude", "total_emit_count"] + [
@@ -498,7 +500,10 @@ def main() -> None:
     if _preamble_file:
         stem = Path(_preamble_file).stem.replace("introspection_", "")
         suffix = f"{suffix}_{stem}primed"
-    rows_path = DATA_DIR / f"face_likelihood_{M.short_name}{suffix}.parquet"
+    # Per-model dir under data/local/<short>{_<out-suffix>}/. M.emotional_data_path
+    # already encodes the right per-model directory (including LLMOJI_OUT_SUFFIX
+    # variants) — use its parent.
+    rows_path = M.emotional_data_path.parent / f"face_likelihood{suffix}.parquet"
 
     # Incremental: load existing scoring (if any) and skip already-scored
     # (face, prompt_id) cells. Default behavior; --no-incremental forces
@@ -603,7 +608,7 @@ def main() -> None:
     summary = _summarize(rows_df, faces_df, summary_topk=topk_arg)
     if topk_arg is not None:
         print(f"  summary aggregation: top-{topk_arg} mean per (face, quadrant)")
-    summary_path = DATA_DIR / f"face_likelihood_{M.short_name}{suffix}_summary.tsv"
+    summary_path = M.emotional_data_path.parent / f"face_likelihood{suffix}_summary.tsv"
     summary.to_csv(summary_path, sep="\t", index=False)
     print(f"wrote per-face summary to {summary_path}")
 

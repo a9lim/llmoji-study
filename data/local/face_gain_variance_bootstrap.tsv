@@ -1,0 +1,1201 @@
+model	kind	n_prompts	rep	r2_face	r2_quad	face_gain
+gemma	bootstrap	120	0	0.59459	0.58894	0.00565
+gemma	bootstrap	120	1	0.60297	0.61701	-0.01404
+gemma	bootstrap	120	2	0.63372	0.62634	0.00737
+gemma	bootstrap	120	3	0.59065	0.56660	0.02406
+gemma	bootstrap	120	4	0.60820	0.60363	0.00456
+gemma	bootstrap	120	5	0.60143	0.60151	-0.00008
+gemma	bootstrap	120	6	0.61119	0.61987	-0.00868
+gemma	bootstrap	120	7	0.59035	0.57107	0.01928
+gemma	bootstrap	120	8	0.56272	0.55550	0.00722
+gemma	bootstrap	120	9	0.61820	0.59986	0.01834
+gemma	bootstrap	120	10	0.61693	0.62459	-0.00767
+gemma	bootstrap	120	11	0.61253	0.63113	-0.01860
+gemma	bootstrap	120	12	0.60034	0.61966	-0.01932
+gemma	bootstrap	120	13	0.61482	0.61908	-0.00425
+gemma	bootstrap	120	14	0.55965	0.57406	-0.01441
+gemma	bootstrap	120	15	0.58929	0.60008	-0.01079
+gemma	bootstrap	120	16	0.62776	0.61736	0.01040
+gemma	bootstrap	120	17	0.57094	0.60044	-0.02950
+gemma	bootstrap	120	18	0.61472	0.60955	0.00517
+gemma	bootstrap	120	19	0.60980	0.63153	-0.02173
+gemma	bootstrap	120	20	0.63185	0.59114	0.04071
+gemma	bootstrap	120	21	0.61332	0.60129	0.01203
+gemma	bootstrap	120	22	0.59691	0.60911	-0.01221
+gemma	bootstrap	120	23	0.58250	0.62202	-0.03952
+gemma	bootstrap	120	24	0.60725	0.62046	-0.01321
+gemma	bootstrap	120	25	0.60391	0.62015	-0.01624
+gemma	bootstrap	120	26	0.62617	0.63087	-0.00470
+gemma	bootstrap	120	27	0.59990	0.60062	-0.00072
+gemma	bootstrap	120	28	0.55454	0.58529	-0.03075
+gemma	bootstrap	120	29	0.57688	0.59949	-0.02261
+gemma	bootstrap	120	30	0.62190	0.60687	0.01502
+gemma	bootstrap	120	31	0.61880	0.61008	0.00872
+gemma	bootstrap	120	32	0.60470	0.59014	0.01456
+gemma	bootstrap	120	33	0.59973	0.61183	-0.01210
+gemma	bootstrap	120	34	0.64523	0.62764	0.01759
+gemma	bootstrap	120	35	0.61716	0.60509	0.01207
+gemma	bootstrap	120	36	0.60266	0.62959	-0.02694
+gemma	bootstrap	120	37	0.59071	0.61390	-0.02319
+gemma	bootstrap	120	38	0.60677	0.59203	0.01475
+gemma	bootstrap	120	39	0.61717	0.64103	-0.02385
+gemma	bootstrap	120	40	0.60262	0.61184	-0.00921
+gemma	bootstrap	120	41	0.62681	0.61143	0.01538
+gemma	bootstrap	120	42	0.59230	0.60968	-0.01739
+gemma	bootstrap	120	43	0.58625	0.57600	0.01025
+gemma	bootstrap	120	44	0.61852	0.62007	-0.00155
+gemma	bootstrap	120	45	0.61135	0.59538	0.01596
+gemma	bootstrap	120	46	0.60225	0.60740	-0.00515
+gemma	bootstrap	120	47	0.58547	0.58298	0.00250
+gemma	bootstrap	120	48	0.59223	0.57622	0.01601
+gemma	bootstrap	120	49	0.62159	0.60061	0.02098
+gemma	bootstrap	120	50	0.60418	0.58603	0.01815
+gemma	bootstrap	120	51	0.60194	0.60354	-0.00161
+gemma	bootstrap	120	52	0.60823	0.61790	-0.00967
+gemma	bootstrap	120	53	0.58337	0.57879	0.00458
+gemma	bootstrap	120	54	0.59112	0.59784	-0.00673
+gemma	bootstrap	120	55	0.61704	0.60975	0.00728
+gemma	bootstrap	120	56	0.60104	0.61421	-0.01316
+gemma	bootstrap	120	57	0.60881	0.62256	-0.01375
+gemma	bootstrap	120	58	0.58298	0.60689	-0.02391
+gemma	bootstrap	120	59	0.60984	0.58158	0.02826
+gemma	bootstrap	120	60	0.60912	0.60977	-0.00065
+gemma	bootstrap	120	61	0.63128	0.61470	0.01657
+gemma	bootstrap	120	62	0.60991	0.59376	0.01615
+gemma	bootstrap	120	63	0.59198	0.59271	-0.00073
+gemma	bootstrap	120	64	0.60485	0.60438	0.00047
+gemma	bootstrap	120	65	0.59917	0.59847	0.00071
+gemma	bootstrap	120	66	0.59046	0.58984	0.00062
+gemma	bootstrap	120	67	0.57170	0.58247	-0.01077
+gemma	bootstrap	120	68	0.57926	0.57588	0.00338
+gemma	bootstrap	120	69	0.60517	0.60786	-0.00269
+gemma	bootstrap	120	70	0.57319	0.59087	-0.01768
+gemma	bootstrap	120	71	0.59628	0.58783	0.00845
+gemma	bootstrap	120	72	0.60552	0.60731	-0.00179
+gemma	bootstrap	120	73	0.62500	0.59433	0.03068
+gemma	bootstrap	120	74	0.58903	0.60466	-0.01562
+gemma	bootstrap	120	75	0.61125	0.60138	0.00987
+gemma	bootstrap	120	76	0.60950	0.60021	0.00928
+gemma	bootstrap	120	77	0.57639	0.57872	-0.00233
+gemma	bootstrap	120	78	0.59016	0.58404	0.00612
+gemma	bootstrap	120	79	0.56712	0.59823	-0.03111
+gemma	bootstrap	120	80	0.57844	0.59205	-0.01362
+gemma	bootstrap	120	81	0.60518	0.60860	-0.00342
+gemma	bootstrap	120	82	0.61747	0.60708	0.01039
+gemma	bootstrap	120	83	0.57256	0.57708	-0.00452
+gemma	bootstrap	120	84	0.63166	0.61777	0.01389
+gemma	bootstrap	120	85	0.60117	0.60880	-0.00763
+gemma	bootstrap	120	86	0.61212	0.58786	0.02425
+gemma	bootstrap	120	87	0.62917	0.63590	-0.00673
+gemma	bootstrap	120	88	0.59367	0.58261	0.01106
+gemma	bootstrap	120	89	0.60657	0.61281	-0.00624
+gemma	bootstrap	120	90	0.59263	0.63063	-0.03800
+gemma	bootstrap	120	91	0.56122	0.58277	-0.02155
+gemma	bootstrap	120	92	0.61507	0.60114	0.01393
+gemma	bootstrap	120	93	0.60941	0.61927	-0.00986
+gemma	bootstrap	120	94	0.59280	0.60111	-0.00832
+gemma	bootstrap	120	95	0.59235	0.58424	0.00811
+gemma	bootstrap	120	96	0.62392	0.59315	0.03077
+gemma	bootstrap	120	97	0.58721	0.59983	-0.01262
+gemma	bootstrap	120	98	0.58906	0.57643	0.01263
+gemma	bootstrap	120	99	0.60808	0.59983	0.00825
+gemma	bootstrap	120	100	0.62584	0.63074	-0.00490
+gemma	bootstrap	120	101	0.59022	0.61734	-0.02712
+gemma	bootstrap	120	102	0.60239	0.59741	0.00498
+gemma	bootstrap	120	103	0.58936	0.61389	-0.02453
+gemma	bootstrap	120	104	0.60486	0.59624	0.00862
+gemma	bootstrap	120	105	0.61378	0.61970	-0.00592
+gemma	bootstrap	120	106	0.60852	0.58822	0.02030
+gemma	bootstrap	120	107	0.60115	0.59592	0.00523
+gemma	bootstrap	120	108	0.62116	0.59255	0.02861
+gemma	bootstrap	120	109	0.61768	0.60338	0.01430
+gemma	bootstrap	120	110	0.60968	0.60111	0.00857
+gemma	bootstrap	120	111	0.57452	0.55778	0.01674
+gemma	bootstrap	120	112	0.60763	0.60094	0.00669
+gemma	bootstrap	120	113	0.59169	0.59663	-0.00494
+gemma	bootstrap	120	114	0.58950	0.59508	-0.00558
+gemma	bootstrap	120	115	0.58638	0.61498	-0.02860
+gemma	bootstrap	120	116	0.62422	0.61729	0.00693
+gemma	bootstrap	120	117	0.59620	0.59904	-0.00285
+gemma	bootstrap	120	118	0.60039	0.60208	-0.00169
+gemma	bootstrap	120	119	0.61178	0.59207	0.01971
+gemma	bootstrap	120	120	0.62860	0.60670	0.02190
+gemma	bootstrap	120	121	0.62997	0.63047	-0.00050
+gemma	bootstrap	120	122	0.60945	0.61520	-0.00575
+gemma	bootstrap	120	123	0.60696	0.59554	0.01142
+gemma	bootstrap	120	124	0.58251	0.57613	0.00639
+gemma	bootstrap	120	125	0.59798	0.57994	0.01804
+gemma	bootstrap	120	126	0.56902	0.59560	-0.02658
+gemma	bootstrap	120	127	0.58962	0.59574	-0.00612
+gemma	bootstrap	120	128	0.60182	0.62492	-0.02310
+gemma	bootstrap	120	129	0.63904	0.61969	0.01936
+gemma	bootstrap	120	130	0.61737	0.57559	0.04178
+gemma	bootstrap	120	131	0.61889	0.59706	0.02183
+gemma	bootstrap	120	132	0.59114	0.61251	-0.02137
+gemma	bootstrap	120	133	0.61831	0.60725	0.01107
+gemma	bootstrap	120	134	0.62709	0.62489	0.00219
+gemma	bootstrap	120	135	0.61076	0.60169	0.00907
+gemma	bootstrap	120	136	0.62140	0.63170	-0.01031
+gemma	bootstrap	120	137	0.59151	0.59132	0.00019
+gemma	bootstrap	120	138	0.58338	0.59076	-0.00738
+gemma	bootstrap	120	139	0.60938	0.59319	0.01619
+gemma	bootstrap	120	140	0.59973	0.59613	0.00361
+gemma	bootstrap	120	141	0.61909	0.61358	0.00551
+gemma	bootstrap	120	142	0.61581	0.61205	0.00377
+gemma	bootstrap	120	143	0.59430	0.60360	-0.00929
+gemma	bootstrap	120	144	0.58526	0.57950	0.00576
+gemma	bootstrap	120	145	0.62115	0.59434	0.02682
+gemma	bootstrap	120	146	0.61468	0.62326	-0.00858
+gemma	bootstrap	120	147	0.59133	0.60267	-0.01133
+gemma	bootstrap	120	148	0.59881	0.60090	-0.00209
+gemma	bootstrap	120	149	0.60958	0.62253	-0.01294
+gemma	bootstrap	120	150	0.60893	0.59968	0.00925
+gemma	bootstrap	120	151	0.58256	0.59037	-0.00780
+gemma	bootstrap	120	152	0.62331	0.61620	0.00712
+gemma	bootstrap	120	153	0.58827	0.59148	-0.00320
+gemma	bootstrap	120	154	0.59931	0.61618	-0.01687
+gemma	bootstrap	120	155	0.59516	0.59745	-0.00229
+gemma	bootstrap	120	156	0.61050	0.60255	0.00795
+gemma	bootstrap	120	157	0.57361	0.60096	-0.02735
+gemma	bootstrap	120	158	0.57038	0.58805	-0.01767
+gemma	bootstrap	120	159	0.58135	0.59402	-0.01268
+gemma	bootstrap	120	160	0.61600	0.63364	-0.01764
+gemma	bootstrap	120	161	0.62156	0.62008	0.00148
+gemma	bootstrap	120	162	0.60293	0.59943	0.00350
+gemma	bootstrap	120	163	0.56172	0.58224	-0.02052
+gemma	bootstrap	120	164	0.58385	0.57537	0.00848
+gemma	bootstrap	120	165	0.59745	0.61167	-0.01422
+gemma	bootstrap	120	166	0.58836	0.58047	0.00789
+gemma	bootstrap	120	167	0.60253	0.59002	0.01251
+gemma	bootstrap	120	168	0.59701	0.62191	-0.02490
+gemma	bootstrap	120	169	0.59077	0.58536	0.00540
+gemma	bootstrap	120	170	0.62160	0.60431	0.01729
+gemma	bootstrap	120	171	0.58504	0.57065	0.01439
+gemma	bootstrap	120	172	0.60229	0.59827	0.00403
+gemma	bootstrap	120	173	0.61539	0.60146	0.01393
+gemma	bootstrap	120	174	0.58650	0.59573	-0.00923
+gemma	bootstrap	120	175	0.57776	0.58393	-0.00617
+gemma	bootstrap	120	176	0.58407	0.59219	-0.00812
+gemma	bootstrap	120	177	0.60264	0.59206	0.01058
+gemma	bootstrap	120	178	0.62318	0.63369	-0.01051
+gemma	bootstrap	120	179	0.63696	0.59448	0.04248
+gemma	bootstrap	120	180	0.59954	0.63028	-0.03074
+gemma	bootstrap	120	181	0.60628	0.61249	-0.00622
+gemma	bootstrap	120	182	0.60144	0.59663	0.00481
+gemma	bootstrap	120	183	0.58828	0.61619	-0.02791
+gemma	bootstrap	120	184	0.61609	0.60952	0.00658
+gemma	bootstrap	120	185	0.59803	0.61362	-0.01559
+gemma	bootstrap	120	186	0.60749	0.59722	0.01027
+gemma	bootstrap	120	187	0.58211	0.58989	-0.00778
+gemma	bootstrap	120	188	0.61493	0.61373	0.00119
+gemma	bootstrap	120	189	0.59932	0.60010	-0.00078
+gemma	bootstrap	120	190	0.60512	0.60387	0.00125
+gemma	bootstrap	120	191	0.61693	0.59962	0.01731
+gemma	bootstrap	120	192	0.60520	0.62926	-0.02406
+gemma	bootstrap	120	193	0.61187	0.60727	0.00460
+gemma	bootstrap	120	194	0.60852	0.59952	0.00901
+gemma	bootstrap	120	195	0.56624	0.61170	-0.04546
+gemma	bootstrap	120	196	0.60129	0.60011	0.00119
+gemma	bootstrap	120	197	0.58717	0.58778	-0.00062
+gemma	bootstrap	120	198	0.64885	0.63660	0.01224
+gemma	bootstrap	120	199	0.61564	0.60182	0.01381
+gemma	subsample	30	0			-0.03394
+gemma	subsample	30	1			0.03589
+gemma	subsample	30	2			0.03545
+gemma	subsample	30	3			0.03549
+gemma	subsample	30	4			0.02633
+gemma	subsample	30	5			0.02663
+gemma	subsample	30	6			0.02590
+gemma	subsample	30	7			0.01223
+gemma	subsample	30	8			0.01818
+gemma	subsample	30	9			0.00522
+gemma	subsample	30	10			0.06026
+gemma	subsample	30	11			0.01729
+gemma	subsample	30	12			0.02650
+gemma	subsample	30	13			0.00489
+gemma	subsample	30	14			0.05149
+gemma	subsample	30	15			0.04557
+gemma	subsample	30	16			-0.02068
+gemma	subsample	30	17			0.01683
+gemma	subsample	30	18			0.01466
+gemma	subsample	30	19			0.02583
+gemma	subsample	30	20			0.04798
+gemma	subsample	30	21			0.00519
+gemma	subsample	30	22			-0.02629
+gemma	subsample	30	23			-0.07546
+gemma	subsample	30	24			-0.02856
+gemma	subsample	30	25			-0.01143
+gemma	subsample	30	26			0.01667
+gemma	subsample	30	27			0.05699
+gemma	subsample	30	28			0.04080
+gemma	subsample	30	29			0.00891
+gemma	subsample	30	30			0.04815
+gemma	subsample	30	31			-0.00625
+gemma	subsample	30	32			-0.02922
+gemma	subsample	30	33			-0.05243
+gemma	subsample	30	34			-0.01114
+gemma	subsample	30	35			0.00009
+gemma	subsample	30	36			0.00165
+gemma	subsample	30	37			-0.01376
+gemma	subsample	30	38			0.00570
+gemma	subsample	30	39			-0.00532
+gemma	subsample	30	40			-0.01122
+gemma	subsample	30	41			0.02032
+gemma	subsample	30	42			0.02557
+gemma	subsample	30	43			0.04061
+gemma	subsample	30	44			0.00950
+gemma	subsample	30	45			0.03792
+gemma	subsample	30	46			0.03334
+gemma	subsample	30	47			0.00608
+gemma	subsample	30	48			0.00441
+gemma	subsample	30	49			0.01246
+gemma	subsample	60	0			0.02075
+gemma	subsample	60	1			0.00858
+gemma	subsample	60	2			0.00196
+gemma	subsample	60	3			-0.02098
+gemma	subsample	60	4			0.01223
+gemma	subsample	60	5			-0.01828
+gemma	subsample	60	6			0.02465
+gemma	subsample	60	7			0.00194
+gemma	subsample	60	8			0.00296
+gemma	subsample	60	9			0.00175
+gemma	subsample	60	10			0.00833
+gemma	subsample	60	11			0.01525
+gemma	subsample	60	12			0.00794
+gemma	subsample	60	13			-0.00772
+gemma	subsample	60	14			0.01962
+gemma	subsample	60	15			-0.02136
+gemma	subsample	60	16			0.01076
+gemma	subsample	60	17			0.00141
+gemma	subsample	60	18			0.03076
+gemma	subsample	60	19			0.00180
+gemma	subsample	60	20			-0.01229
+gemma	subsample	60	21			0.00967
+gemma	subsample	60	22			-0.01586
+gemma	subsample	60	23			-0.00581
+gemma	subsample	60	24			0.01457
+gemma	subsample	60	25			0.01511
+gemma	subsample	60	26			-0.00076
+gemma	subsample	60	27			0.01554
+gemma	subsample	60	28			-0.01813
+gemma	subsample	60	29			0.02894
+gemma	subsample	60	30			0.02030
+gemma	subsample	60	31			0.02289
+gemma	subsample	60	32			0.00537
+gemma	subsample	60	33			0.00856
+gemma	subsample	60	34			-0.01154
+gemma	subsample	60	35			0.01630
+gemma	subsample	60	36			0.00383
+gemma	subsample	60	37			0.00236
+gemma	subsample	60	38			-0.00773
+gemma	subsample	60	39			0.01648
+gemma	subsample	60	40			0.00374
+gemma	subsample	60	41			0.00203
+gemma	subsample	60	42			0.00847
+gemma	subsample	60	43			0.01676
+gemma	subsample	60	44			-0.01363
+gemma	subsample	60	45			-0.00361
+gemma	subsample	60	46			-0.00074
+gemma	subsample	60	47			-0.00278
+gemma	subsample	60	48			-0.00289
+gemma	subsample	60	49			-0.01293
+gemma	subsample	90	0			-0.01204
+gemma	subsample	90	1			-0.01386
+gemma	subsample	90	2			0.00935
+gemma	subsample	90	3			-0.01448
+gemma	subsample	90	4			0.00294
+gemma	subsample	90	5			-0.02585
+gemma	subsample	90	6			0.00174
+gemma	subsample	90	7			-0.01279
+gemma	subsample	90	8			-0.01225
+gemma	subsample	90	9			-0.00375
+gemma	subsample	90	10			-0.00187
+gemma	subsample	90	11			-0.01299
+gemma	subsample	90	12			-0.00794
+gemma	subsample	90	13			-0.00060
+gemma	subsample	90	14			-0.00914
+gemma	subsample	90	15			0.00272
+gemma	subsample	90	16			-0.00817
+gemma	subsample	90	17			-0.02399
+gemma	subsample	90	18			-0.02043
+gemma	subsample	90	19			-0.00892
+gemma	subsample	90	20			-0.01289
+gemma	subsample	90	21			-0.01150
+gemma	subsample	90	22			-0.00112
+gemma	subsample	90	23			-0.00761
+gemma	subsample	90	24			0.00035
+gemma	subsample	90	25			-0.01478
+gemma	subsample	90	26			-0.00215
+gemma	subsample	90	27			0.00408
+gemma	subsample	90	28			-0.00577
+gemma	subsample	90	29			-0.00785
+gemma	subsample	90	30			-0.01830
+gemma	subsample	90	31			0.00868
+gemma	subsample	90	32			-0.00433
+gemma	subsample	90	33			-0.00551
+gemma	subsample	90	34			-0.01110
+gemma	subsample	90	35			-0.00765
+gemma	subsample	90	36			-0.00991
+gemma	subsample	90	37			-0.01474
+gemma	subsample	90	38			-0.01523
+gemma	subsample	90	39			-0.00356
+gemma	subsample	90	40			-0.01221
+gemma	subsample	90	41			-0.00368
+gemma	subsample	90	42			-0.01220
+gemma	subsample	90	43			-0.01245
+gemma	subsample	90	44			-0.00597
+gemma	subsample	90	45			-0.01090
+gemma	subsample	90	46			-0.01139
+gemma	subsample	90	47			-0.00669
+gemma	subsample	90	48			-0.01132
+gemma	subsample	90	49			-0.01273
+gemma	subsample	120	0			0.01536
+gemma	subsample	120	1			0.00854
+gemma	subsample	120	2			-0.00875
+gemma	subsample	120	3			0.00849
+gemma	subsample	120	4			0.00688
+gemma	subsample	120	5			0.00284
+gemma	subsample	120	6			-0.00661
+gemma	subsample	120	7			-0.00441
+gemma	subsample	120	8			-0.01251
+gemma	subsample	120	9			-0.02440
+gemma	subsample	120	10			0.01378
+gemma	subsample	120	11			-0.04362
+gemma	subsample	120	12			-0.01617
+gemma	subsample	120	13			0.00646
+gemma	subsample	120	14			-0.00658
+gemma	subsample	120	15			0.01786
+gemma	subsample	120	16			0.00667
+gemma	subsample	120	17			0.00365
+gemma	subsample	120	18			-0.03328
+gemma	subsample	120	19			0.00630
+gemma	subsample	120	20			0.00283
+gemma	subsample	120	21			0.00212
+gemma	subsample	120	22			-0.02777
+gemma	subsample	120	23			-0.01459
+gemma	subsample	120	24			0.00325
+gemma	subsample	120	25			0.00168
+gemma	subsample	120	26			0.01309
+gemma	subsample	120	27			-0.00436
+gemma	subsample	120	28			-0.00489
+gemma	subsample	120	29			0.00159
+gemma	subsample	120	30			0.00311
+gemma	subsample	120	31			-0.00799
+gemma	subsample	120	32			-0.01042
+gemma	subsample	120	33			0.00839
+gemma	subsample	120	34			-0.01500
+gemma	subsample	120	35			0.00718
+gemma	subsample	120	36			0.02022
+gemma	subsample	120	37			-0.01257
+gemma	subsample	120	38			0.01076
+gemma	subsample	120	39			0.02046
+gemma	subsample	120	40			-0.00204
+gemma	subsample	120	41			-0.02011
+gemma	subsample	120	42			-0.00540
+gemma	subsample	120	43			-0.01557
+gemma	subsample	120	44			-0.00061
+gemma	subsample	120	45			0.00294
+gemma	subsample	120	46			-0.00154
+gemma	subsample	120	47			-0.00200
+gemma	subsample	120	48			-0.00446
+gemma	subsample	120	49			-0.00604
+qwen	bootstrap	120	0	0.58731	0.61014	-0.02284
+qwen	bootstrap	120	1	0.61488	0.63396	-0.01907
+qwen	bootstrap	120	2	0.59558	0.63833	-0.04274
+qwen	bootstrap	120	3	0.57765	0.59561	-0.01796
+qwen	bootstrap	120	4	0.62366	0.63624	-0.01258
+qwen	bootstrap	120	5	0.59910	0.61509	-0.01599
+qwen	bootstrap	120	6	0.61416	0.62435	-0.01020
+qwen	bootstrap	120	7	0.58146	0.59539	-0.01393
+qwen	bootstrap	120	8	0.57858	0.59610	-0.01751
+qwen	bootstrap	120	9	0.60959	0.63387	-0.02428
+qwen	bootstrap	120	10	0.62377	0.64480	-0.02102
+qwen	bootstrap	120	11	0.61973	0.64759	-0.02786
+qwen	bootstrap	120	12	0.58752	0.61327	-0.02575
+qwen	bootstrap	120	13	0.62650	0.66454	-0.03804
+qwen	bootstrap	120	14	0.59108	0.59894	-0.00786
+qwen	bootstrap	120	15	0.61619	0.63328	-0.01709
+qwen	bootstrap	120	16	0.60939	0.63933	-0.02994
+qwen	bootstrap	120	17	0.61755	0.63672	-0.01918
+qwen	bootstrap	120	18	0.61318	0.62393	-0.01075
+qwen	bootstrap	120	19	0.61581	0.64501	-0.02920
+qwen	bootstrap	120	20	0.61816	0.64297	-0.02481
+qwen	bootstrap	120	21	0.59585	0.62127	-0.02542
+qwen	bootstrap	120	22	0.61033	0.62263	-0.01231
+qwen	bootstrap	120	23	0.59192	0.62251	-0.03058
+qwen	bootstrap	120	24	0.62132	0.62664	-0.00531
+qwen	bootstrap	120	25	0.61062	0.63049	-0.01987
+qwen	bootstrap	120	26	0.62155	0.63040	-0.00884
+qwen	bootstrap	120	27	0.58568	0.61341	-0.02773
+qwen	bootstrap	120	28	0.57830	0.60298	-0.02468
+qwen	bootstrap	120	29	0.60690	0.62428	-0.01737
+qwen	bootstrap	120	30	0.60610	0.62470	-0.01860
+qwen	bootstrap	120	31	0.61289	0.62474	-0.01186
+qwen	bootstrap	120	32	0.60160	0.62608	-0.02448
+qwen	bootstrap	120	33	0.61703	0.60905	0.00799
+qwen	bootstrap	120	34	0.61842	0.64859	-0.03016
+qwen	bootstrap	120	35	0.62867	0.63597	-0.00730
+qwen	bootstrap	120	36	0.62077	0.65297	-0.03220
+qwen	bootstrap	120	37	0.59075	0.61035	-0.01960
+qwen	bootstrap	120	38	0.61442	0.64146	-0.02704
+qwen	bootstrap	120	39	0.63675	0.64380	-0.00705
+qwen	bootstrap	120	40	0.62974	0.64762	-0.01789
+qwen	bootstrap	120	41	0.60364	0.60452	-0.00088
+qwen	bootstrap	120	42	0.61821	0.65670	-0.03849
+qwen	bootstrap	120	43	0.61196	0.63829	-0.02633
+qwen	bootstrap	120	44	0.60343	0.64472	-0.04129
+qwen	bootstrap	120	45	0.58918	0.61650	-0.02732
+qwen	bootstrap	120	46	0.61237	0.62603	-0.01366
+qwen	bootstrap	120	47	0.60235	0.61298	-0.01063
+qwen	bootstrap	120	48	0.60129	0.60315	-0.00186
+qwen	bootstrap	120	49	0.60045	0.60435	-0.00390
+qwen	bootstrap	120	50	0.62666	0.62759	-0.00093
+qwen	bootstrap	120	51	0.61372	0.63421	-0.02049
+qwen	bootstrap	120	52	0.60452	0.62838	-0.02386
+qwen	bootstrap	120	53	0.60722	0.63482	-0.02760
+qwen	bootstrap	120	54	0.60292	0.59854	0.00438
+qwen	bootstrap	120	55	0.63139	0.65837	-0.02698
+qwen	bootstrap	120	56	0.59706	0.62349	-0.02643
+qwen	bootstrap	120	57	0.60671	0.64244	-0.03574
+qwen	bootstrap	120	58	0.61482	0.63043	-0.01561
+qwen	bootstrap	120	59	0.60733	0.60795	-0.00061
+qwen	bootstrap	120	60	0.59601	0.62529	-0.02929
+qwen	bootstrap	120	61	0.63643	0.64266	-0.00623
+qwen	bootstrap	120	62	0.60969	0.62775	-0.01806
+qwen	bootstrap	120	63	0.60020	0.62999	-0.02979
+qwen	bootstrap	120	64	0.62506	0.64884	-0.02378
+qwen	bootstrap	120	65	0.58818	0.60158	-0.01340
+qwen	bootstrap	120	66	0.60227	0.61836	-0.01609
+qwen	bootstrap	120	67	0.60577	0.63051	-0.02473
+qwen	bootstrap	120	68	0.59570	0.60838	-0.01269
+qwen	bootstrap	120	69	0.60677	0.62170	-0.01492
+qwen	bootstrap	120	70	0.57610	0.59354	-0.01744
+qwen	bootstrap	120	71	0.58372	0.58809	-0.00437
+qwen	bootstrap	120	72	0.61745	0.63697	-0.01952
+qwen	bootstrap	120	73	0.57841	0.60134	-0.02293
+qwen	bootstrap	120	74	0.61446	0.64096	-0.02651
+qwen	bootstrap	120	75	0.60109	0.62316	-0.02207
+qwen	bootstrap	120	76	0.59538	0.59338	0.00200
+qwen	bootstrap	120	77	0.60334	0.61967	-0.01633
+qwen	bootstrap	120	78	0.59715	0.61727	-0.02011
+qwen	bootstrap	120	79	0.60492	0.61014	-0.00522
+qwen	bootstrap	120	80	0.58020	0.59061	-0.01040
+qwen	bootstrap	120	81	0.59904	0.63916	-0.04012
+qwen	bootstrap	120	82	0.61956	0.64253	-0.02297
+qwen	bootstrap	120	83	0.58048	0.58796	-0.00748
+qwen	bootstrap	120	84	0.63917	0.65959	-0.02042
+qwen	bootstrap	120	85	0.60854	0.62341	-0.01487
+qwen	bootstrap	120	86	0.61536	0.63824	-0.02288
+qwen	bootstrap	120	87	0.64736	0.65017	-0.00281
+qwen	bootstrap	120	88	0.57547	0.61713	-0.04166
+qwen	bootstrap	120	89	0.59758	0.63022	-0.03263
+qwen	bootstrap	120	90	0.60085	0.61967	-0.01882
+qwen	bootstrap	120	91	0.58551	0.60833	-0.02282
+qwen	bootstrap	120	92	0.60638	0.62247	-0.01609
+qwen	bootstrap	120	93	0.60116	0.64118	-0.04002
+qwen	bootstrap	120	94	0.59638	0.63929	-0.04291
+qwen	bootstrap	120	95	0.59476	0.61339	-0.01864
+qwen	bootstrap	120	96	0.60519	0.64256	-0.03737
+qwen	bootstrap	120	97	0.62641	0.63830	-0.01189
+qwen	bootstrap	120	98	0.59250	0.60452	-0.01201
+qwen	bootstrap	120	99	0.60968	0.64495	-0.03527
+qwen	bootstrap	120	100	0.63032	0.65871	-0.02839
+qwen	bootstrap	120	101	0.59938	0.63508	-0.03571
+qwen	bootstrap	120	102	0.59579	0.60177	-0.00598
+qwen	bootstrap	120	103	0.60510	0.63644	-0.03134
+qwen	bootstrap	120	104	0.60192	0.60063	0.00129
+qwen	bootstrap	120	105	0.60783	0.64509	-0.03725
+qwen	bootstrap	120	106	0.60772	0.61554	-0.00782
+qwen	bootstrap	120	107	0.59962	0.62418	-0.02456
+qwen	bootstrap	120	108	0.59702	0.62589	-0.02886
+qwen	bootstrap	120	109	0.61480	0.63437	-0.01957
+qwen	bootstrap	120	110	0.58462	0.61537	-0.03076
+qwen	bootstrap	120	111	0.58014	0.58794	-0.00779
+qwen	bootstrap	120	112	0.58369	0.61029	-0.02659
+qwen	bootstrap	120	113	0.60115	0.62018	-0.01903
+qwen	bootstrap	120	114	0.59479	0.60676	-0.01197
+qwen	bootstrap	120	115	0.61244	0.62973	-0.01728
+qwen	bootstrap	120	116	0.61353	0.62558	-0.01205
+qwen	bootstrap	120	117	0.59016	0.60765	-0.01749
+qwen	bootstrap	120	118	0.59684	0.62370	-0.02686
+qwen	bootstrap	120	119	0.57626	0.60487	-0.02861
+qwen	bootstrap	120	120	0.59279	0.61417	-0.02139
+qwen	bootstrap	120	121	0.60758	0.63831	-0.03073
+qwen	bootstrap	120	122	0.59811	0.62328	-0.02518
+qwen	bootstrap	120	123	0.58302	0.62071	-0.03768
+qwen	bootstrap	120	124	0.60035	0.62409	-0.02374
+qwen	bootstrap	120	125	0.58437	0.61607	-0.03169
+qwen	bootstrap	120	126	0.60659	0.61299	-0.00641
+qwen	bootstrap	120	127	0.59300	0.63479	-0.04179
+qwen	bootstrap	120	128	0.61275	0.64889	-0.03614
+qwen	bootstrap	120	129	0.62699	0.63433	-0.00734
+qwen	bootstrap	120	130	0.60191	0.62069	-0.01878
+qwen	bootstrap	120	131	0.60733	0.63151	-0.02417
+qwen	bootstrap	120	132	0.62596	0.63745	-0.01149
+qwen	bootstrap	120	133	0.61347	0.62753	-0.01406
+qwen	bootstrap	120	134	0.61515	0.64974	-0.03459
+qwen	bootstrap	120	135	0.62040	0.64089	-0.02049
+qwen	bootstrap	120	136	0.60457	0.62683	-0.02226
+qwen	bootstrap	120	137	0.57701	0.61117	-0.03416
+qwen	bootstrap	120	138	0.58245	0.59835	-0.01589
+qwen	bootstrap	120	139	0.60282	0.60934	-0.00652
+qwen	bootstrap	120	140	0.60434	0.62871	-0.02436
+qwen	bootstrap	120	141	0.60400	0.62694	-0.02294
+qwen	bootstrap	120	142	0.61469	0.63738	-0.02269
+qwen	bootstrap	120	143	0.59673	0.62543	-0.02870
+qwen	bootstrap	120	144	0.57244	0.57953	-0.00709
+qwen	bootstrap	120	145	0.60273	0.62128	-0.01855
+qwen	bootstrap	120	146	0.62137	0.65381	-0.03244
+qwen	bootstrap	120	147	0.59609	0.62763	-0.03154
+qwen	bootstrap	120	148	0.60727	0.62011	-0.01284
+qwen	bootstrap	120	149	0.62209	0.63215	-0.01006
+qwen	bootstrap	120	150	0.60113	0.62842	-0.02728
+qwen	bootstrap	120	151	0.58219	0.58692	-0.00473
+qwen	bootstrap	120	152	0.59246	0.62491	-0.03245
+qwen	bootstrap	120	153	0.60087	0.62497	-0.02411
+qwen	bootstrap	120	154	0.60541	0.62972	-0.02430
+qwen	bootstrap	120	155	0.58500	0.59594	-0.01094
+qwen	bootstrap	120	156	0.60061	0.63780	-0.03719
+qwen	bootstrap	120	157	0.58968	0.61364	-0.02396
+qwen	bootstrap	120	158	0.59833	0.62899	-0.03066
+qwen	bootstrap	120	159	0.57701	0.60736	-0.03035
+qwen	bootstrap	120	160	0.61445	0.63603	-0.02158
+qwen	bootstrap	120	161	0.61733	0.64039	-0.02306
+qwen	bootstrap	120	162	0.61415	0.62846	-0.01432
+qwen	bootstrap	120	163	0.59596	0.62279	-0.02683
+qwen	bootstrap	120	164	0.59701	0.61844	-0.02144
+qwen	bootstrap	120	165	0.60404	0.63039	-0.02635
+qwen	bootstrap	120	166	0.58879	0.60982	-0.02103
+qwen	bootstrap	120	167	0.60718	0.61485	-0.00766
+qwen	bootstrap	120	168	0.62488	0.64682	-0.02194
+qwen	bootstrap	120	169	0.60098	0.62566	-0.02468
+qwen	bootstrap	120	170	0.62247	0.62735	-0.00488
+qwen	bootstrap	120	171	0.59172	0.61619	-0.02447
+qwen	bootstrap	120	172	0.60645	0.62783	-0.02138
+qwen	bootstrap	120	173	0.60521	0.61991	-0.01470
+qwen	bootstrap	120	174	0.61144	0.63101	-0.01957
+qwen	bootstrap	120	175	0.60614	0.61695	-0.01081
+qwen	bootstrap	120	176	0.59902	0.62101	-0.02199
+qwen	bootstrap	120	177	0.63287	0.66073	-0.02785
+qwen	bootstrap	120	178	0.60349	0.62911	-0.02562
+qwen	bootstrap	120	179	0.61290	0.62654	-0.01364
+qwen	bootstrap	120	180	0.62120	0.63748	-0.01628
+qwen	bootstrap	120	181	0.61774	0.64380	-0.02605
+qwen	bootstrap	120	182	0.61120	0.63073	-0.01953
+qwen	bootstrap	120	183	0.61901	0.63971	-0.02070
+qwen	bootstrap	120	184	0.60678	0.62682	-0.02003
+qwen	bootstrap	120	185	0.60443	0.62529	-0.02086
+qwen	bootstrap	120	186	0.60919	0.63586	-0.02667
+qwen	bootstrap	120	187	0.58447	0.61339	-0.02893
+qwen	bootstrap	120	188	0.60905	0.63570	-0.02665
+qwen	bootstrap	120	189	0.59257	0.60213	-0.00955
+qwen	bootstrap	120	190	0.62471	0.62877	-0.00406
+qwen	bootstrap	120	191	0.59993	0.62112	-0.02119
+qwen	bootstrap	120	192	0.61329	0.63614	-0.02285
+qwen	bootstrap	120	193	0.59553	0.63761	-0.04208
+qwen	bootstrap	120	194	0.62299	0.62809	-0.00510
+qwen	bootstrap	120	195	0.58258	0.59580	-0.01323
+qwen	bootstrap	120	196	0.61201	0.63005	-0.01805
+qwen	bootstrap	120	197	0.60493	0.60931	-0.00438
+qwen	bootstrap	120	198	0.62179	0.66653	-0.04474
+qwen	bootstrap	120	199	0.61789	0.62630	-0.00841
+qwen	subsample	30	0			0.01377
+qwen	subsample	30	1			-0.02177
+qwen	subsample	30	2			-0.03135
+qwen	subsample	30	3			-0.01215
+qwen	subsample	30	4			-0.02309
+qwen	subsample	30	5			-0.03294
+qwen	subsample	30	6			0.03352
+qwen	subsample	30	7			0.00311
+qwen	subsample	30	8			-0.02023
+qwen	subsample	30	9			0.00763
+qwen	subsample	30	10			-0.02933
+qwen	subsample	30	11			0.02272
+qwen	subsample	30	12			-0.01187
+qwen	subsample	30	13			0.00356
+qwen	subsample	30	14			-0.04100
+qwen	subsample	30	15			-0.00290
+qwen	subsample	30	16			-0.01231
+qwen	subsample	30	17			-0.03944
+qwen	subsample	30	18			0.00199
+qwen	subsample	30	19			-0.01179
+qwen	subsample	30	20			0.01961
+qwen	subsample	30	21			-0.05241
+qwen	subsample	30	22			-0.00264
+qwen	subsample	30	23			0.01100
+qwen	subsample	30	24			0.01135
+qwen	subsample	30	25			0.01602
+qwen	subsample	30	26			-0.00485
+qwen	subsample	30	27			0.00588
+qwen	subsample	30	28			-0.04345
+qwen	subsample	30	29			0.02083
+qwen	subsample	30	30			-0.03769
+qwen	subsample	30	31			0.00048
+qwen	subsample	30	32			-0.01637
+qwen	subsample	30	33			-0.00197
+qwen	subsample	30	34			-0.01301
+qwen	subsample	30	35			0.00333
+qwen	subsample	30	36			-0.01574
+qwen	subsample	30	37			-0.00925
+qwen	subsample	30	38			-0.00953
+qwen	subsample	30	39			0.00641
+qwen	subsample	30	40			-0.00469
+qwen	subsample	30	41			-0.01058
+qwen	subsample	30	42			0.02261
+qwen	subsample	30	43			-0.00109
+qwen	subsample	30	44			0.02543
+qwen	subsample	30	45			-0.04339
+qwen	subsample	30	46			-0.02426
+qwen	subsample	30	47			0.03036
+qwen	subsample	30	48			-0.02545
+qwen	subsample	30	49			0.01746
+qwen	subsample	60	0			-0.01268
+qwen	subsample	60	1			-0.03236
+qwen	subsample	60	2			-0.03957
+qwen	subsample	60	3			-0.02345
+qwen	subsample	60	4			-0.00107
+qwen	subsample	60	5			-0.00545
+qwen	subsample	60	6			-0.00551
+qwen	subsample	60	7			0.01166
+qwen	subsample	60	8			-0.01936
+qwen	subsample	60	9			-0.02832
+qwen	subsample	60	10			-0.02701
+qwen	subsample	60	11			-0.02136
+qwen	subsample	60	12			-0.00450
+qwen	subsample	60	13			-0.00155
+qwen	subsample	60	14			-0.00576
+qwen	subsample	60	15			0.00977
+qwen	subsample	60	16			0.00231
+qwen	subsample	60	17			-0.02868
+qwen	subsample	60	18			-0.01777
+qwen	subsample	60	19			-0.02346
+qwen	subsample	60	20			-0.02741
+qwen	subsample	60	21			-0.01181
+qwen	subsample	60	22			-0.01289
+qwen	subsample	60	23			-0.01912
+qwen	subsample	60	24			-0.01650
+qwen	subsample	60	25			-0.02731
+qwen	subsample	60	26			-0.00085
+qwen	subsample	60	27			-0.00987
+qwen	subsample	60	28			-0.01728
+qwen	subsample	60	29			-0.02532
+qwen	subsample	60	30			0.01710
+qwen	subsample	60	31			-0.02583
+qwen	subsample	60	32			-0.01159
+qwen	subsample	60	33			-0.01907
+qwen	subsample	60	34			-0.01255
+qwen	subsample	60	35			-0.00053
+qwen	subsample	60	36			0.00662
+qwen	subsample	60	37			-0.03124
+qwen	subsample	60	38			-0.01766
+qwen	subsample	60	39			-0.00129
+qwen	subsample	60	40			-0.03102
+qwen	subsample	60	41			-0.02032
+qwen	subsample	60	42			-0.00587
+qwen	subsample	60	43			-0.02523
+qwen	subsample	60	44			-0.01123
+qwen	subsample	60	45			-0.02754
+qwen	subsample	60	46			-0.00658
+qwen	subsample	60	47			-0.01798
+qwen	subsample	60	48			0.00321
+qwen	subsample	60	49			-0.02257
+qwen	subsample	90	0			-0.03501
+qwen	subsample	90	1			-0.01875
+qwen	subsample	90	2			-0.02491
+qwen	subsample	90	3			-0.02864
+qwen	subsample	90	4			-0.03101
+qwen	subsample	90	5			-0.03456
+qwen	subsample	90	6			-0.02169
+qwen	subsample	90	7			-0.02696
+qwen	subsample	90	8			-0.03663
+qwen	subsample	90	9			-0.03936
+qwen	subsample	90	10			-0.02265
+qwen	subsample	90	11			-0.02631
+qwen	subsample	90	12			-0.02571
+qwen	subsample	90	13			-0.02447
+qwen	subsample	90	14			-0.03308
+qwen	subsample	90	15			-0.02584
+qwen	subsample	90	16			-0.02619
+qwen	subsample	90	17			-0.02314
+qwen	subsample	90	18			-0.02544
+qwen	subsample	90	19			-0.01452
+qwen	subsample	90	20			-0.02693
+qwen	subsample	90	21			-0.03608
+qwen	subsample	90	22			-0.03166
+qwen	subsample	90	23			-0.03124
+qwen	subsample	90	24			-0.03370
+qwen	subsample	90	25			-0.03116
+qwen	subsample	90	26			-0.02750
+qwen	subsample	90	27			-0.03130
+qwen	subsample	90	28			-0.03890
+qwen	subsample	90	29			-0.02192
+qwen	subsample	90	30			-0.02138
+qwen	subsample	90	31			-0.02128
+qwen	subsample	90	32			-0.03515
+qwen	subsample	90	33			-0.03919
+qwen	subsample	90	34			-0.03458
+qwen	subsample	90	35			-0.01785
+qwen	subsample	90	36			-0.02939
+qwen	subsample	90	37			-0.02240
+qwen	subsample	90	38			-0.03472
+qwen	subsample	90	39			-0.02457
+qwen	subsample	90	40			-0.02444
+qwen	subsample	90	41			-0.04152
+qwen	subsample	90	42			-0.04577
+qwen	subsample	90	43			-0.03062
+qwen	subsample	90	44			-0.03732
+qwen	subsample	90	45			-0.02331
+qwen	subsample	90	46			-0.02615
+qwen	subsample	90	47			-0.02912
+qwen	subsample	90	48			-0.03568
+qwen	subsample	90	49			-0.03857
+qwen	subsample	120	0			-0.03054
+qwen	subsample	120	1			-0.00187
+qwen	subsample	120	2			-0.00479
+qwen	subsample	120	3			-0.02290
+qwen	subsample	120	4			-0.02171
+qwen	subsample	120	5			-0.01944
+qwen	subsample	120	6			-0.03377
+qwen	subsample	120	7			-0.00987
+qwen	subsample	120	8			-0.03133
+qwen	subsample	120	9			-0.03103
+qwen	subsample	120	10			-0.02641
+qwen	subsample	120	11			0.00022
+qwen	subsample	120	12			-0.04230
+qwen	subsample	120	13			-0.00119
+qwen	subsample	120	14			-0.05512
+qwen	subsample	120	15			-0.01199
+qwen	subsample	120	16			-0.05484
+qwen	subsample	120	17			-0.04251
+qwen	subsample	120	18			-0.02642
+qwen	subsample	120	19			-0.00533
+qwen	subsample	120	20			-0.02043
+qwen	subsample	120	21			-0.01919
+qwen	subsample	120	22			-0.02038
+qwen	subsample	120	23			-0.02242
+qwen	subsample	120	24			-0.00347
+qwen	subsample	120	25			0.00634
+qwen	subsample	120	26			-0.01690
+qwen	subsample	120	27			-0.01221
+qwen	subsample	120	28			-0.00966
+qwen	subsample	120	29			-0.02374
+qwen	subsample	120	30			-0.03297
+qwen	subsample	120	31			-0.02462
+qwen	subsample	120	32			-0.02639
+qwen	subsample	120	33			-0.00461
+qwen	subsample	120	34			-0.01546
+qwen	subsample	120	35			-0.03603
+qwen	subsample	120	36			-0.03042
+qwen	subsample	120	37			-0.01554
+qwen	subsample	120	38			-0.03313
+qwen	subsample	120	39			-0.01511
+qwen	subsample	120	40			-0.02862
+qwen	subsample	120	41			-0.02387
+qwen	subsample	120	42			-0.03049
+qwen	subsample	120	43			-0.00528
+qwen	subsample	120	44			-0.01916
+qwen	subsample	120	45			-0.03214
+qwen	subsample	120	46			-0.02102
+qwen	subsample	120	47			-0.02489
+qwen	subsample	120	48			-0.02645
+qwen	subsample	120	49			-0.01451
+ministral	bootstrap	120	0	0.24911	0.40718	-0.15806
+ministral	bootstrap	120	1	0.25540	0.46199	-0.20659
+ministral	bootstrap	120	2	0.24887	0.45763	-0.20876
+ministral	bootstrap	120	3	0.23528	0.39774	-0.16246
+ministral	bootstrap	120	4	0.28080	0.43102	-0.15022
+ministral	bootstrap	120	5	0.23325	0.41837	-0.18512
+ministral	bootstrap	120	6	0.26620	0.43928	-0.17308
+ministral	bootstrap	120	7	0.24087	0.35819	-0.11732
+ministral	bootstrap	120	8	0.23477	0.36119	-0.12642
+ministral	bootstrap	120	9	0.23622	0.43536	-0.19915
+ministral	bootstrap	120	10	0.27292	0.47181	-0.19889
+ministral	bootstrap	120	11	0.26273	0.47016	-0.20742
+ministral	bootstrap	120	12	0.24269	0.43293	-0.19024
+ministral	bootstrap	120	13	0.25221	0.44053	-0.18832
+ministral	bootstrap	120	14	0.23402	0.39516	-0.16114
+ministral	bootstrap	120	15	0.27383	0.39574	-0.12191
+ministral	bootstrap	120	16	0.25583	0.40142	-0.14559
+ministral	bootstrap	120	17	0.23821	0.42197	-0.18376
+ministral	bootstrap	120	18	0.26790	0.41182	-0.14392
+ministral	bootstrap	120	19	0.25010	0.42495	-0.17485
+ministral	bootstrap	120	20	0.29561	0.40029	-0.10468
+ministral	bootstrap	120	21	0.22388	0.40797	-0.18409
+ministral	bootstrap	120	22	0.22558	0.39564	-0.17006
+ministral	bootstrap	120	23	0.25850	0.42967	-0.17118
+ministral	bootstrap	120	24	0.23485	0.42246	-0.18761
+ministral	bootstrap	120	25	0.24634	0.43404	-0.18770
+ministral	bootstrap	120	26	0.26039	0.42514	-0.16475
+ministral	bootstrap	120	27	0.22890	0.42115	-0.19225
+ministral	bootstrap	120	28	0.24484	0.39689	-0.15205
+ministral	bootstrap	120	29	0.23447	0.41713	-0.18266
+ministral	bootstrap	120	30	0.26022	0.40621	-0.14599
+ministral	bootstrap	120	31	0.27264	0.39836	-0.12572
+ministral	bootstrap	120	32	0.25875	0.40943	-0.15067
+ministral	bootstrap	120	33	0.23219	0.38143	-0.14924
+ministral	bootstrap	120	34	0.22789	0.42436	-0.19647
+ministral	bootstrap	120	35	0.25571	0.39849	-0.14278
+ministral	bootstrap	120	36	0.27431	0.42985	-0.15554
+ministral	bootstrap	120	37	0.25569	0.40327	-0.14758
+ministral	bootstrap	120	38	0.20896	0.41947	-0.21051
+ministral	bootstrap	120	39	0.26617	0.46301	-0.19684
+ministral	bootstrap	120	40	0.24675	0.42782	-0.18107
+ministral	bootstrap	120	41	0.24034	0.41914	-0.17880
+ministral	bootstrap	120	42	0.23452	0.42323	-0.18871
+ministral	bootstrap	120	43	0.24018	0.41293	-0.17276
+ministral	bootstrap	120	44	0.28433	0.41760	-0.13327
+ministral	bootstrap	120	45	0.26638	0.39969	-0.13331
+ministral	bootstrap	120	46	0.22140	0.41312	-0.19172
+ministral	bootstrap	120	47	0.26558	0.37241	-0.10683
+ministral	bootstrap	120	48	0.23464	0.41275	-0.17810
+ministral	bootstrap	120	49	0.22080	0.41609	-0.19529
+ministral	bootstrap	120	50	0.23825	0.40460	-0.16635
+ministral	bootstrap	120	51	0.27597	0.40446	-0.12849
+ministral	bootstrap	120	52	0.27308	0.40108	-0.12800
+ministral	bootstrap	120	53	0.23050	0.39499	-0.16449
+ministral	bootstrap	120	54	0.22832	0.40446	-0.17615
+ministral	bootstrap	120	55	0.25303	0.38850	-0.13546
+ministral	bootstrap	120	56	0.27743	0.45782	-0.18039
+ministral	bootstrap	120	57	0.25930	0.43107	-0.17177
+ministral	bootstrap	120	58	0.26175	0.43193	-0.17018
+ministral	bootstrap	120	59	0.28171	0.44847	-0.16675
+ministral	bootstrap	120	60	0.22781	0.39891	-0.17110
+ministral	bootstrap	120	61	0.25397	0.40074	-0.14677
+ministral	bootstrap	120	62	0.23404	0.39298	-0.15893
+ministral	bootstrap	120	63	0.23272	0.38530	-0.15258
+ministral	bootstrap	120	64	0.24237	0.43232	-0.18995
+ministral	bootstrap	120	65	0.25173	0.38804	-0.13632
+ministral	bootstrap	120	66	0.23785	0.39570	-0.15785
+ministral	bootstrap	120	67	0.23137	0.40805	-0.17669
+ministral	bootstrap	120	68	0.24137	0.39613	-0.15476
+ministral	bootstrap	120	69	0.22884	0.40256	-0.17372
+ministral	bootstrap	120	70	0.23960	0.38639	-0.14679
+ministral	bootstrap	120	71	0.24435	0.36817	-0.12382
+ministral	bootstrap	120	72	0.26560	0.43231	-0.16670
+ministral	bootstrap	120	73	0.23172	0.36627	-0.13456
+ministral	bootstrap	120	74	0.22339	0.41342	-0.19003
+ministral	bootstrap	120	75	0.25136	0.41609	-0.16473
+ministral	bootstrap	120	76	0.21797	0.36454	-0.14657
+ministral	bootstrap	120	77	0.22210	0.40624	-0.18414
+ministral	bootstrap	120	78	0.23880	0.41849	-0.17969
+ministral	bootstrap	120	79	0.24643	0.41345	-0.16702
+ministral	bootstrap	120	80	0.27205	0.39835	-0.12631
+ministral	bootstrap	120	81	0.26198	0.43402	-0.17204
+ministral	bootstrap	120	82	0.24406	0.42052	-0.17646
+ministral	bootstrap	120	83	0.22769	0.38544	-0.15775
+ministral	bootstrap	120	84	0.22729	0.41845	-0.19116
+ministral	bootstrap	120	85	0.23456	0.40347	-0.16891
+ministral	bootstrap	120	86	0.23694	0.40214	-0.16520
+ministral	bootstrap	120	87	0.27399	0.41102	-0.13703
+ministral	bootstrap	120	88	0.24988	0.40551	-0.15563
+ministral	bootstrap	120	89	0.23449	0.41113	-0.17664
+ministral	bootstrap	120	90	0.24762	0.41713	-0.16951
+ministral	bootstrap	120	91	0.24341	0.41342	-0.17002
+ministral	bootstrap	120	92	0.24233	0.40959	-0.16725
+ministral	bootstrap	120	93	0.23081	0.42760	-0.19679
+ministral	bootstrap	120	94	0.26386	0.40253	-0.13867
+ministral	bootstrap	120	95	0.23063	0.38093	-0.15030
+ministral	bootstrap	120	96	0.24507	0.41731	-0.17224
+ministral	bootstrap	120	97	0.24238	0.39394	-0.15156
+ministral	bootstrap	120	98	0.22926	0.42048	-0.19122
+ministral	bootstrap	120	99	0.26034	0.40484	-0.14450
+ministral	bootstrap	120	100	0.25461	0.44560	-0.19100
+ministral	bootstrap	120	101	0.25213	0.44766	-0.19552
+ministral	bootstrap	120	102	0.24644	0.39944	-0.15300
+ministral	bootstrap	120	103	0.24194	0.41744	-0.17550
+ministral	bootstrap	120	104	0.22806	0.38850	-0.16044
+ministral	bootstrap	120	105	0.23220	0.40128	-0.16908
+ministral	bootstrap	120	106	0.24932	0.40634	-0.15702
+ministral	bootstrap	120	107	0.23438	0.40724	-0.17286
+ministral	bootstrap	120	108	0.24047	0.39359	-0.15313
+ministral	bootstrap	120	109	0.25018	0.39751	-0.14733
+ministral	bootstrap	120	110	0.23553	0.37024	-0.13471
+ministral	bootstrap	120	111	0.24790	0.41040	-0.16250
+ministral	bootstrap	120	112	0.26470	0.39450	-0.12980
+ministral	bootstrap	120	113	0.25062	0.38733	-0.13671
+ministral	bootstrap	120	114	0.25342	0.40869	-0.15527
+ministral	bootstrap	120	115	0.25109	0.42948	-0.17839
+ministral	bootstrap	120	116	0.27069	0.44599	-0.17530
+ministral	bootstrap	120	117	0.23432	0.41646	-0.18214
+ministral	bootstrap	120	118	0.22130	0.38981	-0.16851
+ministral	bootstrap	120	119	0.25556	0.42462	-0.16905
+ministral	bootstrap	120	120	0.23777	0.39300	-0.15523
+ministral	bootstrap	120	121	0.24554	0.42380	-0.17826
+ministral	bootstrap	120	122	0.24878	0.39873	-0.14994
+ministral	bootstrap	120	123	0.23946	0.41907	-0.17961
+ministral	bootstrap	120	124	0.21646	0.38152	-0.16506
+ministral	bootstrap	120	125	0.26693	0.39966	-0.13273
+ministral	bootstrap	120	126	0.25000	0.42079	-0.17079
+ministral	bootstrap	120	127	0.24822	0.39719	-0.14897
+ministral	bootstrap	120	128	0.26672	0.43267	-0.16595
+ministral	bootstrap	120	129	0.25655	0.42834	-0.17179
+ministral	bootstrap	120	130	0.20552	0.39961	-0.19409
+ministral	bootstrap	120	131	0.22848	0.42934	-0.20087
+ministral	bootstrap	120	132	0.28258	0.45384	-0.17126
+ministral	bootstrap	120	133	0.24905	0.38567	-0.13662
+ministral	bootstrap	120	134	0.24265	0.41102	-0.16837
+ministral	bootstrap	120	135	0.28516	0.41614	-0.13098
+ministral	bootstrap	120	136	0.27233	0.41408	-0.14174
+ministral	bootstrap	120	137	0.24851	0.40183	-0.15332
+ministral	bootstrap	120	138	0.24744	0.41325	-0.16581
+ministral	bootstrap	120	139	0.25907	0.40650	-0.14743
+ministral	bootstrap	120	140	0.22798	0.41153	-0.18355
+ministral	bootstrap	120	141	0.27086	0.45625	-0.18539
+ministral	bootstrap	120	142	0.26652	0.39908	-0.13256
+ministral	bootstrap	120	143	0.27415	0.43839	-0.16424
+ministral	bootstrap	120	144	0.21797	0.34828	-0.13030
+ministral	bootstrap	120	145	0.25102	0.37677	-0.12576
+ministral	bootstrap	120	146	0.24659	0.44114	-0.19454
+ministral	bootstrap	120	147	0.22637	0.42246	-0.19609
+ministral	bootstrap	120	148	0.24573	0.40443	-0.15870
+ministral	bootstrap	120	149	0.25269	0.42757	-0.17488
+ministral	bootstrap	120	150	0.25348	0.42418	-0.17070
+ministral	bootstrap	120	151	0.22943	0.40388	-0.17445
+ministral	bootstrap	120	152	0.25759	0.39896	-0.14137
+ministral	bootstrap	120	153	0.23965	0.39743	-0.15777
+ministral	bootstrap	120	154	0.23726	0.40716	-0.16990
+ministral	bootstrap	120	155	0.23717	0.41631	-0.17914
+ministral	bootstrap	120	156	0.22768	0.44793	-0.22025
+ministral	bootstrap	120	157	0.24970	0.41569	-0.16598
+ministral	bootstrap	120	158	0.23444	0.40407	-0.16963
+ministral	bootstrap	120	159	0.26892	0.39813	-0.12921
+ministral	bootstrap	120	160	0.25744	0.42824	-0.17080
+ministral	bootstrap	120	161	0.23459	0.41902	-0.18443
+ministral	bootstrap	120	162	0.24545	0.44061	-0.19516
+ministral	bootstrap	120	163	0.25291	0.39609	-0.14318
+ministral	bootstrap	120	164	0.23047	0.37482	-0.14435
+ministral	bootstrap	120	165	0.28655	0.44063	-0.15408
+ministral	bootstrap	120	166	0.22874	0.37085	-0.14212
+ministral	bootstrap	120	167	0.22277	0.39887	-0.17610
+ministral	bootstrap	120	168	0.26667	0.45594	-0.18927
+ministral	bootstrap	120	169	0.23267	0.40956	-0.17690
+ministral	bootstrap	120	170	0.24887	0.38410	-0.13523
+ministral	bootstrap	120	171	0.22795	0.37914	-0.15119
+ministral	bootstrap	120	172	0.24325	0.40903	-0.16577
+ministral	bootstrap	120	173	0.22529	0.40296	-0.17767
+ministral	bootstrap	120	174	0.24001	0.41747	-0.17746
+ministral	bootstrap	120	175	0.24482	0.41775	-0.17293
+ministral	bootstrap	120	176	0.23091	0.38630	-0.15539
+ministral	bootstrap	120	177	0.26346	0.41579	-0.15233
+ministral	bootstrap	120	178	0.27966	0.42719	-0.14753
+ministral	bootstrap	120	179	0.24457	0.42624	-0.18168
+ministral	bootstrap	120	180	0.26313	0.41638	-0.15325
+ministral	bootstrap	120	181	0.23910	0.42743	-0.18833
+ministral	bootstrap	120	182	0.23411	0.41717	-0.18305
+ministral	bootstrap	120	183	0.23293	0.43891	-0.20598
+ministral	bootstrap	120	184	0.25597	0.38267	-0.12669
+ministral	bootstrap	120	185	0.25532	0.41740	-0.16208
+ministral	bootstrap	120	186	0.22978	0.43499	-0.20521
+ministral	bootstrap	120	187	0.22917	0.42232	-0.19315
+ministral	bootstrap	120	188	0.25881	0.38455	-0.12574
+ministral	bootstrap	120	189	0.23881	0.40453	-0.16572
+ministral	bootstrap	120	190	0.25272	0.39016	-0.13744
+ministral	bootstrap	120	191	0.23338	0.44152	-0.20813
+ministral	bootstrap	120	192	0.27147	0.45046	-0.17899
+ministral	bootstrap	120	193	0.22309	0.40148	-0.17839
+ministral	bootstrap	120	194	0.26516	0.43492	-0.16976
+ministral	bootstrap	120	195	0.23869	0.42025	-0.18156
+ministral	bootstrap	120	196	0.25678	0.40119	-0.14441
+ministral	bootstrap	120	197	0.23562	0.41463	-0.17901
+ministral	bootstrap	120	198	0.26143	0.45141	-0.18998
+ministral	bootstrap	120	199	0.26426	0.36890	-0.10465
+ministral	subsample	30	0			-0.19316
+ministral	subsample	30	1			-0.19547
+ministral	subsample	30	2			-0.14149
+ministral	subsample	30	3			-0.22199
+ministral	subsample	30	4			-0.18161
+ministral	subsample	30	5			-0.19934
+ministral	subsample	30	6			-0.15418
+ministral	subsample	30	7			-0.07713
+ministral	subsample	30	8			-0.20892
+ministral	subsample	30	9			-0.19529
+ministral	subsample	30	10			-0.12834
+ministral	subsample	30	11			-0.14607
+ministral	subsample	30	12			-0.24134
+ministral	subsample	30	13			-0.23577
+ministral	subsample	30	14			-0.14118
+ministral	subsample	30	15			-0.11124
+ministral	subsample	30	16			-0.17095
+ministral	subsample	30	17			-0.17027
+ministral	subsample	30	18			-0.19825
+ministral	subsample	30	19			-0.22047
+ministral	subsample	30	20			-0.19749
+ministral	subsample	30	21			-0.11753
+ministral	subsample	30	22			-0.23051
+ministral	subsample	30	23			-0.20064
+ministral	subsample	30	24			-0.19559
+ministral	subsample	30	25			-0.15508
+ministral	subsample	30	26			-0.20855
+ministral	subsample	30	27			-0.17224
+ministral	subsample	30	28			-0.20946
+ministral	subsample	30	29			-0.25487
+ministral	subsample	30	30			-0.15269
+ministral	subsample	30	31			-0.24380
+ministral	subsample	30	32			-0.20050
+ministral	subsample	30	33			-0.21822
+ministral	subsample	30	34			-0.19709
+ministral	subsample	30	35			-0.12755
+ministral	subsample	30	36			-0.11911
+ministral	subsample	30	37			-0.18877
+ministral	subsample	30	38			-0.10236
+ministral	subsample	30	39			-0.21624
+ministral	subsample	30	40			-0.20235
+ministral	subsample	30	41			-0.21656
+ministral	subsample	30	42			-0.21222
+ministral	subsample	30	43			-0.19003
+ministral	subsample	30	44			-0.11884
+ministral	subsample	30	45			-0.21444
+ministral	subsample	30	46			-0.20291
+ministral	subsample	30	47			-0.19331
+ministral	subsample	30	48			-0.21181
+ministral	subsample	30	49			-0.18801
+ministral	subsample	60	0			-0.17090
+ministral	subsample	60	1			-0.16834
+ministral	subsample	60	2			-0.21645
+ministral	subsample	60	3			-0.18455
+ministral	subsample	60	4			-0.14740
+ministral	subsample	60	5			-0.12137
+ministral	subsample	60	6			-0.18010
+ministral	subsample	60	7			-0.13437
+ministral	subsample	60	8			-0.16585
+ministral	subsample	60	9			-0.23025
+ministral	subsample	60	10			-0.12710
+ministral	subsample	60	11			-0.14877
+ministral	subsample	60	12			-0.16532
+ministral	subsample	60	13			-0.15530
+ministral	subsample	60	14			-0.12241
+ministral	subsample	60	15			-0.14829
+ministral	subsample	60	16			-0.12645
+ministral	subsample	60	17			-0.14079
+ministral	subsample	60	18			-0.15549
+ministral	subsample	60	19			-0.17087
+ministral	subsample	60	20			-0.16424
+ministral	subsample	60	21			-0.20414
+ministral	subsample	60	22			-0.19679
+ministral	subsample	60	23			-0.19597
+ministral	subsample	60	24			-0.12866
+ministral	subsample	60	25			-0.20352
+ministral	subsample	60	26			-0.12553
+ministral	subsample	60	27			-0.10455
+ministral	subsample	60	28			-0.14395
+ministral	subsample	60	29			-0.16737
+ministral	subsample	60	30			-0.16896
+ministral	subsample	60	31			-0.19028
+ministral	subsample	60	32			-0.12827
+ministral	subsample	60	33			-0.13541
+ministral	subsample	60	34			-0.16765
+ministral	subsample	60	35			-0.16609
+ministral	subsample	60	36			-0.17334
+ministral	subsample	60	37			-0.11972
+ministral	subsample	60	38			-0.14681
+ministral	subsample	60	39			-0.13700
+ministral	subsample	60	40			-0.18001
+ministral	subsample	60	41			-0.13645
+ministral	subsample	60	42			-0.19672
+ministral	subsample	60	43			-0.16976
+ministral	subsample	60	44			-0.14377
+ministral	subsample	60	45			-0.12738
+ministral	subsample	60	46			-0.17123
+ministral	subsample	60	47			-0.17039
+ministral	subsample	60	48			-0.15315
+ministral	subsample	60	49			-0.16411
+ministral	subsample	90	0			-0.16967
+ministral	subsample	90	1			-0.17710
+ministral	subsample	90	2			-0.15987
+ministral	subsample	90	3			-0.15737
+ministral	subsample	90	4			-0.14687
+ministral	subsample	90	5			-0.16907
+ministral	subsample	90	6			-0.14701
+ministral	subsample	90	7			-0.21255
+ministral	subsample	90	8			-0.17156
+ministral	subsample	90	9			-0.14792
+ministral	subsample	90	10			-0.15271
+ministral	subsample	90	11			-0.18570
+ministral	subsample	90	12			-0.14892
+ministral	subsample	90	13			-0.15607
+ministral	subsample	90	14			-0.16466
+ministral	subsample	90	15			-0.19869
+ministral	subsample	90	16			-0.16093
+ministral	subsample	90	17			-0.17658
+ministral	subsample	90	18			-0.16480
+ministral	subsample	90	19			-0.16881
+ministral	subsample	90	20			-0.17887
+ministral	subsample	90	21			-0.14929
+ministral	subsample	90	22			-0.15074
+ministral	subsample	90	23			-0.17212
+ministral	subsample	90	24			-0.19949
+ministral	subsample	90	25			-0.15782
+ministral	subsample	90	26			-0.18176
+ministral	subsample	90	27			-0.15002
+ministral	subsample	90	28			-0.15245
+ministral	subsample	90	29			-0.15551
+ministral	subsample	90	30			-0.17729
+ministral	subsample	90	31			-0.17075
+ministral	subsample	90	32			-0.16014
+ministral	subsample	90	33			-0.17927
+ministral	subsample	90	34			-0.16872
+ministral	subsample	90	35			-0.15360
+ministral	subsample	90	36			-0.17165
+ministral	subsample	90	37			-0.15617
+ministral	subsample	90	38			-0.16441
+ministral	subsample	90	39			-0.18884
+ministral	subsample	90	40			-0.14869
+ministral	subsample	90	41			-0.15425
+ministral	subsample	90	42			-0.17932
+ministral	subsample	90	43			-0.15867
+ministral	subsample	90	44			-0.17570
+ministral	subsample	90	45			-0.18386
+ministral	subsample	90	46			-0.19290
+ministral	subsample	90	47			-0.15979
+ministral	subsample	90	48			-0.18799
+ministral	subsample	90	49			-0.14570
+ministral	subsample	120	0			-0.14726
+ministral	subsample	120	1			-0.12499
+ministral	subsample	120	2			-0.14864
+ministral	subsample	120	3			-0.13574
+ministral	subsample	120	4			-0.15022
+ministral	subsample	120	5			-0.17334
+ministral	subsample	120	6			-0.18619
+ministral	subsample	120	7			-0.18698
+ministral	subsample	120	8			-0.14069
+ministral	subsample	120	9			-0.16830
+ministral	subsample	120	10			-0.14754
+ministral	subsample	120	11			-0.13467
+ministral	subsample	120	12			-0.17392
+ministral	subsample	120	13			-0.13412
+ministral	subsample	120	14			-0.16936
+ministral	subsample	120	15			-0.12573
+ministral	subsample	120	16			-0.18369
+ministral	subsample	120	17			-0.14912
+ministral	subsample	120	18			-0.15123
+ministral	subsample	120	19			-0.15401
+ministral	subsample	120	20			-0.15236
+ministral	subsample	120	21			-0.13383
+ministral	subsample	120	22			-0.17414
+ministral	subsample	120	23			-0.18013
+ministral	subsample	120	24			-0.16377
+ministral	subsample	120	25			-0.15003
+ministral	subsample	120	26			-0.17775
+ministral	subsample	120	27			-0.13989
+ministral	subsample	120	28			-0.16540
+ministral	subsample	120	29			-0.14484
+ministral	subsample	120	30			-0.18516
+ministral	subsample	120	31			-0.18166
+ministral	subsample	120	32			-0.14886
+ministral	subsample	120	33			-0.17152
+ministral	subsample	120	34			-0.15311
+ministral	subsample	120	35			-0.17873
+ministral	subsample	120	36			-0.13633
+ministral	subsample	120	37			-0.17719
+ministral	subsample	120	38			-0.16622
+ministral	subsample	120	39			-0.17856
+ministral	subsample	120	40			-0.08527
+ministral	subsample	120	41			-0.14165
+ministral	subsample	120	42			-0.15830
+ministral	subsample	120	43			-0.14720
+ministral	subsample	120	44			-0.16051
+ministral	subsample	120	45			-0.19805
+ministral	subsample	120	46			-0.13241
+ministral	subsample	120	47			-0.19627
+ministral	subsample	120	48			-0.19268
+ministral	subsample	120	49			-0.15975

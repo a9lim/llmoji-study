@@ -1,7 +1,0 @@
-model	n_prompts	n_pairs	n_rows	spearman_rho	spearman_p
-gemma	120	7140	960	0.61484	0.00000
-qwen	120	7140	949	0.71472	0.00000
-ministral	120	7140	915	0.34404	0.00000
-gpt_oss_20b	120	7140	959	0.34147	0.00000
-phi4_mini	11	55	11	-0.23025	0.09080
-granite	118	6903	703	0.47535	0.00000

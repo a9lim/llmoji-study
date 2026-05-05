@@ -196,7 +196,7 @@ Scripts split into local (probes, hidden state, v3 follow-ons) and
 harness (contributor corpus): `scripts/local/` and `scripts/harness/`.
 
 For the local side, set `LLMOJI_MODEL=gemma|qwen|ministral` and run
-`scripts/local/03_emotional_run.py` (the v3 800-generation runner).
+`scripts/local/00_emit.py` (the v3 800-generation runner).
 See `CLAUDE.md` § Commands for the full script chain.
 
 For the harness side, you need an `ANTHROPIC_API_KEY` (the cluster
@@ -205,11 +205,11 @@ above pulls `huggingface_hub`). Anonymous reads of the public
 dataset are fine, so `HF_TOKEN` is optional.
 
 ```bash
-python scripts/harness/06_claude_hf_pull.py            # snapshot a9lim/llmoji into data/hf_dataset/
-python scripts/harness/07_claude_kaomoji_basics.py     # printout: top kaomoji, providers, contributors
-python scripts/harness/15_claude_faces_embed_description.py  # per-canonical embeddings
-python scripts/harness/16_eriskii_replication.py       # axes, clusters, writeup
-python scripts/harness/18_claude_faces_pca.py          # PCA panel
+python scripts/harness/60_corpus_pull.py            # snapshot a9lim/llmoji into data/harness/hf_dataset/
+python scripts/harness/61_corpus_basics.py     # printout: top kaomoji, providers, contributors
+python scripts/harness/62_corpus_embed.py  # per-canonical embeddings
+python scripts/harness/64_eriskii_replication.py       # axes, clusters, writeup
+python scripts/harness/63_corpus_pca.py          # PCA panel
 ```
 
 ## Related
@@ -242,7 +242,7 @@ gotchas live in [`CLAUDE.md`](CLAUDE.md),
 [`docs/findings.md`](docs/findings.md), [`docs/local-side.md`](docs/local-side.md),
 and [`docs/gotchas.md`](docs/gotchas.md); headline figures and
 interactive 3D HTMLs are in
-[`figures/local/cross_model/`](figures/local/cross_model/).
+[`figures/local/`](figures/local/).
 
 ### 1. Affect peaks at the model-specific preferred layer, not the deepest
 
@@ -459,7 +459,7 @@ qwen seed 0 (37–46% per-row deviation pre-fix); the cleaner data
 shows the cross-model dominance signal lives most strongly on
 ministral.
 
-Static figures: `figures/local/cross_model/fig_v3_canonical_quadrant_means.png`
+Static figures: `figures/local/fig_v3_canonical_quadrant_means.png`
 (canonical-3-probe per-quadrant means, NB-subtracted) and the
 parallel `fig_v3_extension_quadrant_means.png` (3 extension probes,
 also NB-subtracted). Both show NB at zero by construction with the
@@ -488,8 +488,10 @@ qwen | ministral side-by-side.
   hold qualitatively and have been re-validated with cleaner numbers;
   finding 6 (rule 3b) shifted from "PASS on all 3" to weak (1 PASS /
   1 mid / 1 fail) — a meaningful update, see body. The
-  ~3300 pre-cleanliness generations are archived at
-  `data/archive/2026-05-03_pre_cleanliness/` rather than deleted.
+  ~3300 pre-cleanliness generations were archived at
+  `data/archive/2026-05-03_pre_cleanliness/` rather than deleted; the
+  archive was purged in the 2026-05-05 layout refactor (history
+  retrievable via `git log --diff-filter=D`).
 
 ## License
 

@@ -42,9 +42,9 @@ Two changes in `llmoji_study/capture.py`:
 
 Plumbing changes propagated through:
 - `install_prefix_cache` + `install_full_input_cache` + `run_sample` (added `instruction_override` param)
-- `scripts/local/32_introspection_pilot.py` (per-condition `(extra_preamble, instruction_override)` mapping)
-- `scripts/local/43_introspection_custom.py` (custom preamble → `instruction_override`)
-- `scripts/local/03_emotional_run.py` (env var `LLMOJI_PREAMBLE_FILE` → `instruction_override`)
+- `scripts/local/30_introspection_pilot.py` (per-condition `(extra_preamble, instruction_override)` mapping)
+- `scripts/local/33_introspection_custom.py` (custom preamble → `instruction_override`)
+- `scripts/local/00_emit.py` (env var `LLMOJI_PREAMBLE_FILE` → `instruction_override`)
 - `scripts/local/50_face_likelihood.py` (env var `LLMOJI_PREAMBLE_FILE` → instruction)
 
 Pre-fix data archived under `data/archive/2026-05-04_pre_instruction_override/`.
@@ -86,9 +86,9 @@ intro_pre and intro_custom_v2 share preamble + seed and should be byte-identical
 
 ## v7-primed v3 main (`data/gemma_intro_v7_primed.jsonl`, 960 rows)
 
-Full canonical v3-main-style run on gemma with `LLMOJI_PREAMBLE_FILE=preambles/introspection_v7.txt`. 120 prompts × 8 seeds, 0 errors, 99.8% kaomoji emit. Sidecars at `data/hidden/v3_intro_v7_primed/`.
+Full canonical v3-main-style run on gemma with `LLMOJI_PREAMBLE_FILE=preambles/introspection_v7.txt`. 120 prompts × 8 seeds, 0 errors, 99.8% kaomoji emit. Sidecars at `data/local/hidden/intro_v7_primed/`.
 
-### Per-quadrant priming shift (vs unprimed `data/emotional_raw.jsonl`)
+### Per-quadrant priming shift (vs unprimed `data/local/gemma/emotional_raw.jsonl`)
 
 JSD between unprimed and primed face distributions, per quadrant:
 
@@ -125,7 +125,7 @@ Pairwise κ(unprimed-gemma ↔ v7-primed-gemma) = 0.757 — high agreement. Prim
 
 **Decision: keep v7 canonical for introspection-research-side priming, but face_likelihood ensemble stays on unprimed encoders + haiku.** Don't bake INTROSPECTION_PREAMBLE into face_likelihood as default.
 
-## Haiku face-quadrant judgment (`scripts/harness/24_haiku_face_quadrant_judgment.py`)
+## Haiku face-quadrant judgment (`scripts/harness/50_face_likelihood.py`)
 
 Methodologically distinct face→quadrant mapper: ask `claude-haiku-4-5` to classify each face in `data/v3_face_union.parquet` (573 faces) by visual semantics alone, no prompt context, no LM-head signal.
 
@@ -251,7 +251,7 @@ generate against hybrid-LA models like qwen3.6.
 ## Decisions
 
 - `INTROSPECTION_PREAMBLE` in `config.py` = v7.txt (canonical 2026-05-04 late evening, **gemma-specific**).
-- `data/gemma_intro_v7_primed.jsonl` is the primed-main reference dataset for face-stability triple, Procrustes, same-face-cross-quadrant comparisons under priming. Sidecars under `data/hidden/v3_intro_v7_primed/`.
+- `data/gemma_intro_v7_primed.jsonl` is the primed-main reference dataset for face-stability triple, Procrustes, same-face-cross-quadrant comparisons under priming. Sidecars under `data/local/hidden/intro_v7_primed/`.
 - `face_likelihood` ensemble stays on unprimed encoders + haiku. Don't pass `LLMOJI_PREAMBLE_FILE` to script 50 by default.
 - **Don't apply v7 priming to qwen** (or by extension other models in the qwen-style register-compliance regime). Architecture-specific.
 - Pre-fix introspection data archived at `data/archive/2026-05-04_pre_instruction_override/qwen/` and root-level for gemma.
@@ -259,6 +259,6 @@ generate against hybrid-LA models like qwen3.6.
 ## Open threads
 
 - **Multi-seed verification of v7 vs v3** (~12 min compute) — variance band on face_gain is ~±2pp at n=1. v7 over v3 on absolute coupling is well outside band; v7 over v6 is at the edge. Multi-seed would tighten the conclusion.
-- **Face-stability triple under priming** (scripts 36/37/38 on `gemma_intro_v7_primed.jsonl`) — verify internal-coupling improvement at full statistical power. Scripts may need an `--input` flag or `LLMOJI_OUT_SUFFIX` plumbing to read the primed file.
+- **Face-stability triple under priming** (scripts 27/28/29 on `gemma_intro_v7_primed.jsonl`) — verify internal-coupling improvement at full statistical power. Scripts may need an `--input` flag or `LLMOJI_OUT_SUFFIX` plumbing to read the primed file.
 - **Same-v2-hurts-qwen finding** is on hold under corrected semantics — needs rerun.
 - **Haiku per-face calibrated probabilities → ensemble at higher sizes**: confidences are model-belief, not LM-head softmax. If we want haiku to contribute at size-6+, a different aggregation scheme (rank-based vote? geometric mean?) might unlock it.

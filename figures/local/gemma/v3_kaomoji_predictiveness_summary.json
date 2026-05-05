@@ -2,26 +2,26 @@
   "model": "gemma",
   "rep": "h_first.layer-stack",
   "n_rows_total": 960,
-  "n_rows_kept": 888,
+  "n_rows_kept": 891,
   "min_n": 5,
-  "n_faces_total": 69,
+  "n_faces_total": 68,
   "n_faces_kept": 26,
   "hidden_to_face": {
-    "accuracy": 0.6103603603603603,
-    "macro_f1": 0.19333037172156897,
-    "majority_baseline": 0.17229729729729729,
+    "accuracy": 0.6105499438832772,
+    "macro_f1": 0.1913114058535048,
+    "majority_baseline": 0.1717171717171717,
     "uniform_baseline": 0.038461538461538464,
     "n_classes": 26,
     "n_splits": 3,
     "cv": "StratifiedGroupKFold",
     "per_class_recall": {
-      "(\uff61\u30fb\u0301\ufe3f\u30fb\u0300\uff61)": 0.8823529411764706,
+      "(\uff61\u30fb\u0301\ufe3f\u30fb\u0300\uff61)": 0.9150326797385621,
       "(\u256f\u00b0\u25a1\u00b0)": 0.9850746268656716,
-      "(\u0e51\u02c3\u203f\u02c2)": 0.8137254901960784,
+      "(\u0e51\u02c3\u203f\u02c2)": 0.7843137254901961,
       "(\u2299_\u2299)": 0.7171717171717171,
       "(\uff61\u25d5\u203f\u25d5\uff61)": 0.8125,
-      "(\uff61\u2665\u203f\u2665\uff61)": 0.8125,
-      "(\uff61\u256f\ufe35\u2570\uff61)": 0.3076923076923077,
+      "(\uff61\u2665\u203f\u2665\uff61)": 0.875,
+      "(\uff61\u256f\ufe35\u2570\uff61)": 0.23076923076923078,
       "(\u273f\u25e0\u203f\u25e0)": 0.10344827586206896,
       "(\uff89\u25d5\u30ee\u25d5)": 0.0,
       "(\u2299\ufe4f\u2299)": 0.0,
@@ -33,11 +33,11 @@
       "(\u02d8\u03c9\u02d8)": 0.0,
       "(\u02d8\u0329\u256d\u256e\u02d8\u0329)": 0.0,
       "(\u02d8\u25bd\u02d8)": 0.0,
+      "(\u2267\u25bd\u2266)": 0.0,
       "(\u02d8\u06a1\u02d8)": 0.2,
       "(\uff61\u02c3\u203f\u02c2)": 0.0,
       "(\u02d9\ua4b3\u02d9)": 0.0,
       "(\u30fb_\u30fb)": 0.0,
-      "(\u2267\u25bd\u2266)": 0.0,
       "(\u30fb\u0300\u03c9\u30fb\u0301)": 0.0,
       "(\u2605\u03c9\u2605)": 0.0,
       "(\uff61>\ufe4f<\uff61)": 0.0
@@ -63,48 +63,48 @@
     "pcs": [
       {
         "pc": 1,
-        "explained_variance_ratio": 0.3068524897098541,
-        "eta_squared": 0.8645302653312683
+        "explained_variance_ratio": 0.30627697706222534,
+        "eta_squared": 0.8653002977371216
       },
       {
         "pc": 2,
-        "explained_variance_ratio": 0.1561664491891861,
-        "eta_squared": 0.7705444693565369
+        "explained_variance_ratio": 0.1572476029396057,
+        "eta_squared": 0.7707092761993408
       },
       {
         "pc": 3,
-        "explained_variance_ratio": 0.09499591588973999,
-        "eta_squared": 0.7231419086456299
+        "explained_variance_ratio": 0.0950896143913269,
+        "eta_squared": 0.724798321723938
       },
       {
         "pc": 4,
-        "explained_variance_ratio": 0.07663624733686447,
-        "eta_squared": 0.5421691536903381
+        "explained_variance_ratio": 0.0763997882604599,
+        "eta_squared": 0.5424577593803406
       },
       {
         "pc": 5,
-        "explained_variance_ratio": 0.038990527391433716,
-        "eta_squared": 0.5711382031440735
+        "explained_variance_ratio": 0.0389028862118721,
+        "eta_squared": 0.5701354742050171
       }
     ],
-    "weighted_eta2_top_k": 0.5181307751128572,
-    "topk_explained_variance": 0.6736416816711426,
-    "weighted_eta2_normalized": 0.7691489247332495
+    "weighted_eta2_top_k": 0.5187581120470952,
+    "topk_explained_variance": 0.6739168763160706,
+    "weighted_eta2_normalized": 0.7697657237534365
   },
   "centroid_approximation_quality": {
-    "n_rows": 888,
+    "n_rows": 891,
     "n_features": 301056,
     "face": {
-      "r2": 0.5494953813326324,
-      "mean_centered_cosine": 0.7328827455639839,
-      "median_centered_cosine": 0.7903726696968079,
-      "mean_error_over_baseline": 0.6521008610725403
+      "r2": 0.5500925876993821,
+      "mean_centered_cosine": 0.7333760592839801,
+      "median_centered_cosine": 0.7912856340408325,
+      "mean_error_over_baseline": 0.6516361236572266
     },
     "quadrant": {
-      "r2": 0.5352591249246353,
-      "mean_centered_cosine": 0.7312824016118104,
-      "median_centered_cosine": 0.7569597661495209,
-      "mean_error_over_baseline": 0.6662574410438538
+      "r2": 0.5358734788959219,
+      "mean_centered_cosine": 0.7318452139093419,
+      "median_centered_cosine": 0.7569805383682251,
+      "mean_error_over_baseline": 0.6657494306564331
     }
   }
 }

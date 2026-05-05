@@ -1,7 +1,7 @@
 """Per-row .npz sidecar I/O for saved hidden states.
 
 Each captured generation writes one .npz at
-``data/hidden/<experiment>/<row_uuid>.npz``. Keys in the archive:
+``data/local/hidden/<experiment>/<row_uuid>.npz``. Keys in the archive:
 
   layer_idxs       (N,) int64         — captured layer indices
   n_tokens         ()  int64          — number of generated tokens
@@ -95,8 +95,13 @@ def load_hidden_states(
 
 
 def hidden_state_path(data_dir: Path, experiment: str, row_uuid: str) -> Path:
-    """Canonical sidecar path: ``<data_dir>/hidden/<experiment>/<uuid>.npz``."""
-    return data_dir / "hidden" / experiment / f"{row_uuid}.npz"
+    """Canonical sidecar path: ``<data_dir>/local/hidden/<experiment>/<uuid>.npz``.
+
+    Post-2026-05-05 layout refactor: hidden states are unambiguously
+    local-side (no harness equivalent), so they live under
+    ``data/local/hidden/`` rather than ``data/local/hidden/``.
+    """
+    return data_dir / "local" / "hidden" / experiment / f"{row_uuid}.npz"
 
 
 class SidecarWriter:
