@@ -1,7 +1,7 @@
 # Cross-emit sanity check
 
 **Ground-truth floor:** total_emit_count ≥ 3
-**Encoders compared:** gemma, gemma_v7primed, gpt_oss_20b, granite, haiku, ministral, qwen, rinna_bilingual_4b, rinna_bilingual_4b_jp, rinna_bilingual_4b_jpfull, rinna_bilingual_4b_jpfull30, rinna_jp_3_6b, rinna_jp_3_6b_jp, rinna_jp_3_6b_jpfull, rinna_jp_3_6b_jpfull30
+**Encoders compared:** gemma, gemma_v7primed, gpt_oss_20b, granite, haiku, haiku_v1, ministral, opus, qwen, rinna_bilingual_4b, rinna_bilingual_4b_jp, rinna_bilingual_4b_jpfull, rinna_bilingual_4b_jpfull30, rinna_jp_3_6b, rinna_jp_3_6b_jp, rinna_jp_3_6b_jpfull, rinna_jp_3_6b_jpfull30
 
 ## Partition counts (in GT subset)
 
@@ -22,9 +22,11 @@ Each cell: accuracy (n_correct/n) | κ.  **Bold cells** are cross-prediction (en
 | gemma | 86% (12/14) | κ=0.82 | **67% (16/24) | κ=0.57** | **100% (2/2) | κ=1.00** | 59% (10/17) | κ=0.48 | 88% (7/8) | κ=0.84 |
 | gemma_v7primed | 71% (10/14) | κ=0.63 | 54% (13/24) | κ=0.44 | 100% (2/2) | κ=1.00 | 59% (10/17) | κ=0.47 | 88% (7/8) | κ=0.84 |
 | gpt_oss_20b | 43% (6/14) | κ=0.27 | 33% (8/24) | κ=0.21 | 100% (2/2) | κ=1.00 | 65% (11/17) | κ=0.55 | 75% (6/8) | κ=0.68 |
-| granite | 43% (6/14) | κ=0.24 | 33% (8/24) | κ=0.20 | 100% (2/2) | κ=1.00 | 44% (8/18) | κ=0.33 | 50% (4/8) | κ=0.38 |
-| haiku | 50% (7/14) | κ=0.32 | 54% (13/24) | κ=0.42 | 50% (1/2) | κ=0.33 | 47% (8/17) | κ=0.35 | 88% (7/8) | κ=0.84 |
+| granite | 43% (6/14) | κ=0.25 | 33% (8/24) | κ=0.19 | 100% (2/2) | κ=1.00 | 41% (7/17) | κ=0.27 | 38% (3/8) | κ=0.22 |
+| haiku | 43% (3/7) | κ=0.24 | 50% (5/10) | κ=0.32 | 0% (0/1) | κ=0.00 | 36% (4/11) | κ=0.24 | 83% (5/6) | κ=0.78 |
+| haiku_v1 | 50% (7/14) | κ=0.32 | 54% (13/24) | κ=0.42 | 50% (1/2) | κ=0.33 | 47% (8/17) | κ=0.35 | 88% (7/8) | κ=0.84 |
 | ministral | **29% (4/14) | κ=0.08** | **42% (10/24) | κ=0.30** | 100% (2/2) | κ=1.00 | 41% (7/17) | κ=0.21 | 25% (2/8) | κ=0.11 |
+| opus | 57% (4/7) | κ=0.42 | 80% (8/10) | κ=0.74 | 100% (1/1) | κ=nan | 36% (4/11) | κ=0.22 | 83% (5/6) | κ=0.78 |
 | qwen | **29% (4/14) | κ=0.10** | 42% (10/24) | κ=0.31 | **0% (0/2) | κ=0.00** | 24% (4/17) | κ=0.12 | 25% (2/8) | κ=0.08 |
 | rinna_bilingual_4b | 43% (6/14) | κ=0.25 | 12% (3/24) | κ=0.00 | 0% (0/2) | κ=0.00 | 12% (2/17) | κ=-0.07 | 25% (2/8) | κ=0.00 |
 | rinna_bilingual_4b_jp | 29% (4/14) | κ=0.09 | 8% (2/24) | κ=-0.00 | 0% (0/2) | κ=0.00 | 18% (3/17) | κ=0.03 | 25% (2/8) | κ=0.00 |

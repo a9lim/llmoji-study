@@ -80,6 +80,18 @@ def _markers_for(models: list[str]) -> dict[str, str]:
     return {m: _MARKER_POOL[i % len(_MARKER_POOL)] for i, m in enumerate(models)}
 
 
+def _size_for(symbol: str, base: int = 8) -> float:
+    """Per-symbol size scaling — Plotly's ``x`` marker renders much
+    thicker than the filled shapes at the same nominal size, so it
+    visually dominates. ``cross`` (+) renders close enough to the
+    filled shapes' visual weight that it doesn't need adjustment.
+    Empirically x=0.5×, cross=1.0× brings the marker family into
+    visual balance."""
+    if symbol == "x":
+        return base * 0.5
+    return base
+
+
 def _load_stack(short: str) -> tuple[pd.DataFrame, np.ndarray]:
     """Load layer-stack hidden-state representation for `short`.
     Returns (df with split-HN quadrant column, X (n × n_layers·hidden_dim))."""
@@ -189,23 +201,6 @@ def _add_overlay_scene(
     anchored on the reference model's marker."""
     scene = "scene" if scene_idx == 1 else f"scene{scene_idx}"
 
-    # Per-quadrant connecting lines through all models in order.
-    for i, q in enumerate(common):
-        color = QUADRANT_COLORS.get(q, "#666")
-        xs = [cents_by_model[m][i, 0] for m in models]
-        ys = [cents_by_model[m][i, 1] for m in models]
-        zs = [cents_by_model[m][i, 2] for m in models]
-        fig.add_trace(
-            go.Scatter3d(
-                x=xs, y=ys, z=zs,
-                mode="lines",
-                line=dict(color=color, width=4, dash="dash"),
-                opacity=0.6,
-                showlegend=False, hoverinfo="skip",
-                scene=scene,
-            )
-        )
-
     # Per-quadrant per-model markers; quadrant label anchored on reference.
     for i, q in enumerate(common):
         color = QUADRANT_COLORS.get(q, "#666")
@@ -216,7 +211,7 @@ def _add_overlay_scene(
                 go.Scatter3d(
                     x=[pt[0]], y=[pt[1]], z=[pt[2]],
                     mode="markers+text",
-                    marker=dict(size=8, color=color,
+                    marker=dict(size=_size_for(markers[m]), color=color,
                                 symbol=markers[m],
                                 line=dict(color="black", width=1)),
                     text=text, textposition="top center",
@@ -238,7 +233,7 @@ def _add_overlay_scene(
             go.Scatter3d(
                 x=[None], y=[None], z=[None],
                 mode="markers",
-                marker=dict(size=8, color="#444",
+                marker=dict(size=_size_for(markers[m]), color="#444",
                             symbol=markers[m],
                             line=dict(color="black", width=1)),
                 name=f"{m}",

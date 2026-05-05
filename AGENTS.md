@@ -93,14 +93,54 @@ not nothing.
 
 ### Current headline findings
 
-- **Best deployment ensemble**: `{gemma_v7primed, haiku}` at **0.801
-  emit-weighted similarity** / 0.652 face-uniform on n=128
-  Claude-emitted faces. Best face-uniform (vocabulary): `{gemma, haiku}`
-  at 0.702 / 0.770. Per-encoder solo emit-weighted: gemma_v7primed
-  0.754, haiku 0.734, gemma 0.706, ministral 0.674, gpt_oss_20b 0.661,
-  qwen 0.567. **Introspection-priming generalizes outward** —
-  gemma_v7primed beats unprimed gemma on Claude's actual emission
-  distribution.
+- **Best deployment ensemble**: `{gemma_v7primed, opus}` at **0.829
+  emit-weighted similarity** / 0.788 face-uniform on n=49 GT-floor-3
+  faces (16 encoders, exhaustive subset search via script 53). Top
+  face-uniform ensemble is the same 2-encoder set. Per-encoder solo
+  (emit-weighted, soft-everywhere JSD vs Claude-GT): **gemma_v7primed
+  0.801, opus 0.797**, gemma 0.755, haiku 0.723, gpt_oss_20b 0.667,
+  granite 0.586, ministral 0.579. **Opus introspection scales** — pure
+  introspective rating (no visual priming, no LM head) closes the gap
+  with gemma_v7primed solo and complements the local LM-head encoders
+  cleanly (κ=0.547 with gemma_v7primed). Old headline ensemble
+  `{gemma_v7primed, haiku}` is superseded; the visual-primed haiku v1
+  variant was deleted as an encoder after methodological cleanup
+  (priming bypassed introspection).
+- **Schema v2 for Anthropic-judge JSONLs** (2026-05-05). Script 24
+  (`scripts/harness/24_haiku_face_quadrant_judgment.py --model
+  {haiku,opus}`) emits *likelihoods only* — `top_pick`, `reason`, and
+  the explicit `temperature=0` request are gone (the latter
+  per-model: opus 4.7 deprecated it). Prompt v4 reframes the task as
+  introspection on felt state ("rate by the affective state it
+  causes you to feel"), avoiding visual-feature priming that would
+  shortcut around introspection. v1's visually-primed prompt scored
+  ~0.06 emit-weighted higher than v4's introspection-only prompt on
+  haiku — that gap measures the *visual-shortcut effect*, which the
+  honest measurement now isolates instead of inheriting silently.
+  Bridge from judgment JSONL → ensemble TSV via
+  `scripts/harness/27_anthropic_to_face_likelihood.py`.
+- **Opus introspection — per-quadrant model-size effect** is
+  concentrated in low-arousal and neutral cells. Mean similarity
+  (face-uniform, n=49 GT-floor-3): **opus on NB = 0.698 vs haiku v4
+  = 0.485 (+0.213); opus on LN = 0.753 vs haiku = 0.601 (+0.152)**.
+  HP slightly regressed (-0.095) — opus is more honest about
+  borderline-LP-vs-HP faces haiku v4 over-confidently called HP.
+  Reading: introspective access scales with model size *especially*
+  in cells where visual scaffolding helps least.
+- **Wild-emit residual analysis (`docs/2026-05-05-residual-state-axes.md`):**
+  on the refreshed corpus (1 contributor / 8 source models / 306
+  canonical kaomoji, n=215 wild-emit faces), the unsupervised k=6
+  clustering surfaces a substantial **HN-S-modal cluster (n=44, modal
+  share 0.56, "composed competence with measured empathy")** that
+  was under-resolved at the prior corpus size. The face-shape is
+  empathic-concern, not fear/alarm — (´・ω・`), (´;ω;`), (´-ω-`).
+  Cluster-summed shares (face-count): HP 14% / LP 24% / HN-D 3% /
+  HN-S 15% / LN 12% / NB 32%. Empathic-concern is the primary
+  under-sampled state in the GT pilot — only 5% of GT-only faces
+  are HN-S vs 15% in the wild set — and the cleanest target for the
+  next elicitation arm. Selection-confound argument
+  ("Russell-elicited GT misses what deployment surfaces") survives
+  unchanged.
 - **Sequential Claude scaling complete.** 880 naturalistic
   (`data/claude-runs/run-{0..7}.jsonl`) + 120 introspection
   (`data/claude-runs-introspection/run-0.jsonl`) = 1000 Opus-4.7 rows
@@ -115,10 +155,13 @@ not nothing.
   not undersampling artifact. Priming sharpens per-quadrant face
   concentration without changing modal-quadrant assignments.
 - **Per-project Claude emotion analysis** (script 22) on the expanded
-  GT corpus: 2405 emissions, **66% direct Claude-GT resolution** under
-  `--mode gt-priority` (up from ~22% pre-2026-05-05), 31.8% ensemble
-  fallback, 2.2% unknown. Figures at
-  `figures/harness/claude_per_project_{gt_priority,ensemble,gt_only}.png`.
+  GT corpus: **3119 emissions** across 274 unique faces, **67.2%
+  direct Claude-GT resolution** under `--mode gt-priority` (up from
+  64.4% before HF pull refresh), 29.4% ensemble fallback, 3.4%
+  unknown. Strict gt-only mode: 67.2% resolved, **32.8% unknown**
+  (1024 emissions across 207 unique faces never elicited in the GT
+  pilot). Figures at `figures/harness/claude_per_project_{gt_priority,
+  ensemble,gt_only}.png`.
 - **Rule-3b** (HN-S vs HN-D on `fearful.unflinching` at t0): gemma ✓,
   ministral ✓, qwen 1/3 (qwen's HN-S prompts trip safety priors).
   Detail: `docs/2026-05-01-rule3-redesign.md` +
@@ -213,7 +256,11 @@ python scripts/harness/local_per_project_axes.py
 python scripts/harness/22_claude_per_project_quadrants.py                 # default --mode gt-priority
 python scripts/harness/22_claude_per_project_quadrants.py --mode ensemble # ensemble for every face
 python scripts/harness/22_claude_per_project_quadrants.py --mode gt-only  # strict
-python scripts/harness/24_haiku_face_quadrant_judgment.py                 # haiku face-judgment encoder
+python scripts/harness/24_haiku_face_quadrant_judgment.py                 # haiku face-judgment encoder (default)
+python scripts/harness/24_haiku_face_quadrant_judgment.py --model opus --gt-only   # opus on the GT subset
+python scripts/harness/27_anthropic_to_face_likelihood.py --short opus    # bridge judgment JSONL → face_likelihood TSV
+python scripts/harness/26_wild_faces_eriskii_residual.py --fixed-k 6      # wild-emit residual clusters + 3D PCA
+python scripts/harness/26_wild_faces_eriskii_residual.py --gt-only --fixed-k 6  # gt-only counterpart
 
 # Claude groundtruth pilot (Opus 4.7, T=1.0; saturation-gated sequential).
 # Run-0 was the original block-staged pilot; runs 1+ are single-block
@@ -269,7 +316,7 @@ llmoji-study/
                                # + build_per_face_pca_3d, wrap_blog_3d_html)
     harness/                   # contributor-corpus + Claude-API
                                # (06, 07, 15, 16, 18, 19, 20, 21, 22,
-                               # 23, 24, 25 + local_per_project_axes)
+                               # 23, 24, 25, 26, 27 + local_per_project_axes)
   preambles/                   # introspection-prompt iterations v2..v8;
                                # v7 is canonical (config.INTROSPECTION_PREAMBLE)
   docs/                        # findings / internals / gotchas /
