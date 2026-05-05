@@ -227,8 +227,9 @@ Open questions a9 has flagged for discussion before the rerun:
 - `docs/findings.md` — top-of-Status entry flagging that
   downstream pipeline sections describe the prior prompt set.
 - `docs/2026-05-01-rule3-redesign.md` — superseded addendum.
-- `docs/2026-05-02-introspection-pilot.md` — note that the
-  123-prompt design referenced is the prior set.
+- 2026-05-02 introspection pilot doc (deleted 2026-05-05; summary
+  in `previous-experiments.md` "Initial introspection pilot") — its
+  123-prompt design references the prior set.
 - `docs/gotchas.md` — `123 unique tuples` line updated to note
   the count-shift; mechanism unchanged.
 - `README.md` — minor touch-up on prompt-count refs.

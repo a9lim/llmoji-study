@@ -85,8 +85,11 @@ through every loader.
 The framing evolved twice in that window:
 
 - **L57 → L31 on gemma (2026-04-28).** v3 figures defaulted to the
-  deepest probe layer (gemma L57) until `scripts/local/21` showed
-  silhouette peaked at L31 (0.184) and degraded 36% to L57 (0.117).
+  deepest probe layer (gemma L57) until the (then) layerwise-emergence
+  script showed silhouette peaked at L31 (0.184) and degraded 36% to
+  L57 (0.117). The script number `21` was reused in the post-2026-05-05
+  refactor for `21_v3_same_face_cross_quadrant.py`; current
+  layerwise-emergence is `scripts/local/20_v3_layerwise_emergence.py`.
   Switching to L31 substantially sharpened Russell-quadrant separation
   on gemma — PC1 explained variance jumped 13.0% → 19.8% on the same
   data, HN/LN PC2 gap went from "collapsed near zero" to 9.7 units.
@@ -212,8 +215,9 @@ Three new contrastive probes added 2026-04-29 to address the V-A
 circumplex's anger/fear collapse. Stored as dict-keyed
 `extension_probe_*` fields on the v3 sidecars so the existing
 list-schema `SampleRow.probe_scores_t0` was unaffected. Materialized
-once per model into `~/.saklas/vectors/default/`, then
-`scripts/local/27` re-scored the existing 800-row v3 sidecars
+once per model into `~/.saklas/vectors/default/`, then a (now-deleted)
+re-score script — the script number `27` was later reused for
+`27_v3_face_stability.py` — re-scored the existing 800-row v3 sidecars
 without new generations.
 
 The theoretical premise was that `powerful.powerless` would read PAD
@@ -233,9 +237,13 @@ the post-cleanliness balanced 20/20 (mid on gemma, fail on qwen,
 PASS on ministral) — see findings.md § "Rule 3 redesign" for
 detail.
 
-The extension-probe pipeline (scripts 26-29, the `probe_packs/`
-directory, the `analysis.py` and `probe_extensions.py` modules) was
-deleted 2026-05-04 along with the rest of the archival cleanup.
+The extension-probe pipeline (the original scripts 26-29, the
+`probe_packs/` directory, the `analysis.py` and `probe_extensions.py`
+modules) was deleted 2026-05-04 along with the rest of the archival
+cleanup. Those script numbers were later reused for the face-stability
+triple + Procrustes (current `scripts/local/26_v3_quadrant_procrustes.py`,
+`27_v3_face_stability.py`, `28_v3_state_predicts_face.py`,
+`29_v3_pc_probe_rotation_3d.py`); see `local-side.md`.
 Pre-2026-05-04 v3 sidecars retain the orphan dict-keyed
 `extension_probe_scores_*` fields; `available_extension_probes(df)`
 in `llmoji_study.emotional_analysis` surfaces them if any future
@@ -329,22 +337,104 @@ empirical-emission majority across the {gemma, qwen, ministral} trio
 — a different denominator than the post-2026-05-04 51-face Claude-GT
 (Claude pilot modal-quadrant per face).
 
-The two numbers are not directly comparable. The 2026-05-04 best
-ensemble — `{gemma, gpt_oss_20b, granite, ministral, qwen,
-rinna_jp_3_6b_jpfull}` at uniform top-k=5 → 70.6% (51 faces) /
-77.3% (22 faces, modal_n ≥ 2) — is on Claude-GT, the metric that
-matters for the deployable Claude extension.
+The 2026-05-04 best ensemble — `{gemma, gpt_oss_20b, granite,
+ministral, qwen, rinna_jp_3_6b_jpfull}` at uniform top-k=5 → 70.6%
+(51 faces) / 77.3% (22 faces, modal_n ≥ 2) — was on Claude-GT,
+hard-classification accuracy.
 
 Solo accuracy lifts from top-k pooling: gemma 56.9% → 62.7% at k=3
 (+5.8pp), qwen 21.6% → 31.4% at k=2 (+9.8pp), ministral 31.4% →
 39.2% at k=3 (+7.8pp), rinna_bilingual_4b_jpfull 23.5% → 33.3% at
-k=2 (+9.8pp). `--summary-topk N` is the flag on script 50.
+k=2 (+9.8pp). `--summary-topk N` is the flag on
+`scripts/local/50_face_likelihood.py`.
 
 GLM-4.7-Flash was tried as an ensemble member and dropped — it
 predicts LN 100% / NB 0% solo, dominates the weighted vote, and
-poisons every subset that includes it. Adding κ throughout (script 53)
-properly penalizes class-imbalanced predictors and the data-driven
-subset search now demotes glm automatically.
+poisons every subset that includes it. Adding κ throughout
+(`scripts/52_subset_search.py`) properly penalizes class-imbalanced
+predictors and the data-driven subset search now demotes glm
+automatically.
+
+**Superseded again 2026-05-05 by soft-everywhere methodology.** The
+shift from hard-classification accuracy + Cohen's κ to
+distribution-vs-distribution JSD (`similarity = 1 − JSD/ln 2`,
+face-uniform + emit-weighted) inverted several rankings. The current
+best deployment ensemble is `{gemma_v7primed, opus}` at 0.829
+emit-weighted similarity / 0.788 face-uniform on n=49 GT-floor-3
+faces. Gemma_v7primed (rejected from the 2026-05-04 ensemble for
+hurting hard accuracy) is the best single LM-head encoder under
+emit-weighting; opus introspection scaling complements it at the
+quadrants where visual scaffolding helps least (NB, LN). Rinna
+variants drop from the top tier — solo similarity below 0.43
+face-uniform / 0.55 emit-weighted. Detail in
+[`2026-05-05-soft-everywhere-methodology.md`](2026-05-05-soft-everywhere-methodology.md).
+
+## Disclosure-preamble pilot (2026-05-02 → 2026-05-04 reversal)
+
+Tested whether a "fyi this is a study about your kaomoji emissions"
+preamble shifts kaomoji style or emit rate on Claude (Opus 4.7).
+300 gens (2 seeds × 5 prompts × 30 conditions or similar; full design
+is in `findings.md` Disclosure pilot section). Findings: framed
+condition shifts kaomoji style on HP and concentration on NB while
+preserving LP and emit rate. Wing-hand kaomoji `\(^o^)/` initially
+read as 28% non-emission until the llmoji v2.0 extractor refactor
+recovered them at 0% non-emission.
+
+The pilot's load-bearing decision — "leave the negative-affect run as
+a known gap and write up what we have" — was reversed 2026-05-04 in
+favor of an undisclosed naturalistic groundtruth pilot
+([`2026-05-04-claude-groundtruth-pilot.md`](2026-05-04-claude-groundtruth-pilot.md)).
+The disclosure-shift result motivated the no-disclosure decision in
+the GT pilot.
+
+## Initial face_likelihood method validation (2026-05-02)
+
+Bayesian-inversion per-face quadrant scoring on gemma alone validated
+at 72.7% argmax-match against v3 empirical-emission majority on 66
+faces with ≥3 emits (NB weakest at 59%). Established the method
+(`scripts/local/50_face_likelihood.py` is the descendant); subsequent
+scaling to 8 encoders + soft-everywhere replaced both the metric and
+the headline numbers.
+
+## Initial introspection pilot (2026-05-02)
+
+Established the 3-condition framework — `intro_none` /
+`intro_pre` (v1 preamble) / `intro_lorem` (length-only control) — that
+every introspection iteration since has used. Original "Rule I PASS"
+verdict on h_mean was contaminated by the double-ask plumbing bug;
+walked back at h_first under corrected single-ask semantics. The
+content-vs-length disambiguator via lorem control survives unchanged.
+
+## Temperature smoke (2026-05-03)
+
+240 gens (gemma + qwen at T=1.0 vs T=0.7 seed=0 baseline) under a
+pre-registered three-path decision tree (top-K + entropy + JSD-vs-
+cross-seed-floor). All three signals fired path-A: T=0.7 sharpening
+is real and material relative to T=1.0; ensemble face_likelihood is
+teacher-forced and temp-invariant so cross-T comparison is meaningful;
+the T=1.0 v3 main rerun was justified.
+
+## v3 ministral pilot (2026-04-30)
+
+Validated ministral entry into the v3 lineup at silhouette ≈ 0.149 (h_first @
+L20 under the single-layer methodology). Pairwise CKA gemma↔ministral
+peaked ~0.741. Carried by the same `(╥_╥)` / `(╯_╰)` register and a
+clean Russell circumplex; promoted into the canonical v3 lineup.
+Pre-cleanliness 100-prompt set, pre-T=1.0, single-layer methodology —
+all subsequently rebaselined.
+
+## Rinna integration + top-k pooling era (2026-05-04)
+
+PPO 3.6B JP-only and bilingual 4B Japanese models were added behind
+chat-template overrides (T5Tokenizer SentencePiece) and a JP prompt
+body (translated `emotional_prompts_jp.py`). Best Japanese-encoder
+configurations under hard accuracy: `rinna_jp_3_6b_jpfull` 25.9%
+solo on Claude-GT (vs 15.7% under EN body); `rinna_bilingual_4b_jpfull`
+top-k=2 → 33.3%. Both rinna variants entered the pre-soft-everywhere
+6-model best ensemble at uniform top-k=5. Saklas hybrid-LA cache patch
++ native chat-template overrides land in `gotchas.md`. Soft-everywhere
+demotes both — solo similarity below 0.43 face-uniform / 0.55
+emit-weighted; rinna is no longer in the deployment ensemble.
 
 ## Pre-llmoji-v2.0 bare-kaomoji extraction gap
 
@@ -371,9 +461,10 @@ T=0.7 was the default through 2026-05-03; the project flipped to T=1.0
 that day to align with the Anthropic API default. Pre-T=1.0 v3 main
 data is archived as `*_temp0.7.{jsonl,tsv}`; canonical
 `M.emotional_data_path` paths are reserved for the T=1.0 rerun. The
-pre-registered temp smoke (`docs/2026-05-03-temp-smoke.md`) verified
-that face_likelihood is teacher-forced and temp-invariant (ensemble
-unaffected) so the cross-T comparison is meaningful.
+pre-registered temp smoke (design doc deleted 2026-05-05; summary
+under "Temperature smoke" above) verified that face_likelihood is
+teacher-forced and temp-invariant (ensemble unaffected) so the
+cross-T comparison is meaningful.
 
 ## Pre-MAX_NEW_TOKENS=16
 

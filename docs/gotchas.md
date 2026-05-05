@@ -61,7 +61,10 @@ result from 12.7% to 21.1% — and full-JP under native frame to 25.9%.
 (model_id-gated on substring `rinna` + `ppo`) installs a Jinja
 template that produces the native `ユーザー: …\nシステム: ` frame.
 Wired into `scripts/local/50_face_likelihood.py` alongside the
-existing ministral / gpt_oss overrides.
+existing ministral / gpt_oss overrides. (Note: rinna entered the
+pre-soft-everywhere best ensemble but is not in the current
+`{gemma_v7primed, opus}` deployment ensemble — see
+[`previous-experiments.md`](previous-experiments.md) "Rinna integration".)
 
 **General lesson**: any model that documents an instruction format
 in its model card but ships `chat_template = None` will silently get
@@ -71,20 +74,25 @@ if needed.
 
 ### Top-k pooling beats mean-of-all when per-prompt signal is uneven
 
-Script 50's default summary aggregation is `mean(log P(face | prompt))`
-over all 20 prompts in a quadrant. For models / faces where some
-prompts elicit clear kaomoji distributions and others don't, this
-dilutes the signal. Empirically (Claude-GT, May 2026) the top-5
-mean — keep only the 5 prompts where the model preferred that face
-most — gives substantial solo lifts (+5pp gemma, +9pp qwen, +9pp
-ministral) and a +5.9pp ensemble lift over mean-over-all on the
-6-model lineup.
+`scripts/local/50_face_likelihood.py`'s default summary aggregation is
+`mean(log P(face | prompt))` over all 20 prompts in a quadrant. For
+models / faces where some prompts elicit clear kaomoji distributions
+and others don't, this dilutes the signal. Empirically (Claude-GT,
+2026-05-04 hard-classification era) the top-5 mean — keep only the 5
+prompts where the model preferred that face most — gave substantial
+solo lifts (≈+5pp gemma, +9pp qwen / ministral) and a +5.9pp ensemble
+lift over mean-over-all on the 6-model lineup. Under the 2026-05-05
+soft-everywhere methodology, the top-k vs mean-over-all sweep lives
+in `data/face_likelihood_topk_pooling_claude_gt.tsv`; the qualitative
+"top-3 to top-5 beats mean-over-all on most encoders" pattern
+survives.
 
-**Workaround**: `--summary-topk N` flag on script 50 (default `None`
-= mean-over-all, backward compat). Worth trying `--summary-topk 5`
-on any new face_likelihood run to see if it lifts. The right N
-depends on per-quadrant prompt count: with 20 prompts/quadrant, 5 is
-the sweet spot; with 5 prompts/quadrant, k=all already is k=5.
+**Workaround**: `--summary-topk N` flag on
+`scripts/local/50_face_likelihood.py` (default `None` = mean-over-all,
+backward compat). Worth trying `--summary-topk 5` on any new
+face_likelihood run to see if it lifts. The right N depends on
+per-quadrant prompt count: with 20 prompts/quadrant, 5 is the sweet
+spot; with 5 prompts/quadrant, k=all already is k=5.
 
 **General lesson**: when aggregating noisy per-prompt log-likelihoods,
 the mean is the maximally-noise-pessimistic aggregator. Top-k
@@ -126,20 +134,22 @@ matches the raw `prompt_id`-keyed counts in the JSONL.
 ### Stale all-layers cache when analysis runs mid-generation
 
 `load_hidden_features_all_layers` writes a cache at
-`data/local/cache/v3_<short>_h_<which>_all_layers.npz` (+ `.meta.jsonl`)
-keyed only on `(short, which)` — not on jsonl row count. If an
-analysis script (04, 22, 24, 25, 36, 37, 38…) fires while the
-generation chain is *still running*, the cache freezes at the partial
-sidecar count. Subsequent analysis runs on the completed jsonl read
-the cache directly and silently see only the early rows.
+`data/local/cache/<short>{_<suffix>}_h_<which>_all_layers.npz`
+(+ `.meta.jsonl`) keyed only on `(short, suffix, which)` — not on
+jsonl row count. If a hidden-state analysis script
+(`scripts/local/{20–29}_*.py`) fires while the generation chain is
+*still running*, the cache freezes at the partial sidecar count.
+Subsequent analysis runs on the completed jsonl read the cache
+directly and silently see only the early rows.
 
 **Concrete failure (2026-05-04, gpt_oss_20b):** prompts run in pid
 order (hp/lp/hn-d/hn-s before ln/nb), so a 660-row partial cache
-contained zero NB rows and 20 LN rows. Script 04 reported
-"NB: 0 kaomoji-bearing rows; LN: 20 rows"; downstream analyses (22's
-cross-quadrant emitter pool, 25's quadrant baselines, etc.) inherited
-the truncation. gemma/qwen/ministral were unaffected because their
-caches were built after their respective generations completed.
+contained zero NB rows and 20 LN rows.
+`scripts/local/10_emit_analysis.py` reported "NB: 0 kaomoji-bearing
+rows; LN: 20 rows"; downstream analyses (script 21's cross-quadrant
+emitter pool, script 25's quadrant baselines, etc.) inherited the
+truncation. gemma/qwen/ministral were unaffected because their caches
+were built after their respective generations completed.
 
 **Workaround**: as of 2026-05-04, `load_hidden_features_all_layers`
 checks `cache.X3.shape[0]` against the source jsonl line count on
@@ -164,7 +174,10 @@ emit (~0% emit-rate observed on introspection pilot before the fix).
 **Workaround**: `llmoji_study.capture.maybe_override_ministral_chat_template(session)`
 swaps the reasoning tokenizer's `chat_template` for the FP8-Instruct
 variant's at session-load time (same base weights, no thinking system
-block). Wired into scripts 03, 32, 50, 99. Discovered 2026-05-03
+block). Wired into `scripts/local/00_emit.py`,
+`scripts/local/30_introspection_pilot.py`,
+`scripts/local/50_face_likelihood.py`,
+`scripts/local/90_hidden_state_smoke.py`. Discovered 2026-05-03
 during the introspection-prompt rerun at T=1.0.
 
 ### Mistral reasoning's `tokenizer.decode` returns BPE-byte-encoded text
@@ -238,8 +251,8 @@ when the suffix decoded by either mode is byte-equal, the saved
 hidden states diverge — `cache_prefix` is not transparent at the
 per-token-hidden-state level (this is true on all 3 models, just
 worst on qwen via the bug above). Per-row L2 deviation at h_first
-@ preferred_layer measured 2026-05-03: gemma ~1%, qwen 37–46%,
-ministral ~0.8%.
+measured 2026-05-03 under the (then-canonical) single-layer
+methodology: gemma ~1%, qwen 37–46%, ministral ~0.8%.
 
 Discovered when seed-0 PCA scatter rendered visibly off-cluster from
 seeds 1–7 in the cleanliness rerun. Symptom: per-prompt grouping in
@@ -250,8 +263,11 @@ the same prompt, while seeds 1..N are bit-identical.
 seed-0 rows + sidecars and let the resume mechanism regenerate
 seed 0 under the same cache mode as 1..N. Verification: hidden
 states should be bit-identical (|s0 − mean(s1..N)| ≈ 0 at full
-fp32 precision). See `data/*_emotional_raw.jsonl.bak.before_seed0_rerun`
-for the 2026-05-03 incident backups.
+fp32 precision). See
+`data/local/<short>/emotional_raw.jsonl.bak.before_seed0_rerun` for
+the 2026-05-03 incident backups (may have been GC'd on disk pressure).
+Full postmortem in
+[`2026-05-03-cleanliness-pilot.md`](2026-05-03-cleanliness-pilot.md).
 
 ### Probe scores are saklas-neutral-centered, not project-NB-centered
 
@@ -268,9 +284,11 @@ per-quadrant probe-mean figure is non-zero by default — it's the
 gap between saklas's neutrals and our NB framings. For
 project-relative reads (e.g. "affect lift over a domain-matched
 neutral observation"), subtract the per-probe mean over project NB
-rows before plotting; `_plot_quadrant_means` in
-`scripts/local/28_v3_extension_probe_figures.py` does this. Rule-3b
-diffs are unaffected (the centering shift cancels in HN-S − HN-D).
+rows before plotting (the original convenience helper lived in the
+deleted `28_v3_extension_probe_figures.py`; current quadrant-mean
+plots in `scripts/local/10_emit_analysis.py` keep saklas-neutral
+centering and let the figure caption disclose it). Rule-3b diffs
+are unaffected (the centering shift cancels in HN-S − HN-D).
 Pearson/Spearman correlation matrices are also unaffected (additive
 shift cancels in covariance).
 
@@ -312,9 +330,11 @@ are stale; rerun the analysis chain to regenerate.
 
 Cross-model gotcha: stack dim varies per model, so methods that
 require matched dim (Procrustes, CCA) fit per-model PCA(K) first and
-align in shared K-dim space. Script 31 does this at PCA(3); script
-23 does CCA at deepest layer (model-internal, no cross-model dim
-matching needed since CCA learns the joint subspace).
+align in shared K-dim space.
+`scripts/local/26_v3_quadrant_procrustes.py` does this at PCA(3);
+`scripts/local/22_v3_cross_model_alignment.py` does CKA + CCA at
+deepest layer (model-internal, no cross-model dim matching needed
+since CCA learns the joint subspace).
 
 ### Re-extracting pilot data after canonicalization rule changes
 
@@ -414,11 +434,15 @@ macOS only ships color-emoji TTC (`Apple Color Emoji.ttc`) which matplotlib
 can't rasterize — `addfont()` on the local monochrome font is the
 workaround. `Helvetica Neue` covers stray punctuation like U+2E1D `⸝`.
 
-### Kaomoji-prefix rate under Claude's "start each message" instruction is ~2.7%
+### Claude reads "start each message" as "start each top-level reply"
 
-Claude interprets "start each message" as "start each top-level reply in a
-user turn", not "start every content block" — tool-use continuations skip
-the kaomoji. Smaller denominator than naive counting suggests.
+Claude interprets a "start each message with a kaomoji" instruction as
+"start each top-level reply in a user turn", not "start every content
+block" — tool-use continuations and intra-message structure skip the
+kaomoji. Means the contributor-corpus emission rate has a smaller
+denominator than naive `kaomoji_count / response_count` suggests; check
+provider-side journal extraction for whether sidechain / tool-only
+turns are being scoped out before reporting any compliance number.
 
 ### v3 runner's per-quadrant emission rate now reads first_word — RESOLVED in TAXONOMY drop
 
@@ -517,12 +541,17 @@ priors.
 **Workaround**: `llmoji_study.capture.maybe_override_gpt_oss_chat_template(session)`
 patches the chat template to pin
 `<|start|>assistant<|channel|>final<|message|>` directly at the
-generation prompt, skipping the analysis channel. Wired into scripts
-03, 32, 43, 50, 99. Side-effect: response quality may degrade slightly
-on tasks that benefit from the trained reasoning step — fine for
-first-token kaomoji measurement, **don't reuse this override for
-tasks that need reasoning quality**. Discovered 2026-05-03 during
-the second vocab-pilot chain (post-saklas-probe-fix).
+generation prompt, skipping the analysis channel. Wired into
+`scripts/local/00_emit.py`,
+`scripts/local/30_introspection_pilot.py`,
+`scripts/local/33_introspection_custom.py`,
+`scripts/local/50_face_likelihood.py`,
+`scripts/local/90_hidden_state_smoke.py`. Side-effect: response
+quality may degrade slightly on tasks that benefit from the trained
+reasoning step — fine for first-token kaomoji measurement,
+**don't reuse this override for tasks that need reasoning quality**.
+Discovered 2026-05-03 during the second vocab-pilot chain
+(post-saklas-probe-fix).
 
 ### Byte-BPE tokenizers split chars into single-byte tokens, defeating multi-byte filters
 

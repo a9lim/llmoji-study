@@ -56,25 +56,25 @@ Contributor side, in the `llmoji` package:
 
 Research side, in this repo:
 
-4. `scripts/60_corpus_pull.py` snapshot-downloads
+4. `scripts/harness/60_corpus_pull.py` snapshot-downloads
    `a9lim/llmoji`, walks every bundle, canonicalizes each kaomoji
    form again (in case contributors have different package
    versions), and pools by canonical form across contributors.
    Output: `data/harness/claude_descriptions.jsonl`, one row per canonical
    form with the union of per-bundle synthesized descriptions
    plus per-contributor counts and provider mix.
-5. `scripts/61_corpus_basics.py` prints descriptive stats
+5. `scripts/harness/61_corpus_basics.py` prints descriptive stats
    (top kaomoji, contributor and bundle counts, provider mix,
    coverage histogram).
-6. `scripts/62_corpus_embed.py` embeds every
+6. `scripts/harness/62_corpus_embed.py` embeds every
    per-bundle synthesized description with
    `sentence-transformers/all-MiniLM-L6-v2`, weighted-means by
    per-bundle count across contributors, L2-normalizes. Output:
    `data/harness/claude_faces_embed_description.parquet`.
-7. `scripts/64_eriskii_replication.py` projects onto eriskii's 21
+7. `scripts/harness/64_eriskii_replication.py` projects onto eriskii's 21
    axes, runs t-SNE plus KMeans(k=15), asks Haiku for short
    cluster labels, and writes the comparison markdown.
-8. `scripts/63_corpus_pca.py` runs PCA on the same
+8. `scripts/harness/63_corpus_pca.py` runs PCA on the same
    embeddings as a parity-with-eriskii visualization.
 
 ## Privacy
@@ -152,12 +152,12 @@ fields aren't in the bundle:
 If we want either of these analyses back, the right move is a
 separate research-side scrape of a single contributor's local
 journal, not adding fields to the public dataset. That's what
-`scripts/65_per_project_axes.py` does for the per-project axis
+`scripts/harness/65_per_project_axes.py` does for the per-project axis
 breakdown — see the next section.
 
 ### Per-provider per-project axes (single-contributor side script)
 
-`scripts/65_per_project_axes.py` reads `~/.claude/kaomoji-journal.jsonl`
+`scripts/harness/65_per_project_axes.py` reads `~/.claude/kaomoji-journal.jsonl`
 and `~/.codex/kaomoji-journal.jsonl` directly via the
 `llmoji.sources.journal` adapter, embeds each emission's
 `assistant_text` with MiniLM, projects onto the same 21 eriskii
@@ -346,11 +346,11 @@ pip install -e .
 
 export ANTHROPIC_API_KEY=...    # Haiku cluster-labeling
 
-python scripts/60_corpus_pull.py            # snapshot a9lim/llmoji into data/harness/hf_dataset/
-python scripts/61_corpus_basics.py     # printout: top kaomoji, providers, contributors
-python scripts/62_corpus_embed.py  # per-canonical embeddings
-python scripts/64_eriskii_replication.py       # axes, clusters, narrative writeup
-python scripts/63_corpus_pca.py          # PCA panel
+python scripts/harness/60_corpus_pull.py            # snapshot a9lim/llmoji into data/harness/hf_dataset/
+python scripts/harness/61_corpus_basics.py     # printout: top kaomoji, providers, contributors
+python scripts/harness/62_corpus_embed.py  # per-canonical embeddings
+python scripts/harness/64_eriskii_replication.py       # axes, clusters, narrative writeup
+python scripts/harness/63_corpus_pca.py          # PCA panel
 ```
 
 If you want to contribute to the dataset rather than just

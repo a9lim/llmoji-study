@@ -4,10 +4,11 @@
 unconditional 60 gens; Block B gate scout 15 gens, 0/15 refusals;
 Block C gated 45 gens) for a total of 120 generations. Output at
 `data/claude_groundtruth_pilot.jsonl` + per-quadrant top-5 in
-`data/claude_groundtruth_pilot_summary.tsv`. Sibling design to
-`2026-05-02-claude-disclosure-pilot.md`; reopened the negative-affect
-Claude run that the disclosure pilot deferred, under a revised
-methodology that drops the disclosure preamble entirely *and* gates
+`data/claude_groundtruth_pilot_summary.tsv`. Sibling design to the 2026-05-02 disclosure pilot (summarized in
+[`previous-experiments.md`](previous-experiments.md)
+"Disclosure-preamble pilot"); reopened the negative-affect Claude
+run that the disclosure pilot deferred, under a revised methodology
+that drops the disclosure preamble entirely *and* gates
 the negative arm on a refusal-rate scout. Implementation:
 `scripts/harness/00_emit.py`.
 

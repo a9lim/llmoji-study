@@ -132,8 +132,8 @@ vs HN-S dominance split sits orthogonal to both. The axis labels you
 read off any one model's PCA plot are not invariant — what's invariant
 is the relative arrangement.
 
-Detail and per-pipeline numbers in `findings.md` § "Current state
-(2026-05-04)" and per-pilot subsections.
+Detail and per-pipeline numbers in `findings.md` § "Current state"
+and per-pilot subsections.
 
 ## Face → state coupling — the kaomoji as readout
 
@@ -163,12 +163,13 @@ fold):
   inversion happens when per-face cells get too thin to anchor a
   stable centroid.
 
-The face-stability triple (scripts 36 / 37 / 38) frames this as a
-bidirectional question. **Forward direction** (state predicts face),
-pair-level Spearman ρ between cosine_sim(h_first) and 1 − JSD(face_dist):
-+0.59 gemma / +0.68 qwen / +0.42 ministral. **Reverse direction**
-(face commits state at h_mean), η²(face | prompt): 0.36 / 0.52 /
-0.67 across the same three.
+The face-stability triple (`scripts/local/27_v3_face_stability.py`,
+`28_v3_state_predicts_face.py`, `29_v3_pc_probe_rotation_3d.py`)
+frames this as a bidirectional question. **Forward direction** (state
+predicts face), pair-level Spearman ρ between cosine_sim(h_first) and
+1 − JSD(face_dist): +0.59 gemma / +0.68 qwen / +0.42 ministral.
+**Reverse direction** (face commits state at h_mean), η²(face | prompt):
+0.36 / 0.52 / 0.67 across the same three.
 
 Forward and reverse rank invert. Gemma is forward-biased — its hidden
 state pre-determines the face well, but once the face is sampled it
@@ -187,74 +188,122 @@ analyses".
 
 The next question is the inverse: given a kaomoji a model emits, can
 I predict which quadrant prompted it without ever running the model's
-hidden state? This is the function I need for a deployable Claude
-extension — no internal access to closed-weight models.
+hidden state? This is the function a deployable Claude extension
+needs — no internal access to closed-weight models.
 
 Approach: for each (face, prompt) pair, build the v3 chat prefix,
 append the face tokens, teacher-force forward to compute
 `log P(face | prompt) = sum_j log_softmax(logits[j])[face_ids[j]]`.
 Aggregate per quadrant: `score(face, q) = mean over prompts in q of
-log P(face | prompt)`. Argmax over quadrants is the predicted
-quadrant. Length cancels under within-face softmax over quadrants
-so longer faces don't get penalized.
+log P(face | prompt)` (or `topk` mean — see below). Within-face
+softmax over quadrants gives a per-face per-quadrant probability
+distribution; length cancels in the softmax so longer faces aren't
+penalized.
 
 The key property: this only uses the LM-head distribution. No hidden
 states, no probes, no model-internal access beyond what any forward
-pass gives you. Output is a face → quadrant lookup table that any
-agent can consult.
+pass gives you. Output is a face → quadrant *distribution* lookup
+table that any agent can consult.
 
-Solo accuracies on the 51-face Claude-GT subset (Claude pilot
-modal-quadrant per face, modal_n ≥ 1):
+### Soft-everywhere methodology (canonical 2026-05-05)
 
-| encoder | k=all | best-k |
+The eval target is **distribution similarity vs Claude-GT**, not
+hard accuracy. Claude's per-face per-quadrant emission counts in the
+groundtruth pilot are themselves a distribution; comparing the
+encoder's predicted softmax against Claude's empirical distribution
+via Jensen-Shannon divergence captures how well an encoder
+characterizes Claude's behavior. Headline metric:
+
+```
+similarity = 1 − JSD(predicted_dist, claude_emission_dist) / ln 2
+```
+
+Reported in two flavors:
+- **Face-uniform**: arithmetic mean over GT faces. Each face counts
+  equally regardless of how often Claude emits it. Reads as
+  "characterizes Claude's *vocabulary*." Sensitive to long-tail
+  failures.
+- **Emit-weighted**: weighted mean by Claude's per-face emit count.
+  Reads as "characterizes Claude's actual *emission distribution*."
+  Closer to deployment-relevant. Tends 5–15pp higher than
+  face-uniform because modal faces are easier wins.
+
+Strict-majority voting and argmax-as-headline are gone; the ensemble
+vote is the soft mean of per-encoder softmax distributions.
+Helpers in `llmoji_study/jsd.py` plus
+`claude_gt.load_claude_gt_distribution()`. Detail in
+[`2026-05-05-soft-everywhere-methodology.md`](2026-05-05-soft-everywhere-methodology.md).
+
+### Solo-encoder similarity vs Claude-GT (current)
+
+Per-encoder solo similarity on the 49 GT-floor-3 faces (face-uniform
+/ emit-weighted), from `data/face_likelihood_subset_search_claude_gt.tsv`:
+
+| encoder | face-uniform | emit-weighted |
 | --- | ---: | ---: |
-| haiku-4-5 (face semantics, no LM-head) | 58.8% | — |
-| gemma | 56.9% | 62.7% (k=3) |
-| gpt_oss_20b | 47.1% | 47.1% |
-| granite | 41.2% | 43.1% (k=5) |
-| ministral | 31.4% | 39.2% (k=1, k=3) |
-| rinna_jp_3_6b_jpfull | 33.3% | 33.3% |
-| rinna_bilingual_4b_jpfull | 23.5% | 33.3% (k=2) |
-| qwen | 21.6% | 31.4% (k=2) |
+| **gemma_v7primed** | 0.777 | **0.801** |
+| **opus** (introspection) | 0.776 | 0.797 |
+| gemma | 0.756 | 0.755 |
+| haiku (introspection) | — | 0.723 |
+| gpt_oss_20b | — | 0.667 |
+| granite | — | 0.586 |
+| ministral | — | 0.579 |
 
-Top-k=N pooling (`--summary-topk N` on script 50) aggregates the
-per-(face, q) score as the mean of the top-N highest-log-prob prompts
-only — noise-reducing on 20-prompt-per-quadrant runs. Substantial
-solo lifts on several encoders, biggest on qwen (+9.8pp at k=2) and
-ministral (+7.8pp at k=3).
+The story under emit-weighting: **introspection priming on gemma
+becomes the best single LM-head encoder**, beating unprimed gemma
+substantially. Under hard-accuracy (the 2026-05-04 framing) primed
+gemma had read as a regression because primed gemma's NB modal
+(`( ˙꒳˙ )`) diverged from Claude's gentle-warm `(｡◕‿◕｡)` on argmax;
+under JSD-against-distribution, primed gemma's softmax matches
+Claude's emission *distribution* far better, especially on modal
+faces. Distribution-vs-distribution sees what hard accuracy hid.
 
-**Haiku is the new best solo encoder** at 58.8% Claude-GT (κ=0.492),
-above gemma's 56.9% (κ=0.478). Uses Anthropic SDK 0.97's
-`output_config={"format": {"type": "json_schema", ...}}` to enforce
-structured per-quadrant softmax with calibrated confidences. No
-LM-head, no prompt context — Haiku reads the face glyph and assigns
-a quadrant from visual semantics alone. Pairwise κ(gemma ↔ haiku) =
-0.297 — high complementarity. Validates "face semantics carries real
-quadrant signal" as project-foundational.
+**Opus introspection scaling.** A pure introspective rating arm —
+ask Opus 4.7 to rate each face by the affective state it causes the
+model to feel, no visual priming, no LM-head — closes the gap with
+gemma_v7primed solo (0.797 vs 0.801 emit-weighted). Per-quadrant
+gain is concentrated where visual scaffolding helps least: opus on
+NB = 0.698 vs haiku v4 = 0.485 (+0.213); opus on LN = 0.753 vs
+haiku = 0.601 (+0.152). HP regressed slightly (−0.095) — opus is
+more honest about borderline-LP-vs-HP faces haiku v4 over-confidently
+called HP. Reading: introspective access scales with model size
+*especially* in cells where visual scaffolding helps least.
 
-Best ensemble on Claude-GT: `{gemma, gpt_oss_20b, granite, ministral,
-qwen, rinna_jp_3_6b_jpfull}` at uniform top-k=5 → **70.6% (51 faces,
-floor=1) / 77.3% (22 faces, floor=2)**. +5.9pp / +4.6pp over the
-prior 4-model k=all canonical. Haiku appears in best subsets at sizes
-1-4 but not size-6: calibrated Haiku confidences are model-belief,
-LM-head softmax is teacher-forced likelihood, and the two epistemic
-types don't blend cleanly into the soft-vote optimum at higher
-subset sizes.
+### Best ensemble (current)
 
-Per-quadrant breakdown from the 51-face Claude-GT eval: HP 33%,
-LP 100%, HN-D 100%, HN-S 50%, LN 75%, NB 80%. The HP miss is
-small-N (3 faces, Claude favors `(°〇°)` for HP which the predictor
-reads as surprised-neutral). HN-S is the consistently weakest
-quadrant — same weak spot as rule-3b on the probe side.
+| ensemble | face-uniform | emit-weighted |
+| --- | ---: | ---: |
+| **`{gemma_v7primed, opus}`** | **0.788** | **0.829** |
+| `{gemma, gemma_v7primed, opus}` | 0.787 | 0.821 |
+| `{gemma, gemma_v7primed, haiku, opus}` | 0.780 | 0.821 |
+| `{gemma_v7primed, haiku}` | 0.774 | 0.814 |
 
-Cross-emit sanity: gemma → qwen-only-faces 67% (κ=0.57); qwen →
-gemma-only-faces 50% (κ=0.33). 3-4× chance for 6 quadrants. The
-encoders recover shared intrinsic affect from the face form, not
-memorizing their own emission preferences. The cross-model bridge
-is real.
+`{gemma_v7primed, opus}` is the best ensemble across both ranking
+metrics. Pairwise κ(gemma_v7primed, opus) = 0.547 — moderate, with
+complementary error patterns: opus owns NB / LN, gemma_v7primed
+owns the high-arousal cells, the soft-mean ensemble averages well.
 
-Detail: `findings.md` § "2026-05-04 face_likelihood expansion" and
-`docs/2026-05-04-rinna-jpfull-topk.md`.
+Subset search source: `scripts/52_subset_search.py` against
+`data/face_likelihood_subset_search_claude_gt.tsv`. Top-k pooling
+sweep at `data/face_likelihood_topk_pooling_claude_gt.tsv`. Final
+predictions per face land in
+`data/face_likelihood_ensemble_predict_claude_gt.tsv` (and the
+local-eval companion at
+`data/local/face_likelihood_ensemble_predict.tsv`).
+
+### Cross-emit sanity — bridge holds
+
+Cross-emit sanity check: gemma → qwen-only-faces 67% argmax-match
+(κ=0.57); qwen → gemma-only-faces 50% (κ=0.33). 3–4× chance for 6
+quadrants. The encoders recover shared intrinsic affect from the
+face form, not memorizing their own emission preferences. This
+hard-accuracy argument predates the soft-everywhere pivot but
+generalizes to similarity-against-distribution: cross-emit
+similarity stays high because both encoders' softmaxes are reading
+the same intrinsic-affect axis. The cross-model bridge is real.
+
+Detail in `findings.md` and
+[`2026-05-05-soft-everywhere-methodology.md`](2026-05-05-soft-everywhere-methodology.md).
 
 ## Introspection v7 — gemma-specific priming
 
@@ -283,8 +332,9 @@ sweep. Headline behavior: priming shifts NB modal from gentle-warm
 face-judgment confirms.
 
 The v7-primed v3 main reference lives at
-`data/gemma_intro_v7_primed.jsonl` (960 rows, sidecars under
-`data/local/hidden/intro_v7_primed/`). Per-quadrant JSD on NB is 0.341,
+`data/local/gemma_intro_v7_primed/emotional_raw.jsonl` (960 rows,
+sidecars under `data/local/hidden/gemma_intro_v7_primed/`).
+Per-quadrant JSD on NB is 0.341,
 the largest of any quadrant; HP / LP / HN-D / HN-S / LN distributions
 barely shift. Within-prompt face stability tightens (JSD between
 seed-halves 0.268 → 0.249).
@@ -300,20 +350,25 @@ Cross-architecturally, **introspection priming is gemma-specific**:
 canonical for gemma, anti-canonical for qwen. Don't bake
 `INTROSPECTION_PREAMBLE` into qwen analyses.
 
-For face_likelihood, primed gemma drops from 56.9% → 49.0% Claude-GT
-(κ 0.478 → 0.381), the entire regression in NB (70% → 30%).
-Mechanism: under v7, gemma's LM head scores `(｡◕‿◕｡)` (a
-Claude-NB face) lower on NB prompts because primed gemma's
-face / state model says NB looks like `( ˙꒳˙ )`. Claude isn't primed,
-so primed gemma diverges from Claude.
+For face_likelihood under hard-accuracy, primed gemma initially
+read as a regression: 56.9% → 49.0% Claude-GT argmax-match
+(κ 0.478 → 0.381), the entire drop in NB (70% → 30%). Mechanism:
+under v7, gemma's LM head scores `(｡◕‿◕｡)` (a Claude-NB face)
+lower on NB prompts because primed gemma's face/state model says
+NB looks like `( ˙꒳˙ )`. Claude isn't primed, so primed gemma
+diverges from Claude on argmax.
 
-Two distinct objectives diverge under priming: internal face / state
-coupling (v7-primed wins) vs Claude-tracking external alignment
-(unprimed wins). Decision: v7 stays canonical for research-side
-priming; the face_likelihood ensemble that ships to the Claude
-extension uses unprimed encoders + Haiku.
+The 2026-05-05 soft-everywhere pivot **inverts the verdict**:
+gemma_v7primed becomes the best single LM-head encoder (0.801
+emit-weighted similarity vs unprimed gemma's 0.755). Distribution-
+vs-distribution sees that primed gemma's softmax matches Claude's
+*emission distribution* better — priming helps where Claude is
+concentrated (head modal faces); unprimed helps where Claude is
+diffuse. Both ship in the current best ensemble
+`{gemma_v7primed, opus}`.
 
-Detail: `docs/2026-05-04-introspection-v7-and-haiku.md`.
+Detail: [`2026-05-04-introspection-v7-and-haiku.md`](2026-05-04-introspection-v7-and-haiku.md)
++ [`2026-05-05-soft-everywhere-methodology.md`](2026-05-05-soft-everywhere-methodology.md).
 
 ## Claude validation
 
@@ -331,35 +386,36 @@ vs outstretched-hand `(ノ◕ヮ◕)` direct); NB collapses to a tighter
 observational register (`(・_・)` 58% framed vs `(・ω・)` 26% direct).
 Decision: don't run disclosure on follow-on Claude work; the framing
 demonstrably shifts vocabulary on positive + neutral content, which
-would confound v3 cross-model comparability.
+would confound v3 cross-model comparability. Detail in
+[`previous-experiments.md`](previous-experiments.md) "Disclosure-preamble pilot".
 
-**Groundtruth pilot** (2026-05-04, all 6 quadrants × 20 prompts × 1
-gen on Opus 4.7, no disclosure preamble). Three-block design (Block A
-unconditional 60 gens; Block B negative-quadrant gate scout 15 gens;
-Block C gated negative 45 gens) caps welfare cost on the failure
-branch. Result: 0/15 refusals on the gate scout, full pilot ran
-cleanly. HN-D modal `(╬ಠ益ಠ)` 50%, HN-S modal `(｡・́︿・̀｡)` 20%,
-LN modal `(´-`)` 30%. Per-face Claude-pilot-modal-quadrant ground
-truth is the eval target for the face_likelihood ensemble (the
-Claude-GT denominator referenced throughout).
-
-Detail: `docs/2026-05-02-claude-disclosure-pilot.md`,
-`docs/2026-05-04-claude-groundtruth-pilot.md`.
+**Sequential groundtruth pilot** (2026-05-04 → 2026-05-05). Started
+as a single block-staged 120-gen run on Opus 4.7, expanded into a
+saturation-gated sequential protocol: 8 naturalistic runs (run-0
+through run-7) plus 1 introspection-arm run (v7-primed). Final corpus
+is **1000 rows** total — 880 naturalistic (run-0..7) + 120
+introspection. Per-quadrant saturation gate exited HN-D after r2
+and LN after r6; HP / LP / HN-S / NB went to r7. Welfare ledger
+~460 negative-affect generations vs ~540 worst case. Cross-arm
+comparison (introspection vs naturalistic) is **distinguishable in
+6/6 quadrants** at JSD threshold 0.05; gaps stayed stable across
+the 8x naturalistic accumulation, so the introspection effect is
+genuine, not undersampling. Detail:
+[`2026-05-04-claude-groundtruth-pilot.md`](2026-05-04-claude-groundtruth-pilot.md)
++ [`2026-05-05-soft-everywhere-methodology.md`](2026-05-05-soft-everywhere-methodology.md).
 
 ## Per-project Claude affect
 
-Applying the face_likelihood ensemble to
-`~/.claude/kaomoji-journal.jsonl` gives 1945 emissions across 219
-unique kaomoji from months of Claude Code work. **96.7% ensemble
-coverage**; the 3.3% gap is kaomoji families like `ʕ・ᴥ・ʔ`-bears
-that aren't in the v3 corpus or the claude-faces export yet (corpus
-bump pending).
-
-Global distribution: NB 51%, LP 20%, HN-S 9%, LN 7%, HP 6%, HN-D 6%.
-Claude's default register on Claude Code work is observational /
-neutral, with gentle satisfaction the second-most-common state. HP
-(high-arousal joy) is rare; concern (HN-S) is more common than
-annoyance (HN-D) by about 50%.
+Applying the per-face quadrant resolver to
+`~/.claude/kaomoji-journal.jsonl` plus contributor-corpus exports
+gives **3119 emissions across 274 unique faces** under
+`--mode gt-priority`. Direct Claude-GT resolution (the face appeared
+in the 1000-row groundtruth pilot) covers **67.2%** of emissions;
+the soft ensemble fills another 29.4%; the residual 3.4% is unknown
+(faces not in the canonical face union). Strict `--mode gt-only`
+leaves 32.8% (1024 emissions / 207 unique faces) unknown — those
+are the in-the-wild contributor faces that Claude never emitted
+under the Russell-elicitation pilot.
 
 Per-project, most projects sit close to the global distribution. A
 few diverge sharply:
@@ -370,24 +426,29 @@ few diverge sharply:
 - `verify` is HN-D-modal (29% anger / contempt at n=7 — a code-review
   and bug-finding tool, the project's purpose lines up with the
   register).
-- `shoals` has anomalously high HP (18% vs 6% global, plausibly tied
-  to the simulator's narrative-event content).
+- `shoals` has anomalously high HP (18% vs the global rate, plausibly
+  tied to the simulator's narrative-event content).
 
 These are intrinsic-affect readings of the kaomoji Claude chose to
 emit, not assertions about Claude's "actual" emotional state. The
-predictor's 70.6% accuracy on Claude-GT (and 75.8% on the broader
-local-model GT) gives the per-project picture meaningful resolution.
+ensemble's 0.829 emit-weighted similarity to Claude-GT gives the
+per-project picture meaningful resolution where direct GT doesn't
+cover.
 
-Pipeline: `scripts/66_per_project_quadrants.py` with
-three resolution modes — `--mode gt-priority` (default, Claude-GT
-first then ensemble fallback for in-the-wild faces), `--mode ensemble`
+Pipeline: `scripts/66_per_project_quadrants.py` with three
+resolution modes — `--mode gt-priority` (default, Claude-GT first
+then ensemble fallback for in-the-wild faces), `--mode ensemble`
 (ensemble for every face — the deployable-extension scenario), and
-`--mode gt-only` (strict, no speculative grading). Reads the canonical
-script-56 ensemble predictions when the active mode needs them; pulls
-GT from the script-23 pilot. Pulls emissions from
-`~/.claude/kaomoji-journal.jsonl` plus comma-separated claude.ai
-exports (defaults to two known exports under `~/Downloads/`, unioned
-by conversation UUID).
+`--mode gt-only` (strict, no speculative grading). Reads the
+canonical ensemble predictions from
+`scripts/54_ensemble_predict.py` and the Claude-GT distribution from
+`llmoji_study.claude_gt.load_claude_gt_distribution()` (which pools
+across all naturalistic runs + the introspection arm). Pulls
+emissions from `~/.claude/kaomoji-journal.jsonl` plus
+comma-separated claude.ai exports (defaults to two known exports
+under `~/Downloads/`, unioned by conversation UUID). Outputs to
+`data/harness/claude_per_project_{gt_priority,ensemble,gt_only}{,.md}.tsv`
++ `figures/harness/claude_per_project_*.png`.
 
 ## Hidden-state pipeline
 
@@ -419,8 +480,9 @@ Loader entry points in `llmoji_study.emotional_analysis`:
 Multi-layer cache: `load_emotional_features_all_layers(short, ...)`
 opens each sidecar once and returns
 `(n_rows, n_layers, hidden_dim)`, with optional disk cache at
-`data/local/cache/v3_<short>_h_mean_all_layers.npz` (gitignored, legacy
-filename — contents reflect whatever `which` is set to).
+`data/local/cache/<short>{_<suffix>}_h_mean_all_layers.npz`
+(gitignored, legacy filename — contents reflect whatever `which` is
+set to).
 
 Per-row `row_uuid` links to its sidecar. JSONL `row_uuid == ""` rows
 are pre-refactor and have no sidecar; loaders drop them.
@@ -435,13 +497,14 @@ generations at ~25 sec each, plus model load and saklas probe
 bootstrap). Resumable via a `(condition, prompt_id, seed)` check
 against the JSONL — errored cells get retried on the next invocation.
 
-Outputs are keyed by model: `LLMOJI_MODEL=qwen` reroutes everything to
-`data/qwen_emotional_*` and `figures/local/qwen/*`.
-`LLMOJI_OUT_SUFFIX=foo` writes to `data/{short}_foo.jsonl` + sidecars
-under `data/local/hidden/*_foo/` for parallel analysis variants.
+Outputs are keyed by model: `LLMOJI_MODEL=qwen` reroutes everything
+to `data/local/qwen/*` and `figures/local/qwen/*`.
+`LLMOJI_OUT_SUFFIX=foo` writes to
+`data/local/<short>_foo/emotional_raw.jsonl` + sidecars under
+`data/local/hidden/<short>_foo/` for parallel analysis variants.
 `LLMOJI_PREAMBLE_FILE=preambles/<file>.txt` plumbs through to
-`instruction_override` so introspection priming swaps the kaomoji ask
-rather than stacking another ask on top.
+`instruction_override` so introspection priming swaps the kaomoji
+ask rather than stacking another ask on top.
 
 ## Gotchas
 
@@ -474,7 +537,8 @@ A few of the worst (full list in `gotchas.md`):
   it; the h_mean and h_last aggregates window-tighten with the cap
   and cross-cutover comparisons stop being meaningful.
 
-Sidecars (`data/local/hidden/`) and JSONL (`data/*.jsonl`) are the source
+Sidecars (`data/local/hidden/<short>{_<suffix>}/`) and JSONL
+(`data/local/<short>{_<suffix>}/emotional_raw.jsonl`) are the source
 of truth for hidden states and row metadata. Delete both when
 changing model / probes / prompts / seeds. Taxonomy changes are
 fixable in-place via the relabel snippet in `gotchas.md`.
