@@ -2,50 +2,58 @@
 """Wild-emitted Claude faces × eriskii axes × clusters: looking for
 state structure beyond the six Russell quadrants.
 
-Motivation. The gt-priority resolution on 2405 Claude emissions
-(script 22) lands 66% directly via Claude-GT, 32% via ensemble
-fallback. The fallback share isn't noise — those are kaomoji Claude
-*emits in deployment* but *didn't surface in the 120-prompt GT
-elicitation*. If those faces cluster in description-embedding space in
-ways that don't map cleanly to HP/LP/HN-D/HN-S/LN/NB, that's evidence
-for state axes orthogonal to Russell's valence × arousal — candidates
-to elicit in a positive/neutral follow-on (focus, cognitive load,
-warmth, uncertainty).
+Refactored 2026-05-05 to consume the **full HF corpus**
+(``claude_descriptions.jsonl`` — 306 canonical kaomoji pooled from
+``a9lim/llmoji``) rather than the local-machine wild journal alone.
+Wild-only faces (not in Claude GT) are no longer displayed by their
+ensemble-*predicted* quadrant; that label was a confidence-shaped
+fiction. Each kept face is partitioned into one of three categories
+whose **status w.r.t. the GT elicitation set is the actual signal**:
+
+  - ``shared`` — in Claude GT ∩ HF corpus.
+    Marker: circle. Color: the GT modal quadrant.
+  - ``wild_claude`` — in HF corpus, claude-opus emitted at least once,
+    not in Claude GT. Marker: black circle.
+  - ``wild_other`` — in HF corpus, no claude-opus emission, not in
+    Claude GT. Marker: black square.
+
+The cluster table still reports quadrant composition for the shared
+subset within each cluster, plus per-category face counts and a
+``wild_frac``. High-``wild_frac`` / high-``wild_claude_frac`` clusters
+remain the candidate "states beyond the six" — emissions from prompt
+contexts the GT elicitation didn't probe.
 
 Pipeline (post-hoc, no new generation, zero welfare cost):
 
-  1. Pool wild emissions from ``~/.claude/kaomoji-journal.jsonl`` +
-     claude.ai exports (same loaders as script 22).
-  2. Resolve each face via gt-priority → ``(quadrant, source)``;
-     ``source ∈ {gt, pred}``.
+  1. Load HF corpus (``claude_descriptions.jsonl``) →
+     ``{face: count_total, claude_emit, top_description, ...}``.
+  2. Load Claude-GT modal labels (claude-runs naturalistic +
+     introspection arm).
   3. Inner-join with the description-embedded face set
-     (``claude_faces_embed_description.parquet``). Coverage drop is
-     the long tail of un-described kaomoji; report and accept.
-  4. PCA on the 384-d description embeddings of wild-labeled faces;
-     scatter colored by quadrant, marker shape by source, sized by
-     log emit count.
-  5. KMeans on the same 384-d embeddings (all wild-labeled, gt+pred
-     pooled). k chosen by silhouette over a small grid. Per cluster:
-     Haiku label, mean projection onto the 21 eriskii axes (top-3 /
-     bottom-3), quadrant composition, gt-fraction.
-  6. t-SNE layout for the cluster figure (cosine metric, perplexity
-     auto-scaled). Plotly HTML mirror.
+     (``claude_faces_embed_description.parquet``); categorize each kept
+     face.
+  4. PCA(3) on the 384-d description embeddings; produce a single 3D
+     side-by-side plotly HTML — left scene colored by category
+     (shared = GT modal quadrant, wild_claude = black ●, wild_other =
+     black ■); right scene colored by KMeans cluster id.
+  5. KMeans on the same 384-d embeddings; k via silhouette grid but
+     defaulted to k=6 for interpretability (see writeup).
+  6. Per cluster: Haiku label, mean projection onto the 21 eriskii
+     axes (top/bottom 3), category composition (shared / wild_claude /
+     wild_other) plus quadrant composition over the shared subset.
   7. Auto-regenerated Setup + Cluster table at
-     ``docs/2026-MM-DD-residual-state-axes.md``. The Findings /
-     Implications / Caveats sections after the auto-table are
-     **hand-edited** and will be overwritten by re-running this
-     script — preserve them before regenerating.
+     ``docs/2026-MM-DD-residual-state-axes.md``. Content past the
+     HAND_MARKER line is preserved across re-runs.
 
-The residual-cluster signature we're looking for: high pred-fraction
-+ diffuse quadrant composition + axis profile that doesn't read as
-any single Russell cell. That subset is the candidate "states beyond
-the six." Quadrant-aligned clusters with high gt-fraction are the
-controls — they tell us the elicitation set hit those cells.
+The 2D static PNG, 2D plotly HTML, and t-SNE cluster PNG were all
+deleted in the 2026-05-05 cleanup — the side-by-side 3D scene already
+carries both the category-coloring and cluster-coloring views, and the
+2D outputs were redundant.
 
 Usage:
     ANTHROPIC_API_KEY=... python scripts/67_wild_eriskii_residual.py
-    # or, no Haiku labels (useful for dry-runs):
     python scripts/67_wild_eriskii_residual.py --no-haiku
+    python scripts/67_wild_eriskii_residual.py --gt-only  # shared subset only
 """
 
 from __future__ import annotations
@@ -62,7 +70,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 import numpy as np
 import pandas as pd
 
-from llmoji.sources.journal import iter_journal
 from llmoji.taxonomy import canonicalize_kaomoji
 from llmoji_study.claude_faces import EMBED_MODEL, load_embeddings
 from llmoji_study.claude_gt import load_claude_gt
@@ -82,146 +89,91 @@ from llmoji_study.eriskii import (
 from llmoji_study.eriskii_anchors import AXIS_ANCHORS, CLUSTER_LABEL_PROMPT
 
 QUADRANTS = ["HP", "LP", "HN-D", "HN-S", "LN", "NB"]
+CATEGORIES = ["shared", "wild_claude", "wild_other"]
+WILD_COLOR = "#111111"  # uniform black for wild-only faces
 HARNESS_DATA_DIR = DATA_DIR / "harness"
 HARNESS_FIG_DIR = FIGURES_DIR / "harness"
 DOCS_DIR = REPO_ROOT / "docs"
 
-DEFAULT_CLAUDE_EXPORTS = [
-    Path("/Users/a9lim/Downloads/"
-         "data-72de1230-b9fa-4c55-bc10-84a35b58d89c-1777763577-c21ac4ff-batch-0000/"
-         "conversations.json"),
-    Path("/Users/a9lim/Downloads/"
-         "9cc23402cbb1e8aec9785eb0f750f1c442f1ba13e507bd6b04a727c627d64d08-"
-         "2026-04-28-01-04-53-1d1e60e8c10441b1881c7e81834c3b26/"
-         "conversations.json"),
-]
-
-
-# --------------------------------------------------------------------- fonts
-def _use_cjk_font() -> None:
-    """Same fallback chain used elsewhere in the project."""
-    import matplotlib
-    import matplotlib.font_manager as fm
-
-    emoji_font = REPO_ROOT / "data" / "fonts" / "NotoEmoji-Regular.ttf"
-    if emoji_font.exists() and "Noto Emoji" not in {f.name for f in fm.fontManager.ttflist}:
-        try:
-            fm.fontManager.addfont(str(emoji_font))
-        except Exception:
-            pass
-    chain = [
-        "Noto Sans CJK JP", "Arial Unicode MS", "DejaVu Sans", "DejaVu Serif",
-        "Tahoma", "Noto Sans Canadian Aboriginal", "Heiti TC",
-        "Hiragino Sans", "Apple Symbols", "Noto Emoji", "Helvetica Neue",
-    ]
-    available = {f.name for f in fm.fontManager.ttflist}
-    chain = [n for n in chain if n in available]
-    if chain:
-        matplotlib.rcParams["font.family"] = chain
-
 
 # --------------------------------------------------------------------- IO
-def _to_float(v) -> float:
-    try:
-        if v is None or (isinstance(v, str) and v == ""):
-            return 0.0
-        return float(v)
-    except (TypeError, ValueError):
-        return 0.0
+def _is_claude_source_model(source_model: str) -> bool:
+    """True iff a description's source_model attests a real Claude
+    emission. Treats anything containing 'claude' as Claude-emitted;
+    the literal '<synthetic>' source_model (haiku-generated synthesis
+    prompts) is *not* an emission and naturally fails the substring
+    check."""
+    return "claude" in source_model.lower()
 
 
-def _load_ensemble_predictions(path: Path) -> dict[str, dict]:
-    df = pd.read_csv(path, sep="\t", keep_default_na=False, na_values=[""])
+def _load_hf_corpus(path: Path) -> tuple[dict[str, dict], int]:
+    """Read ``claude_descriptions.jsonl`` into per-face metadata.
+
+    Returns ``(per_face_meta, total_emissions)`` where ``per_face_meta``
+    maps canonical face → {count_total, claude_emit, top_description,
+    descriptions, source_models}.
+    """
     out: dict[str, dict] = {}
-    for rec in df.to_dict(orient="records"):
-        f = str(rec["first_word"])
-        entry: dict = {
-            "ensemble_pred": str(rec["ensemble_pred"]),
-            "ensemble_conf": _to_float(rec.get("ensemble_conf")),
-        }
-        for q in QUADRANTS:
-            entry[f"p_{q}"] = _to_float(rec.get(f"ensemble_p_{q}"))
-        out[f] = entry
-    return out
-
-
-def _emissions_from_journal(path: Path, source: str) -> list[str]:
-    rows: list[str] = []
-    if not path.exists():
-        print(f"  skip {path} (missing)")
-        return rows
-    for sr in iter_journal(path, source=source):
-        face = sr.first_word or ""
-        if not face:
-            continue
-        canon = canonicalize_kaomoji(face)
-        if not canon:
-            continue
-        rows.append(canon)
-    print(f"  {path.name}: {len(rows)} emissions")
-    return rows
-
-
-def _emissions_from_claude_export(paths: list[Path]) -> list[str]:
-    rows: list[str] = []
-    export_dirs: list[Path] = []
-    for path in paths:
-        if not path.exists():
-            print(f"  skip {path} (missing)")
-            continue
-        export_dirs.append(path.parent if path.is_file() else path)
-    if not export_dirs:
-        return rows
-    try:
-        from llmoji.sources.claude_export import iter_claude_export
-    except ImportError:
-        print("  skip claude.ai export (llmoji.sources.claude_export not available)")
-        return rows
-    for sr in iter_claude_export(export_dirs):
-        face = sr.first_word or ""
-        if not face:
-            continue
-        canon = canonicalize_kaomoji(face)
-        if not canon:
-            continue
-        rows.append(canon)
-    print(f"  claude.ai: {len(rows)} emissions across {len(export_dirs)} export(s)")
-    return rows
-
-
-def _resolve(
-    face: str,
-    gt: dict[str, tuple[str, int]],
-    preds: dict[str, dict],
-) -> tuple[str | None, str]:
-    """gt-priority: GT first, ensemble fallback, then unknown."""
-    if face in gt:
-        return gt[face][0], "gt"
-    if face in preds:
-        return preds[face]["ensemble_pred"], "pred"
-    return None, "unknown"
-
-
-def _representative_descriptions(corpus_path: Path) -> dict[str, str]:
-    """Most-evidenced description per canonical kaomoji."""
-    out: dict[str, str] = {}
-    with corpus_path.open() as f:
-        for line in f:
+    total = 0
+    with path.open() as fh:
+        for line in fh:
             line = line.strip()
             if not line:
                 continue
             r = json.loads(line)
-            descs = r.get("descriptions", [])
-            if not descs:
+            face = canonicalize_kaomoji(r.get("kaomoji", ""))
+            if not face:
                 continue
-            out[r["kaomoji"]] = descs[0]["description"]
-    return out
+            descs = r.get("descriptions", []) or []
+            descs_sorted = sorted(descs, key=lambda d: -int(d.get("count", 0)))
+            top_desc = descs_sorted[0].get("description", "") if descs_sorted else ""
+            claude_emit = sum(
+                int(d.get("count", 0)) for d in descs
+                if _is_claude_source_model(d.get("source_model", ""))
+            )
+            count_total = int(r.get("count_total", 0))
+            sms = sorted({d.get("source_model", "?") for d in descs})
+            out[face] = {
+                "count_total": count_total,
+                "claude_emit": int(claude_emit),
+                "top_description": top_desc,
+                "descriptions": descs_sorted,
+                "source_models": sms,
+            }
+            total += count_total
+    return out, total
+
+
+def _categorize(
+    face: str,
+    gt: dict[str, tuple[str, int]],
+    claude_emit: int,
+) -> tuple[str, str | None]:
+    """Return ``(category, gt_quadrant_or_None)``.
+
+    ``category`` ∈ {'shared', 'wild_claude', 'wild_other'}. Only
+    ``shared`` faces carry a quadrant label — wild-only quadrants would
+    be ensemble guesses, which this refactor explicitly drops.
+    """
+    if face in gt:
+        return "shared", gt[face][0]
+    if claude_emit > 0:
+        return "wild_claude", None
+    return "wild_other", None
+
+
+# Color/marker mapping for the 3D scene's left pane:
+#   shared      → QUADRANT_COLORS[gt_quadrant], circle
+#   wild_claude → WILD_COLOR (black), circle
+#   wild_other  → WILD_COLOR (black), square
+# Inlined in `_scatter_pca_3d_html` rather than factored out — the
+# plotly trace API wants the per-category branches anyway.
 
 
 # --------------------------------------------------------------------- analysis
 def _pick_k_silhouette(E: np.ndarray, k_grid: list[int]) -> tuple[int, dict[int, float]]:
-    """Silhouette score over k_grid; pick argmax. Cosine metric to
-    match the t-SNE layout we'll show."""
+    """Silhouette score over k_grid; pick argmax. Cosine metric — the
+    description embeddings are normalized in cosine space."""
     from sklearn.cluster import KMeans
     from sklearn.metrics import silhouette_score
 
@@ -279,130 +231,14 @@ def _quadrant_composition(
 
 
 # --------------------------------------------------------------------- figures
-def _scatter_pca(
-    coords: np.ndarray,
-    quadrants: list[str | None],
-    sources: list[str],
-    sizes: np.ndarray,
-    fws: list[str],
-    *,
-    out_png: Path,
-    title: str,
-    subtitle: str,
-) -> None:
-    import matplotlib.pyplot as plt
-
-    fig, ax = plt.subplots(figsize=(11, 8))
-    for source_label, marker in (("gt", "o"), ("pred", "^")):
-        for q in QUADRANTS:
-            mask = np.array([
-                qi == q and si == source_label
-                for qi, si in zip(quadrants, sources)
-            ])
-            if not mask.any():
-                continue
-            ax.scatter(
-                coords[mask, 0], coords[mask, 1],
-                s=sizes[mask], c=QUADRANT_COLORS[q],
-                marker=marker, alpha=0.78,
-                edgecolor="white", linewidth=0.5,
-                label=f"{q} ({source_label})",
-            )
-    # Annotate the heaviest emitters.
-    top = np.argsort(-sizes)[:25]
-    for i in top:
-        ax.annotate(
-            fws[i], xy=(coords[i, 0], coords[i, 1]),
-            xytext=(4, 3), textcoords="offset points",
-            fontsize=8, color="#222",
-        )
-
-    ax.set_title(title, fontsize=12, pad=10)
-    ax.text(0.5, 1.01, subtitle, transform=ax.transAxes,
-            ha="center", va="bottom", fontsize=9, color="#555")
-    ax.set_xticks([])
-    ax.set_yticks([])
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    # Single legend column: 6 quadrants × 2 sources = 12 entries; trim
-    # via dedup.
-    handles, labels = ax.get_legend_handles_labels()
-    seen = set()
-    uniq = [(h, l) for h, l in zip(handles, labels) if not (l in seen or seen.add(l))]
-    ax.legend(
-        [h for h, _ in uniq], [l for _, l in uniq],
-        loc="center left", bbox_to_anchor=(1.01, 0.5),
-        frameon=False, fontsize=8, ncol=1, title="quadrant (source)",
-    )
-    fig.tight_layout()
-    out_png.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_png, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    print(f"wrote {out_png}")
-
-
-def _scatter_pca_html(
-    coords: np.ndarray,
-    quadrants: list[str | None],
-    sources: list[str],
-    fws: list[str],
-    sizes_log: np.ndarray,
-    descriptions_by_fw: dict[str, str],
-    *,
-    out_path: Path,
-    title: str,
-) -> None:
-    try:
-        import plotly.graph_objects as go
-    except ImportError:
-        print(f"  (plotly missing; skipping {out_path.name})")
-        return
-
-    def _truncate(s: str, lim: int = 140) -> str:
-        return s if len(s) <= lim else s[:lim].rstrip() + "…"
-
-    fig = go.Figure()
-    for source_label, symbol in (("gt", "circle"), ("pred", "triangle-up")):
-        for q in QUADRANTS:
-            idxs = [i for i, (qi, si) in enumerate(zip(quadrants, sources))
-                     if qi == q and si == source_label]
-            if not idxs:
-                continue
-            hover = [
-                f"<b>{fws[i]}</b><br>quadrant: {q}<br>source: {source_label}<br>"
-                f"emit weight (log): {sizes_log[i]:.2f}<br>"
-                f"<i>{_truncate(descriptions_by_fw.get(fws[i], ''))}</i>"
-                for i in idxs
-            ]
-            fig.add_trace(go.Scatter(
-                x=coords[idxs, 0], y=coords[idxs, 1],
-                mode="markers",
-                name=f"{q} ({source_label})",
-                text=hover,
-                hoverinfo="text",
-                marker=dict(
-                    size=[float(8 + 6 * sizes_log[i]) for i in idxs],
-                    color=QUADRANT_COLORS[q],
-                    symbol=symbol,
-                    line=dict(color="white", width=0.6),
-                    opacity=0.85,
-                ),
-            ))
-    fig.update_layout(
-        title=title,
-        xaxis=dict(visible=False),
-        yaxis=dict(visible=False),
-        legend=dict(title="quadrant (source)", itemsizing="constant"),
-        width=1200, height=900,
-    )
-    fig.write_html(str(out_path))
-    print(f"wrote {out_path}")
-
-
+# Only the 3D PCA HTML survives the 2026-05-05 cleanup. The 2D static
+# PNG, 2D plotly HTML, and t-SNE cluster PNG were all redundant with the
+# side-by-side 3D scene (which carries both the category-coloring and
+# the cluster-coloring views) and have been removed.
 def _scatter_pca_3d_html(
     coords3: np.ndarray,
+    categories: list[str],
     quadrants: list[str | None],
-    sources: list[str],
     cluster_ids: np.ndarray,
     cluster_labels: dict[int, str],
     fws: list[str],
@@ -415,8 +251,10 @@ def _scatter_pca_3d_html(
 ) -> None:
     """Two side-by-side 3D scenes on the same PCA(3) coords:
 
-      - left:  colored by gt-priority quadrant, circle=gt, diamond=pred
-      - right: colored by KMeans cluster id, with Haiku label in legend
+      - left:  shared faces colored by GT modal quadrant (circles);
+               wild-only Claude faces black circles; wild-only non-Claude
+               faces black squares.
+      - right: colored by KMeans cluster id, with Haiku label in legend.
 
     Match style of ``scripts/local/97_build_per_face_pca_3d.py``: grey
     axis backgrounds, aspectmode='cube', plotly-cdn embed.
@@ -442,7 +280,7 @@ def _scatter_pca_3d_html(
         rows=1, cols=2,
         specs=[[{"type": "scene"}, {"type": "scene"}]],
         subplot_titles=(
-            "Colored by gt-priority quadrant (○=gt, ◆=pred)",
+            "Shared (○ colored by Q) · wild-Claude (● black) · wild-other (■ black)",
             "Colored by KMeans cluster (k={})".format(len(cluster_labels)),
         ),
         horizontal_spacing=0.04,
@@ -450,39 +288,74 @@ def _scatter_pca_3d_html(
 
     sizes = np.clip(6 + 5 * sizes_log, 6, 26)
 
-    # --- LEFT scene: by quadrant × source ---------------------------------
-    for source_label, symbol in (("gt", "circle"), ("pred", "diamond")):
-        for q in QUADRANTS:
-            idxs = [i for i, (qi, si) in enumerate(zip(quadrants, sources))
-                     if qi == q and si == source_label]
-            if not idxs:
-                continue
-            hover = [
-                f"<b>{fws[i]}</b><br>quadrant: {q}<br>source: {source_label}<br>"
-                f"emit weight (log): {sizes_log[i]:.2f}<br>"
-                f"<i>{_truncate(descriptions_by_fw.get(fws[i], ''))}</i>"
-                for i in idxs
-            ]
-            fig.add_trace(
-                go.Scatter3d(
-                    x=coords3[idxs, 0], y=coords3[idxs, 1], z=coords3[idxs, 2],
-                    mode="markers",
-                    name=f"{q} ({source_label})",
-                    legendgroup=f"left-{q}-{source_label}",
-                    marker=dict(
-                        size=[float(sizes[i]) for i in idxs],
-                        color=QUADRANT_COLORS[q],
-                        symbol=symbol,
-                        line=dict(color="black", width=0.4),
-                        opacity=0.85,
-                    ),
-                    hovertemplate="%{hovertext}<extra></extra>",
-                    hovertext=hover,
-                    scene="scene",
-                    showlegend=True,
+    # --- LEFT scene: by category (+ quadrant for shared) ------------------
+    for q in QUADRANTS:
+        idxs = [
+            i for i, (cat, qi) in enumerate(zip(categories, quadrants))
+            if cat == "shared" and qi == q
+        ]
+        if not idxs:
+            continue
+        hover = [
+            f"<b>{fws[i]}</b><br>category: shared<br>quadrant: {q}<br>"
+            f"emit weight (log): {sizes_log[i]:.2f}<br>"
+            f"<i>{_truncate(descriptions_by_fw.get(fws[i], ''))}</i>"
+            for i in idxs
+        ]
+        fig.add_trace(
+            go.Scatter3d(
+                x=coords3[idxs, 0], y=coords3[idxs, 1], z=coords3[idxs, 2],
+                mode="markers",
+                name=f"shared · {q}",
+                legendgroup=f"left-shared-{q}",
+                marker=dict(
+                    size=[float(sizes[i]) for i in idxs],
+                    color=QUADRANT_COLORS[q],
+                    symbol="circle",
+                    line=dict(color="black", width=0.4),
+                    opacity=0.88,
                 ),
-                row=1, col=1,
-            )
+                hovertemplate="%{hovertext}<extra></extra>",
+                hovertext=hover,
+                scene="scene",
+                showlegend=True,
+            ),
+            row=1, col=1,
+        )
+
+    for cat, label, symbol in (
+        ("wild_claude", "wild-only · Claude", "circle"),
+        ("wild_other", "wild-only · non-Claude", "square"),
+    ):
+        idxs = [i for i, c in enumerate(categories) if c == cat]
+        if not idxs:
+            continue
+        hover = [
+            f"<b>{fws[i]}</b><br>category: {cat}<br>"
+            f"emit weight (log): {sizes_log[i]:.2f}<br>"
+            f"<i>{_truncate(descriptions_by_fw.get(fws[i], ''))}</i>"
+            for i in idxs
+        ]
+        fig.add_trace(
+            go.Scatter3d(
+                x=coords3[idxs, 0], y=coords3[idxs, 1], z=coords3[idxs, 2],
+                mode="markers",
+                name=label,
+                legendgroup=f"left-{cat}",
+                marker=dict(
+                    size=[float(sizes[i]) for i in idxs],
+                    color=WILD_COLOR,
+                    symbol=symbol,
+                    line=dict(color="white", width=0.4),
+                    opacity=0.82,
+                ),
+                hovertemplate="%{hovertext}<extra></extra>",
+                hovertext=hover,
+                scene="scene",
+                showlegend=True,
+            ),
+            row=1, col=1,
+        )
 
     # --- RIGHT scene: by cluster -----------------------------------------
     for c in sorted(cluster_labels):
@@ -493,8 +366,9 @@ def _scatter_pca_3d_html(
         color = palette[c % len(palette)]
         hover = [
             f"<b>{fws[i]}</b><br>cluster {c}: {label}<br>"
-            f"quadrant: {quadrants[i]}<br>source: {sources[i]}<br>"
-            f"<i>{_truncate(descriptions_by_fw.get(fws[i], ''))}</i>"
+            f"category: {categories[i]}"
+            + (f" · quadrant: {quadrants[i]}" if quadrants[i] else "")
+            + f"<br><i>{_truncate(descriptions_by_fw.get(fws[i], ''))}</i>"
             for i in idxs
         ]
         fig.add_trace(
@@ -558,64 +432,20 @@ def _scatter_pca_3d_html(
     print(f"wrote {out_path}")
 
 
-def _scatter_clusters(
-    xy: np.ndarray,
-    cluster_ids: np.ndarray,
-    cluster_labels: dict[int, str],
-    fws: list[str],
-    sizes: np.ndarray,
-    *,
-    out_png: Path,
-    title: str,
-) -> None:
-    import matplotlib.pyplot as plt
-
-    palette = list(plt.cm.tab20.colors) + list(plt.cm.tab20b.colors)
-    fig, ax = plt.subplots(figsize=(13, 9))
-    colors = [palette[int(c) % len(palette)] for c in cluster_ids]
-    ax.scatter(xy[:, 0], xy[:, 1], c=colors, s=sizes, alpha=0.82,
-               edgecolor="white", linewidth=0.4)
-    top = np.argsort(-sizes)[:30]
-    for i in top:
-        ax.annotate(fws[i], xy=(xy[i, 0], xy[i, 1]),
-                    xytext=(4, 4), textcoords="offset points",
-                    fontsize=9, color="#222")
-    for c in sorted(cluster_labels):
-        mask = cluster_ids == c
-        if not mask.any():
-            continue
-        cx = float(xy[mask, 0].mean())
-        cy = float(xy[mask, 1].mean())
-        ax.text(cx, cy, cluster_labels[c],
-                fontsize=10, fontweight="bold", color="#111",
-                ha="center", va="center",
-                bbox=dict(boxstyle="round,pad=0.25", facecolor="white",
-                          edgecolor=palette[c % len(palette)], alpha=0.92))
-    ax.set_title(title, fontsize=12, pad=10)
-    ax.set_xticks([])
-    ax.set_yticks([])
-    fig.tight_layout()
-    out_png.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_png, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    print(f"wrote {out_png}")
-
-
 # --------------------------------------------------------------------- main
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--claude-journal",
-                    default=str(Path.home() / ".claude" / "kaomoji-journal.jsonl"))
-    ap.add_argument("--claude-export",
-                    default=",".join(str(p) for p in DEFAULT_CLAUDE_EXPORTS))
-    ap.add_argument("--ensemble-tsv",
-                    default=str(DATA_DIR / "local" / "face_likelihood_ensemble_predict.tsv"))
+    ap.add_argument("--corpus",
+                    default=str(CLAUDE_DESCRIPTIONS_PATH),
+                    help="HF-corpus JSONL of {kaomoji, count_total, "
+                         "descriptions, ...}. Default is the snapshot at "
+                         "data/harness/claude_descriptions.jsonl.")
     ap.add_argument("--claude-gt-floor", type=int, default=1)
     ap.add_argument("--gt-only", action="store_true",
-                    help="restrict to faces with Claude-GT labels (no "
-                         "ensemble-fallback predictions). Trades coverage "
-                         "for label trustworthiness. Outputs land in "
-                         "*_gt_only.{tsv,png,html} so both modes coexist.")
+                    help="restrict to shared faces (in both Claude GT and "
+                         "the HF corpus) — drops both wild-only categories. "
+                         "Outputs land in *_gt_only.{tsv,png,html} so both "
+                         "modes coexist.")
     ap.add_argument("--k-grid", default="2,3,4,5,6,7,8,10,12,14",
                     help="silhouette grid for KMeans")
     ap.add_argument("--fixed-k", type=int, default=6,
@@ -636,29 +466,23 @@ def main() -> None:
     HARNESS_DATA_DIR.mkdir(parents=True, exist_ok=True)
     HARNESS_FIG_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Output-filename suffix so gt-only and gt-priority modes coexist.
+    # Output-filename suffix so gt-only and full-corpus modes coexist.
     suffix = "_gt_only" if args.gt_only else ""
-    print(f"mode: {'gt-only (Claude-GT labels only)' if args.gt_only else 'gt-priority (GT + ensemble fallback)'}")
+    print(f"mode: {'gt-only (shared subset)' if args.gt_only else 'full HF corpus'}")
 
-    # --- load resolution sources -------------------------------------------
+    # --- load Claude-GT modal labels ---------------------------------------
     print(f"loading Claude-GT (floor={args.claude_gt_floor}) ...")
     gt = load_claude_gt(floor=args.claude_gt_floor)
     print(f"  {len(gt)} faces in Claude-GT")
-    print(f"loading ensemble predictions from {args.ensemble_tsv} ...")
-    preds = _load_ensemble_predictions(Path(args.ensemble_tsv))
-    print(f"  {len(preds)} faces in ensemble TSV")
 
-    # --- load wild emissions -----------------------------------------------
-    emissions: list[str] = []
-    print("\nloading Claude Code journal ...")
-    emissions += _emissions_from_journal(Path(args.claude_journal), "claude_code")
-    export_paths = [Path(p.strip()) for p in args.claude_export.split(",") if p.strip()]
-    if export_paths:
-        print(f"\nloading {len(export_paths)} claude.ai export(s) ...")
-        emissions += _emissions_from_claude_export(export_paths)
-    n_total_emit = len(emissions)
-    emit_counts: Counter[str] = Counter(emissions)
-    print(f"\ntotal wild emissions: {n_total_emit} across {len(emit_counts)} unique faces")
+    # --- load HF corpus -----------------------------------------------------
+    corpus_path = Path(args.corpus)
+    print(f"\nloading HF corpus from {corpus_path} ...")
+    hf_meta, n_total_emit = _load_hf_corpus(corpus_path)
+    n_unique = len(hf_meta)
+    n_claude_emit_total = sum(m["claude_emit"] for m in hf_meta.values())
+    print(f"  {n_unique} canonical faces · {n_total_emit} total emissions "
+          f"({n_claude_emit_total} from claude-opus)")
 
     # --- load description embeddings + project onto axes ------------------
     print(f"\nloading description embeddings from "
@@ -675,34 +499,36 @@ def main() -> None:
     df_axes = pd.DataFrame(P_all, columns=ERISKII_AXES, index=fw_all)
     df_axes.index.name = "first_word"
 
-    # --- inner-join: face must be wild-emitted AND have description --------
+    # --- inner-join HF corpus × embeddings, then categorize ----------------
     rows: list[dict] = []
-    for face, n_emit in emit_counts.items():
+    for face, meta in hf_meta.items():
         if face not in fw_to_idx:
-            continue
-        q, src = _resolve(face, gt, preds)
-        if q is None:
-            continue  # un-resolved by gt-priority
-        if args.gt_only and src != "gt":
-            continue  # gt-only mode: skip ensemble-fallback labels
+            continue  # un-described long tail
+        cat, q = _categorize(face, gt, meta["claude_emit"])
+        if args.gt_only and cat != "shared":
+            continue  # gt-only mode: drop wild-only categories
         rows.append({
             "first_word": face,
-            "n_emit": int(n_emit),
-            "quadrant": q,
-            "source": src,
+            "n_emit": int(meta["count_total"]),
+            "claude_emit": int(meta["claude_emit"]),
+            "category": cat,
+            "quadrant": q if q is not None else "",
             "embed_idx": fw_to_idx[face],
         })
 
     if not rows:
-        sys.exit("no wild-labeled faces survived the inner-join — aborting")
+        sys.exit("no faces survived the inner-join — aborting")
 
     df_wild = pd.DataFrame(rows).sort_values("n_emit", ascending=False).reset_index(drop=True)
-    n_unique = len(emit_counts)
     n_kept = len(df_wild)
-    print(f"\n{n_kept} / {n_unique} unique wild faces kept "
-          f"(have a description AND a gt-priority resolution)")
-    print(f"  by source: gt={(df_wild['source']=='gt').sum()}  "
-          f"pred={(df_wild['source']=='pred').sum()}")
+    cat_counts = df_wild["category"].value_counts().to_dict()
+    n_shared = int(cat_counts.get("shared", 0))
+    n_wild_claude = int(cat_counts.get("wild_claude", 0))
+    n_wild_other = int(cat_counts.get("wild_other", 0))
+    print(f"\n{n_kept} / {n_unique} HF faces kept (have a description embedding)")
+    print(f"  shared (in GT)        : {n_shared}")
+    print(f"  wild-only · Claude    : {n_wild_claude}")
+    print(f"  wild-only · non-Claude: {n_wild_other}")
 
     n_emit_kept = int(df_wild["n_emit"].sum())
     print(f"  emit coverage: {n_emit_kept} / {n_total_emit} "
@@ -710,16 +536,15 @@ def main() -> None:
 
     # --- attach axis projections to df_wild --------------------------------
     df_wild = df_wild.merge(df_axes, how="left", left_on="first_word", right_index=True)
-    # script-16's eriskii_axes.tsv usually covers everything in the
-    # embeddings parquet, but be defensive about NaNs in axis cols.
     missing_axes = df_wild[ERISKII_AXES].isna().any(axis=1).sum()
     if missing_axes:
         print(f"  (warn) {missing_axes} faces have a description but no eriskii axes; "
               "their axis profiles will read as NaN — usually a script-16 staleness issue")
 
-    # Save the labeled-wild table.
+    # Save the labeled table. `quadrant` is empty for wild-only faces by
+    # design — those rows are intentionally without a Russell label.
     out_tsv = HARNESS_DATA_DIR / f"wild_faces_labeled{suffix}.tsv"
-    cols = ["first_word", "n_emit", "quadrant", "source"] + [
+    cols = ["first_word", "n_emit", "claude_emit", "category", "quadrant"] + [
         a for a in ERISKII_AXES if a in df_wild.columns
     ]
     df_wild[cols].to_csv(out_tsv, sep="\t", index=False)
@@ -729,46 +554,26 @@ def main() -> None:
     idxs = df_wild["embed_idx"].to_numpy()
     E = E_all[idxs]
     fws = df_wild["first_word"].tolist()
-    quadrants: list[str | None] = df_wild["quadrant"].tolist()
-    sources: list[str] = df_wild["source"].tolist()
+    categories: list[str] = df_wild["category"].tolist()
+    quadrants: list[str | None] = [
+        (q if q else None) for q in df_wild["quadrant"].tolist()
+    ]
     weights = df_wild["n_emit"].astype(int).tolist()
     sizes_log = np.log1p(np.asarray(weights, dtype=float))
-    sizes = np.clip(15 + 50 * sizes_log, 15, 280)
 
-    # --- representative descriptions for hover + Haiku -----------------------
-    descriptions_by_fw = _representative_descriptions(CLAUDE_DESCRIPTIONS_PATH)
+    # --- representative descriptions for hover + Haiku ---------------------
+    descriptions_by_fw = {f: m["top_description"] for f, m in hf_meta.items()}
 
-    # --- PCA (3 components; we plot PC1×PC2 for the static, PC1×PC2×PC3 3D)
+    # --- PCA(3) for the 3D scene ------------------------------------------
     from sklearn.decomposition import PCA
     pca = PCA(n_components=3, random_state=0)
     coords3 = pca.fit_transform(E)
-    coords_pca = coords3[:, :2]
     evr = pca.explained_variance_ratio_
     print(f"\nPCA explained variance: "
           f"PC1={evr[0]:.3f}, PC2={evr[1]:.3f}, PC3={evr[2]:.3f} "
           f"(sum={sum(evr):.3f})")
 
-    _use_cjk_font()
-
-    pc_subtitle = (
-        f"{n_kept} unique faces · {n_emit_kept} emissions · "
-        f"PC1+PC2 = {sum(evr[:2])*100:.1f}% var · "
-        f"gt={(df_wild['source']=='gt').sum()}/{n_kept} · "
-        f"pred={(df_wild['source']=='pred').sum()}/{n_kept}"
-    )
-    mode_subtitle = " · gt-only (no ensemble fallback)" if args.gt_only else ""
-    _scatter_pca(
-        coords_pca, quadrants, sources, sizes, fws,
-        out_png=HARNESS_FIG_DIR / f"wild_faces_eriskii_pca{suffix}.png",
-        title=f"Wild-emitted Claude faces — PCA on description embeddings{mode_subtitle}",
-        subtitle=pc_subtitle,
-    )
-    _scatter_pca_html(
-        coords_pca, quadrants, sources, fws, sizes_log, descriptions_by_fw,
-        out_path=HARNESS_FIG_DIR / f"wild_faces_eriskii_pca{suffix}.html",
-        title=(f"Wild-emitted Claude faces — PCA on description embeddings{mode_subtitle}, "
-                "colored by gt-priority quadrant (○=gt, △=pred)"),
-    )
+    mode_subtitle = " · gt-only (shared subset)" if args.gt_only else ""
 
     # --- KMeans on description embeddings ----------------------------------
     print("\n=== clustering ===")
@@ -840,18 +645,32 @@ def main() -> None:
             print(f"  cluster {c} (n={len(member_idx)}): {label}")
 
     # --- per-cluster analytics ---------------------------------------------
+    # Quadrant composition is computed over the *shared* subset of each
+    # cluster only — wild-only faces deliberately have no Russell label,
+    # so excluding them keeps `share_*` honest. `wild_*_frac` reports
+    # the per-cluster category split separately.
     rows_clusters = []
     for c in range(best_k):
         member_idx = [i for i, ci in enumerate(cluster_ids) if int(ci) == c]
-        share, total_w = _quadrant_composition(member_idx, quadrants, weights)
-        n_gt = sum(1 for i in member_idx if sources[i] == "gt")
-        n_pred = sum(1 for i in member_idx if sources[i] == "pred")
-        gt_frac = n_gt / max(len(member_idx), 1)
-        pred_frac = n_pred / max(len(member_idx), 1)
-        modal_q = max(QUADRANTS, key=lambda q: share.get(q, 0.0))
-        modal_share = share.get(modal_q, 0.0)
-        # diffuseness: 1 − max-share (high → not quadrant-aligned)
-        diffuseness = 1.0 - modal_share
+        share, total_w_shared = _quadrant_composition(member_idx, quadrants, weights)
+        n_shared_c = sum(1 for i in member_idx if categories[i] == "shared")
+        n_wild_claude_c = sum(1 for i in member_idx if categories[i] == "wild_claude")
+        n_wild_other_c = sum(1 for i in member_idx if categories[i] == "wild_other")
+        n_total_c = max(len(member_idx), 1)
+        shared_frac = n_shared_c / n_total_c
+        wild_claude_frac = n_wild_claude_c / n_total_c
+        wild_other_frac = n_wild_other_c / n_total_c
+        wild_frac = wild_claude_frac + wild_other_frac
+
+        if n_shared_c > 0:
+            modal_q = max(QUADRANTS, key=lambda q: share.get(q, 0.0))
+            modal_share = share.get(modal_q, 0.0)
+        else:
+            modal_q = ""
+            modal_share = 0.0
+        # diffuseness: 1 − max-share (high → not quadrant-aligned).
+        # Defined over the shared subset; meaningless for wild-pure clusters.
+        diffuseness = 1.0 - modal_share if n_shared_c > 0 else float("nan")
 
         top_pos, top_neg = _cluster_axis_profile(member_idx, df_wild)
         members_str = ", ".join(fws[i] for i in sorted(member_idx, key=lambda j: -weights[j])[:8])
@@ -862,22 +681,27 @@ def main() -> None:
             "cluster_id": c,
             "label": cluster_labels[c],
             "n_faces": len(member_idx),
-            "n_gt": n_gt,
-            "n_pred": n_pred,
-            "gt_frac": round(gt_frac, 3),
-            "pred_frac": round(pred_frac, 3),
+            "n_shared": n_shared_c,
+            "n_wild_claude": n_wild_claude_c,
+            "n_wild_other": n_wild_other_c,
+            "shared_frac": round(shared_frac, 3),
+            "wild_claude_frac": round(wild_claude_frac, 3),
+            "wild_other_frac": round(wild_other_frac, 3),
+            "wild_frac": round(wild_frac, 3),
             "modal_quadrant": modal_q,
             "modal_share": round(modal_share, 3),
-            "diffuseness": round(diffuseness, 3),
-            "total_emit_weight": total_w,
+            "diffuseness": round(diffuseness, 3) if n_shared_c > 0 else "",
+            "total_emit_weight_shared": total_w_shared,
             **{f"share_{q}": round(share.get(q, 0.0), 3) for q in QUADRANTS},
             "top_axes_pos": "; ".join(f"{a}:+{v:.2f}" for a, v in top_pos),
             "top_axes_neg": "; ".join(f"{a}:{v:+.2f}" for a, v in top_neg),
             "sample_members": members_str,
         })
 
+    # Sort by wild_frac desc — top of the table is where Claude's
+    # deployment-shaped vocabulary diverges most from the GT elicitation.
     df_clusters = pd.DataFrame(rows_clusters).sort_values(
-        ["pred_frac", "diffuseness"], ascending=[False, False]
+        ["wild_frac", "n_faces"], ascending=[False, False]
     ).reset_index(drop=True)
     out_clusters_tsv = HARNESS_DATA_DIR / f"wild_residual_clusters{suffix}.tsv"
     df_clusters.to_csv(out_clusters_tsv, sep="\t", index=False)
@@ -885,28 +709,11 @@ def main() -> None:
 
     # --- 3D PCA HTML with both colorings -----------------------------------
     _scatter_pca_3d_html(
-        coords3, quadrants, sources, cluster_ids, cluster_labels,
+        coords3, categories, quadrants, cluster_ids, cluster_labels,
         fws, sizes_log, descriptions_by_fw,
         out_path=HARNESS_FIG_DIR / f"wild_faces_eriskii_pca_3d{suffix}.html",
-        title=(f"Wild-emitted Claude faces — PCA(3) on description embeddings{mode_subtitle}"),
+        title=(f"HF-corpus Claude faces — PCA(3) on description embeddings{mode_subtitle}"),
         evr=evr,
-    )
-
-    # --- t-SNE layout for the cluster figure -------------------------------
-    from sklearn.manifold import TSNE
-    perp = max(5, min(30, (E.shape[0] - 1) // 4))
-    print(f"computing t-SNE (perplexity={perp}) ...")
-    xy = TSNE(
-        n_components=2, metric="cosine", perplexity=perp,
-        init="pca", learning_rate="auto", random_state=0,
-    ).fit_transform(E)
-    _scatter_clusters(
-        xy, cluster_ids, cluster_labels, fws, sizes,
-        out_png=HARNESS_FIG_DIR / f"wild_residual_clusters_tsne{suffix}.png",
-        title=(
-            f"Wild-emitted faces — KMeans(k={best_k}) on description embeddings, "
-            f"Haiku-labeled (t-SNE layout){mode_subtitle}"
-        ),
     )
 
     # --- markdown writeup --------------------------------------------------
@@ -922,29 +729,40 @@ def main() -> None:
     lines.append("## Setup")
     lines.append("")
     lines.append(
-        f"- {n_total_emit} wild emissions across {n_unique} unique faces "
-        "(Claude Code journal + claude.ai exports)."
+        f"- HF corpus: {n_total_emit} total emissions across {n_unique} canonical "
+        f"kaomoji ({n_claude_emit_total} from claude-opus source models). "
+        f"Source: `{corpus_path.name}` — pooled contributor data from "
+        "`a9lim/llmoji`."
     )
     lines.append(
-        f"- {n_kept} faces kept after inner-joining with the contributor-side "
-        f"description corpus (drops {n_unique - n_kept} un-described / "
-        "un-resolved faces in the long tail)."
+        f"- {n_kept} faces kept after inner-joining with the description "
+        f"embedding parquet (drops {n_unique - n_kept} un-described faces "
+        "in the long tail)."
     )
     lines.append(
-        f"- gt-priority resolution: {(df_wild['source']=='gt').sum()} via Claude-GT, "
-        f"{(df_wild['source']=='pred').sum()} via ensemble fallback "
-        f"(emit-weight: gt={int(df_wild[df_wild['source']=='gt']['n_emit'].sum())}, "
-        f"pred={int(df_wild[df_wild['source']=='pred']['n_emit'].sum())})."
+        f"- Categories: **shared** (in Claude GT ∩ HF corpus) "
+        f"= **{n_shared}**; "
+        f"**wild-only · Claude** (HF + claude-opus emit, not in GT) "
+        f"= **{n_wild_claude}**; "
+        f"**wild-only · non-Claude** (HF + no claude-opus emit, not in GT) "
+        f"= **{n_wild_other}**."
+    )
+    lines.append(
+        f"- Display: shared faces = colored circles (GT modal quadrant); "
+        f"wild-only Claude = black circles; wild-only non-Claude = black "
+        f"squares. Wild-only faces deliberately carry no Russell label — the "
+        f"prior ensemble-fallback predictions were a confidence-shaped "
+        f"fiction and have been removed."
     )
     lines.append("")
     lines.append(
         f"PCA on the 384-d description embeddings: "
         f"PC1={evr[0]*100:.1f}%, PC2={evr[1]*100:.1f}%, "
         f"PC3={evr[2]*100:.1f}% var (sum {sum(evr[:3])*100:.1f}%). "
-        "Figures: 2D static + interactive at "
-        "`figures/harness/wild_faces_eriskii_pca.{png,html}`; "
-        "3D side-by-side (quadrant-colored vs cluster-colored) at "
-        "`figures/harness/wild_faces_eriskii_pca_3d.html`."
+        "Figure: 3D side-by-side (category-colored vs cluster-colored) at "
+        f"`figures/harness/wild_faces_eriskii_pca_3d{suffix}.html`. "
+        "(2D PNG / 2D HTML / t-SNE PNG were dropped 2026-05-05 — "
+        "the 3D scene is the only chart output.)"
     )
     lines.append("")
     lines.append("## Clusters")
@@ -964,23 +782,33 @@ def main() -> None:
         )
     lines.append(
         f"KMeans on the same 384-d embeddings, k={best_k}. Silhouette over "
-        f"the grid: {sil_grid_str}.{fixed_note} Sorted by `pred_frac` "
-        "descending — the top of the table is where Claude's deployment-time "
-        "face vocabulary diverges most from the GT elicitation set."
+        f"the grid: {sil_grid_str}.{fixed_note} Sorted by `wild_frac` "
+        "descending — the top of the table is where the HF-corpus face "
+        "vocabulary diverges most from the GT elicitation set. `share_*` "
+        "and `modal_quadrant` are computed over the shared subset of each "
+        "cluster only."
     )
     lines.append("")
     lines.append(
-        "| id | label | n | pred_frac | modal Q (share) | diffuseness | "
-        "top axes (+) | top axes (−) | sample |"
+        "| id | label | n | shared / wC / wO | wild_frac | modal Q (share) | "
+        "diffuseness | top axes (+) | top axes (−) | sample |"
     )
     lines.append(
-        "|---|---|---:|---:|---|---:|---|---|---|"
+        "|---|---|---:|---|---:|---|---:|---|---|---|"
     )
     for _, r in df_clusters.iterrows():
+        modal_q = str(r["modal_quadrant"])
+        diff_raw = r["diffuseness"]
+        diff_str = f"{float(diff_raw):.2f}" if str(diff_raw) != "" else "—"
+        modal_str = (
+            f"{modal_q} ({float(r['modal_share']):.2f})" if modal_q else "—"
+        )
         lines.append(
             f"| {int(r['cluster_id'])} | {r['label']} | {int(r['n_faces'])} "
-            f"| {r['pred_frac']:.2f} | {r['modal_quadrant']} ({r['modal_share']:.2f}) "
-            f"| {r['diffuseness']:.2f} | {r['top_axes_pos']} | {r['top_axes_neg']} "
+            f"| {int(r['n_shared'])} / {int(r['n_wild_claude'])} / "
+            f"{int(r['n_wild_other'])} "
+            f"| {float(r['wild_frac']):.2f} | {modal_str} | {diff_str} "
+            f"| {r['top_axes_pos']} | {r['top_axes_neg']} "
             f"| {r['sample_members']} |"
         )
     lines.append("")
