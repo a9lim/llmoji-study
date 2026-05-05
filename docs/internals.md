@@ -7,8 +7,8 @@ every v3 analysis script.
 ## Hidden-state pipeline
 
 After `session.generate()`,
-`llmoji.hidden_capture.read_after_generate(session)` reads saklas's per-token
-last-position buckets and writes `(h_first, h_last, h_mean[, per_token])`
+`llmoji_study.hidden_capture.read_after_generate(session)` reads saklas's
+per-token last-position buckets and writes `(h_first, h_last, h_mean[, per_token])`
 per probe layer to `data/hidden/<experiment>/<row_uuid>.npz`. The default
 since the 2026-05-02 perf batch is the three aggregates only — ~700 KB
 per row vs the earlier ~20–70 MB with the full per-token trace included
@@ -23,14 +23,26 @@ background thread (`SidecarWriter`) so they overlap the next row's
 generation. JSONL keeps probe scores for back-compat and audit, flushed
 every 20 rows + on error / at run end.
 
-`llmoji.hidden_state_analysis.load_hidden_features(...)` returns
+`llmoji_study.hidden_state_analysis.load_hidden_features(...)` returns
 `(metadata df, (n_rows, hidden_dim) feature matrix)`. Defaults: `which="h_first"`
 (kaomoji-emission state; methodology-invariant across the
 2026-05-02 MAX_NEW_TOKENS cutover; substantially cleaner Russell-
 quadrant separation than `h_mean` — see findings.md), `layer=None`
-(deepest probe layer; per-model `preferred_layer` overrides via
-`MODEL_REGISTRY`). `$LLMOJI_WHICH` overrides the default per-run.
+(deepest probe layer). `$LLMOJI_WHICH` overrides the default per-run.
 v3 figures default to `h_first` since 2026-05-02.
+
+Active analyses since 2026-05-04 use the **layer-stack
+representation** rather than picking a single layer. Helpers
+`load_emotional_features_stack` (registry-keyed) and
+`load_emotional_features_stack_at` (path-aware for introspection
+JSONLs) live in `llmoji_study.emotional_analysis` and return
+`(metadata df, (n_rows, n_layers · hidden_dim) feature matrix)` —
+the row-wise concat of every probe layer's `h_first`. Single-layer
+`load_hidden_features(layer=...)` is preserved for harness/internal
+use, but the `preferred_layer` field on `ModelPaths` was deleted
+2026-05-04 (the silhouette-peak heuristic was methodologically
+arbitrary; PCA over the full stack picks informative directions
+agnostically).
 
 ## Kaomoji canonicalization
 

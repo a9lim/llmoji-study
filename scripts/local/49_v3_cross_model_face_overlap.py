@@ -49,6 +49,7 @@ import pandas as pd
 
 from llmoji.taxonomy import canonicalize_kaomoji
 
+from llmoji_study.claude_gt import CLAUDE_RUNS_DIR, find_run_files
 from llmoji_study.config import DATA_DIR, MODEL_REGISTRY
 
 
@@ -57,7 +58,6 @@ DEFAULT_MODELS = ("gemma", "qwen", "ministral", "gpt_oss_20b", "granite")
 QUADRANT_ORDER = ["HP", "LP", "HN-D", "HN-S", "LN", "NB"]
 
 CLAUDE_KEY = "claude"  # Conventional name for the Claude column in outputs.
-CLAUDE_DATA_PATH = DATA_DIR / "claude_groundtruth_pilot.jsonl"
 
 
 def _emit_dist_local(model: str) -> dict[str, dict[str, int]] | None:
@@ -118,33 +118,36 @@ def _emit_dist_local(model: str) -> dict[str, dict[str, int]] | None:
     return out
 
 
-def _emit_dist_claude(jsonl_path: Path) -> dict[str, dict[str, int]] | None:
-    """Same shape as _emit_dist_local, but for Claude groundtruth pilot.
-    Quadrant is already 6-way (no split-HN reconstruction needed).
-    Faces canonicalized to match local-model first_word column."""
-    if not jsonl_path.exists():
-        print(f"  [{CLAUDE_KEY}] no data at {jsonl_path}; skipping")
+def _emit_dist_claude(claude_runs_dir: Path) -> dict[str, dict[str, int]] | None:
+    """Same shape as _emit_dist_local, but for Claude groundtruth runs.
+    Unions over every run-N.jsonl in ``claude_runs_dir``. Quadrant is
+    already 6-way (no split-HN reconstruction needed). Faces
+    canonicalized to match local-model first_word column."""
+    runs = find_run_files(claude_runs_dir)
+    if not runs:
+        print(f"  [{CLAUDE_KEY}] no run-*.jsonl in {claude_runs_dir}; skipping")
         return None
     out: dict[str, dict[str, int]] = {}
     n_rows = 0
-    with jsonl_path.open() as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            r = json.loads(line)
-            if "error" in r:
-                continue
-            q = r.get("quadrant", "")
-            if q not in QUADRANT_ORDER:
-                continue
-            fw_raw = r.get("first_word") or ""
-            fw = canonicalize_kaomoji(fw_raw) or ""
-            if not fw or not fw.startswith("("):
-                continue
-            n_rows += 1
-            entry = out.setdefault(fw, {qq: 0 for qq in QUADRANT_ORDER})
-            entry[q] += 1
+    for _idx, jsonl_path in runs:
+        with jsonl_path.open() as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                r = json.loads(line)
+                if "error" in r:
+                    continue
+                q = r.get("quadrant", "")
+                if q not in QUADRANT_ORDER:
+                    continue
+                fw_raw = r.get("first_word") or ""
+                fw = canonicalize_kaomoji(fw_raw) or ""
+                if not fw or not fw.startswith("("):
+                    continue
+                n_rows += 1
+                entry = out.setdefault(fw, {qq: 0 for qq in QUADRANT_ORDER})
+                entry[q] += 1
     if not out:
         print(f"  [{CLAUDE_KEY}] no kaomoji-bearing rows; skipping")
         return None
@@ -184,7 +187,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--include-claude", action="store_true",
-        help=f"Also include Claude data from {CLAUDE_DATA_PATH.name}.",
+        help=f"Also include Claude data from {CLAUDE_RUNS_DIR.name}/run-*.jsonl.",
     )
     parser.add_argument(
         "--output", default=str(DATA_DIR / "v3_cross_model_face_overlap.tsv"),
@@ -213,7 +216,7 @@ def main() -> None:
             per_source[m] = d
             print(f"  [{m}] {len(d)} unique faces emitted in v3")
     if args.include_claude:
-        d = _emit_dist_claude(CLAUDE_DATA_PATH)
+        d = _emit_dist_claude(CLAUDE_RUNS_DIR)
         if d is not None:
             per_source[CLAUDE_KEY] = d
 

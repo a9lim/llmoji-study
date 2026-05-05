@@ -155,37 +155,30 @@ def _behavior_modal(row: pd.Series) -> tuple[str | None, int, int]:
 
 
 def _claude_modal_table() -> dict[str, str]:
-    """Per-face modal restricted to Claude pilot rows. The union
+    """Per-face modal restricted to Claude groundtruth rows. The union
     parquet flags Claude-emitting faces via ``is_claude`` but doesn't
     expose the per-quadrant breakdown for that subset, so we recompute
-    from data/claude_groundtruth_pilot.jsonl directly.
+    from the union of data/claude-runs/run-*.jsonl directly.
 
     Returns {face: claude_modal_quadrant} for faces Claude emitted.
     """
-    pilot_path = DATA_DIR / "claude_groundtruth_pilot.jsonl"
-    if not pilot_path.exists():
-        return {}
-    # Rebuild Claude per-face per-quadrant counts from the pilot.
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
     from llmoji.taxonomy import canonicalize_kaomoji
+    from llmoji_study.claude_gt import load_all_run_rows
     from llmoji_study.emotional_prompts import EMOTIONAL_PROMPTS
+    rows = load_all_run_rows()
+    if not rows:
+        return {}
     qmap = {ep.id: _bucket(ep) for ep in EMOTIONAL_PROMPTS}
     counts: dict[str, Counter] = defaultdict(Counter)
-    with pilot_path.open() as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            r = json.loads(line)
-            if "error" in r:
-                continue
-            face = canonicalize_kaomoji(r.get("first_word") or "")
-            if not face:
-                continue
-            q = qmap.get(r["prompt_id"])
-            if q is None:
-                continue
-            counts[face][q] += 1
+    for r in rows:
+        face = canonicalize_kaomoji(r.get("first_word") or "")
+        if not face:
+            continue
+        q = qmap.get(r["prompt_id"])
+        if q is None:
+            continue
+        counts[face][q] += 1
     return {face: c.most_common(1)[0][0] for face, c in counts.items() if c}
 
 

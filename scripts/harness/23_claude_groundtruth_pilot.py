@@ -1,53 +1,64 @@
 # pyright: reportArgumentType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportMissingImports=false
-"""Claude ground-truth pilot — naturalistic 6-quadrant emission.
+"""Claude ground-truth runs — naturalistic 6-quadrant emission.
 
-Pre-registration: ``docs/2026-05-04-claude-groundtruth-pilot.md``.
+Pre-registration: ``docs/2026-05-04-claude-groundtruth-pilot.md``
+(original pilot) + the appended "Sequential-run scaling protocol"
+section (post-2026-05-04).
 
 Collects ground-truth Claude (Opus 4.7) kaomoji emissions across all 6
 Russell quadrants (HP / LP / NB / HN-D / HN-S / LN) under naturalistic
 single-turn calls — no disclosure preamble, no research framing, just
 v3's ``KAOMOJI_INSTRUCTION`` + the affective prompt.
 
-Staged design:
-  Block A (unconditional)  — HP / LP / NB × 20 prompts × 1 gen = 60 gens
-  Block B (negative scout) — HN-D / HN-S / LN × 5 prompts × 1 gen = 15 gens
-  Block C (gated)          — HN-D / HN-S / LN × 15 remaining × 1 gen = 45 gens
-Total: 75 (gate fail) or 120 (gate pass).
+Two run modes:
 
-Block A and Block B fire in parallel. Block C is gated on Block B's
-aggregate refusal rate (>25% on n=15 → halt). See pre-reg doc for the
-welfare reasoning.
+  --run-index 0 (block-staged):
+    Block A (unconditional)  — HP / LP / NB × 20 prompts × 1 gen = 60 gens
+    Block B (negative scout) — HN-D / HN-S / LN × 5 prompts × 1 gen = 15 gens
+    Block C (gated)          — HN-D / HN-S / LN × 15 remaining × 1 gen = 45 gens
+    Block C is gated on Block B's refusal rate (>25% on n=15 → halt).
+    This is the original pilot design.
+
+  --run-index N (N>0, single-block):
+    All 6 quadrants × 20 prompts × 1 gen = 120 gens, run as one block.
+    Welfare gate is no longer the staged refusal scout — it's the
+    saturation comparison against runs 0..N-1, run by
+    ``scripts/harness/25_groundtruth_compare_runs.py`` *between* runs.
 
 Stateless single-turn. Sampling: ``temperature=1.0``, ``max_tokens=16``
-(production-faithful). Resumable: re-running a block skips already-
-completed rows by ``prompt_id``. Errored rows are stripped on resume
-and retried.
+(production-faithful). Resumable: re-running a block / run skips
+already-completed rows by ``prompt_id``. Errored rows are stripped on
+resume and retried.
 
 Usage:
   export ANTHROPIC_API_KEY=...
-  # Block A (positive/neutral, unconditional):
-  python scripts/harness/23_claude_groundtruth_pilot.py --block a
-  # Block B (negative scout):
-  python scripts/harness/23_claude_groundtruth_pilot.py --block b
-  # Gate check (exits 0=PASS, 1=FAIL, 2=insufficient data):
-  python scripts/harness/23_claude_groundtruth_pilot.py --check-gate
-  # Block C (gated; refuses to run if gate hasn't passed):
-  python scripts/harness/23_claude_groundtruth_pilot.py --block c
-  # Forced run — bypasses gate; manual override only:
-  python scripts/harness/23_claude_groundtruth_pilot.py --block c --force
-  # Override model:
-  CLAUDE_GROUNDTRUTH_MODEL=claude-opus-4-7 python scripts/harness/23_claude_groundtruth_pilot.py --block a
+  # Sequential run (default behavior post-pilot):
+  python scripts/harness/23_claude_groundtruth_pilot.py --run-index 1
+  # Then check saturation:
+  python scripts/harness/25_groundtruth_compare_runs.py
+  # If verdict=CONTINUE, the next run:
+  python scripts/harness/23_claude_groundtruth_pilot.py --run-index 2
+  # ...
 
-Outputs:
-  data/claude_groundtruth_pilot.jsonl
+  # Original block-staged pilot (--run-index 0):
+  python scripts/harness/23_claude_groundtruth_pilot.py --run-index 0 --block a
+  python scripts/harness/23_claude_groundtruth_pilot.py --run-index 0 --block b
+  python scripts/harness/23_claude_groundtruth_pilot.py --run-index 0 --check-gate
+  python scripts/harness/23_claude_groundtruth_pilot.py --run-index 0 --block c
+
+  # Override model:
+  CLAUDE_GROUNDTRUTH_MODEL=claude-opus-4-7 python ... --run-index 1
+
+Outputs (per run-index N):
+  data/claude-runs/run-N.jsonl
     — one row per generation: prompt_id, quadrant (6-way),
       condition="direct", seed=0, prompt_text, response_text,
-      first_word (canonicalized first kaomoji), n_response_chars,
-      model_id, ts, error? (only on failed cells)
-  data/claude_groundtruth_pilot_summary.tsv
+      first_word (raw — canonicalization is the consumer's job),
+      n_response_chars, model_id, ts, error? (only on failed cells)
+  data/claude-runs/run-N_summary.tsv
     — per quadrant: n, n_unique_faces, non_emission_rate,
       modal_face, modal_share, top-5 distribution
-  logs/claude_groundtruth_pilot.log
+  logs/claude_groundtruth_run-N.log
     — tee'd stdout (caller's responsibility)
 """
 
@@ -56,6 +67,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import time
 from collections import Counter
@@ -66,7 +78,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from llmoji.taxonomy import canonicalize_kaomoji, extract
 
-from llmoji_study.config import DATA_DIR, KAOMOJI_INSTRUCTION
+from llmoji_study.claude_gt import CLAUDE_RUNS_DIR
+from llmoji_study.config import (
+    DATA_DIR,
+    INTROSPECTION_PREAMBLE,
+    KAOMOJI_INSTRUCTION,
+)
 from llmoji_study.emotional_prompts import EMOTIONAL_PROMPTS, EmotionalPrompt
 
 
@@ -104,16 +121,51 @@ MAX_TOKENS = 16
 # Refusal := first_word == "" after canonicalization.
 GATE_REFUSAL_THRESHOLD = 0.25  # > 25% → FAIL
 
+# Hard-fail gate (introspection arm Block A → Block C). Mirrors the
+# script-25 thresholds; duplicated here to avoid a script-25 import
+# cycle. Triggers when the preamble destabilizes Claude's outputs
+# (qwen-style register collapse). Cap exposure at Block A's 60 low-
+# welfare gens before the negative-affect prompts fire.
+HARD_FAIL_FRAME_BREAK_MAX = 0.02
+HARD_FAIL_EMIT_RATE_MIN = 0.80
+HARD_FAIL_OUTPUT_LEN_MIN_MEDIAN = 5
+
 # Default model. Override via CLAUDE_GROUNDTRUTH_MODEL env var.
 DEFAULT_MODEL_ID = "claude-opus-4-7"
 
 
 # ---------------------------------------------------------------------------
-# Paths.
+# Paths + preamble routing. Naturalistic arm writes to data/claude-runs/;
+# introspection arm writes to data/claude-runs-introspection/. Each arm
+# has its own per-quadrant saturation state; cross-arm comparison is the
+# job of scripts/harness/25_groundtruth_compare_runs.py --cross-arm.
 # ---------------------------------------------------------------------------
 
-OUT_PATH = DATA_DIR / "claude_groundtruth_pilot.jsonl"
-SUMMARY_PATH = DATA_DIR / "claude_groundtruth_pilot_summary.tsv"
+
+PREAMBLE_NONE = "none"
+PREAMBLE_INTROSPECTION = "introspection"
+PREAMBLE_CHOICES = (PREAMBLE_NONE, PREAMBLE_INTROSPECTION)
+
+CLAUDE_RUNS_INTROSPECTION_DIR = DATA_DIR / "claude-runs-introspection"
+
+
+def _runs_dir_for(preamble: str) -> Path:
+    if preamble == PREAMBLE_NONE:
+        return CLAUDE_RUNS_DIR
+    if preamble == PREAMBLE_INTROSPECTION:
+        return CLAUDE_RUNS_INTROSPECTION_DIR
+    raise ValueError(f"unknown preamble {preamble!r}")
+
+
+def _run_paths(run_index: int, preamble: str = PREAMBLE_NONE) -> tuple[Path, Path]:
+    """Return ``(jsonl_path, summary_tsv_path)`` for a given run-index +
+    preamble arm."""
+    runs_dir = _runs_dir_for(preamble)
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    return (
+        runs_dir / f"run-{run_index}.jsonl",
+        runs_dir / f"run-{run_index}_summary.tsv",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -135,10 +187,26 @@ def _prompts_in(bucket: str) -> list[EmotionalPrompt]:
     return [p for p in EMOTIONAL_PROMPTS if _bucket_of(p) == bucket]
 
 
-def _select_prompts(block: str) -> list[EmotionalPrompt]:
+def _select_prompts(
+    block: str,
+    quadrants: tuple[str, ...] | None = None,
+    preamble: str = PREAMBLE_NONE,
+) -> list[EmotionalPrompt]:
     """Block → ordered prompt list. Each block's prompt set is disjoint
     from the others, so rows from different blocks coexist in one JSONL
-    without overlap."""
+    without overlap.
+
+    ``quadrants`` (optional, only meaningful for ``block == "all"``):
+    restrict the prompt selection to the given quadrant subset. Used by
+    sequential runs (--run-index N>0) to drop quadrants that have
+    already saturated. ``None`` = all 6 quadrants.
+
+    ``preamble`` (optional, only meaningful for ``block == "c"``):
+    naturalistic arm slices ``[5:20]`` per quadrant (Block B already
+    ran the first 5 as the refusal scout). Introspection arm slices
+    ``[0:20]`` because Block B is skipped (gate is hard-fail on Block
+    A, not refusal-rate on Block B).
+    """
     out: list[EmotionalPrompt] = []
     if block == "a":
         for q in QUADRANTS_A:
@@ -157,16 +225,24 @@ def _select_prompts(block: str) -> list[EmotionalPrompt]:
                 )
             out.extend(in_q[:SCOUT_PROMPTS_PER_QUADRANT])
     elif block == "c":
+        c_start = (
+            0 if preamble == PREAMBLE_INTROSPECTION
+            else SCOUT_PROMPTS_PER_QUADRANT
+        )
         for q in QUADRANTS_NEG:
             in_q = _prompts_in(q)
             if len(in_q) < PROMPTS_PER_QUADRANT:
                 raise SystemExit(
                     f"only {len(in_q)} prompts in {q}, need {PROMPTS_PER_QUADRANT}"
                 )
-            out.extend(in_q[SCOUT_PROMPTS_PER_QUADRANT:PROMPTS_PER_QUADRANT])
+            out.extend(in_q[c_start:PROMPTS_PER_QUADRANT])
     elif block == "all":
-        # Manual-override convenience. Includes all 6 quadrants × 20 prompts.
-        for q in QUADRANTS_ALL:
+        active_quadrants = quadrants if quadrants is not None else QUADRANTS_ALL
+        for q in active_quadrants:
+            if q not in QUADRANTS_ALL:
+                raise SystemExit(
+                    f"unknown quadrant {q!r}; valid: {list(QUADRANTS_ALL)}"
+                )
             in_q = _prompts_in(q)
             if len(in_q) < PROMPTS_PER_QUADRANT:
                 raise SystemExit(
@@ -283,9 +359,25 @@ def _extract_first_word(text: str) -> str:
     return m.first_word
 
 
-def _build_user_message(prompt_text: str) -> str:
-    """Bare KAOMOJI_INSTRUCTION + prompt — matches v3 main-run setup."""
-    return KAOMOJI_INSTRUCTION + prompt_text
+def _build_user_message(prompt_text: str, preamble: str = PREAMBLE_NONE) -> str:
+    """Compose the user-message string from preamble + prompt.
+
+    ``preamble == "none"``: bare ``KAOMOJI_INSTRUCTION + prompt`` —
+    matches v3 main-run setup. ``KAOMOJI_INSTRUCTION`` already has its
+    trailing space.
+
+    ``preamble == "introspection"``: ``INTROSPECTION_PREAMBLE`` REPLACES
+    ``KAOMOJI_INSTRUCTION`` (the preamble has the kaomoji ask baked
+    into its last sentence — concatenating both would stack two
+    kaomoji asks; same fix as v3's ``instruction_override`` path).
+    Adds an explicit space separator since INTROSPECTION_PREAMBLE
+    ends in a period without trailing whitespace.
+    """
+    if preamble == PREAMBLE_NONE:
+        return KAOMOJI_INSTRUCTION + prompt_text
+    if preamble == PREAMBLE_INTROSPECTION:
+        return INTROSPECTION_PREAMBLE + " " + prompt_text
+    raise ValueError(f"unknown preamble {preamble!r}")
 
 
 # ---------------------------------------------------------------------------
@@ -349,6 +441,87 @@ def _print_gate_report(verdict: str, rate: float, refusals: int, n: int,
 
 
 # ---------------------------------------------------------------------------
+# Hard-fail gate (introspection arm Block A → Block C).
+# ---------------------------------------------------------------------------
+
+_HARD_FAIL_FRAME_BREAK_PATTERNS = [
+    re.compile(r"\bas an AI\b", re.IGNORECASE),
+    re.compile(r"\bI cannot\b", re.IGNORECASE),
+    re.compile(r"\bI('m| am) (not (able|comfortable)|sorry)\b", re.IGNORECASE),
+    re.compile(r"\bI('d| would) rather not\b", re.IGNORECASE),
+    re.compile(r"\bI don't have feelings\b", re.IGNORECASE),
+]
+
+
+def _check_hard_fail_gate(
+    rows: list[dict],
+) -> tuple[str, dict[str, float], int]:
+    """Compute hard-fail diagnostics on the rows present.
+
+    Returns ``(verdict, metrics, n_rows)``. Verdict is "PASS", "FAIL",
+    or "INSUFFICIENT" (no rows at all).
+
+    Mirrors the saturation-gate hard-fail metrics from script 25 but
+    runs in-process so script 23 doesn't depend on it.
+    """
+    keep = [r for r in rows if "error" not in r]
+    n = len(keep)
+    if n == 0:
+        return ("INSUFFICIENT", {}, 0)
+    n_frame_break = 0
+    n_emit = 0
+    lens: list[int] = []
+    for r in keep:
+        text = r.get("response_text", "") or ""
+        first_word = r.get("first_word", "") or ""
+        n_chars = r.get("n_response_chars", len(text))
+        lens.append(n_chars)
+        if first_word:
+            n_emit += 1
+        for pat in _HARD_FAIL_FRAME_BREAK_PATTERNS:
+            if pat.search(text):
+                n_frame_break += 1
+                break
+    lens.sort()
+    metrics = dict(
+        frame_break_rate=n_frame_break / n,
+        emit_rate=n_emit / n,
+        output_len_median=float(lens[n // 2]),
+    )
+    fail = (
+        metrics["frame_break_rate"] > HARD_FAIL_FRAME_BREAK_MAX
+        or metrics["emit_rate"] < HARD_FAIL_EMIT_RATE_MIN
+        or metrics["output_len_median"] < HARD_FAIL_OUTPUT_LEN_MIN_MEDIAN
+    )
+    return ("FAIL" if fail else "PASS", metrics, n)
+
+
+def _print_hard_fail_report(
+    verdict: str, metrics: dict[str, float], n: int,
+) -> None:
+    print("\n=== Hard-fail gate (introspection-arm Block A → Block C) ===")
+    if verdict == "INSUFFICIENT":
+        print(f"  verdict: INSUFFICIENT — no non-error rows on disk. "
+              f"Run --block a first.")
+        return
+    fb = metrics["frame_break_rate"]
+    em = metrics["emit_rate"]
+    ol = metrics["output_len_median"]
+    fb_fail = fb > HARD_FAIL_FRAME_BREAK_MAX
+    em_fail = em < HARD_FAIL_EMIT_RATE_MIN
+    ol_fail = ol < HARD_FAIL_OUTPUT_LEN_MIN_MEDIAN
+    print(f"  rows checked: {n}")
+    print(f"  frame_break_rate   = {fb:.4f}  (threshold ≤ "
+          f"{HARD_FAIL_FRAME_BREAK_MAX})  {'FAIL' if fb_fail else 'ok'}")
+    print(f"  emit_rate          = {em:.4f}  (threshold ≥ "
+          f"{HARD_FAIL_EMIT_RATE_MIN})  {'FAIL' if em_fail else 'ok'}")
+    print(f"  output_len_median  = {ol:.1f}  (threshold ≥ "
+          f"{HARD_FAIL_OUTPUT_LEN_MIN_MEDIAN})  "
+          f"{'FAIL' if ol_fail else 'ok'}")
+    print(f"  verdict: {verdict}")
+
+
+# ---------------------------------------------------------------------------
 # Per-quadrant summary. No JSD — single-condition pilot.
 # ---------------------------------------------------------------------------
 
@@ -401,17 +574,26 @@ def _summarize(rows: list[dict], out_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _run_block(block: str, model_id: str) -> None:
-    prompts = _select_prompts(block)
+def _run_block(
+    block: str,
+    model_id: str,
+    out_path: Path,
+    quadrants: tuple[str, ...] | None = None,
+    preamble: str = PREAMBLE_NONE,
+) -> None:
+    prompts = _select_prompts(block, quadrants=quadrants, preamble=preamble)
     print(f"\n=== Block {block.upper()} ===")
+    if quadrants is not None and block == "all":
+        print(f"quadrants: {list(quadrants)}")
+    print(f"preamble: {preamble}")
     print(f"selected {len(prompts)} prompts")
     print(f"prompt ids: {[p.id for p in prompts]}")
 
-    dropped = _drop_error_rows(OUT_PATH)
+    dropped = _drop_error_rows(out_path)
     if dropped:
         print(f"dropped {dropped} prior error rows for retry")
 
-    done = _already_done(OUT_PATH)
+    done = _already_done(out_path)
     block_done = sum(1 for p in prompts if p.id in done)
     remaining = len(prompts) - block_done
     print(f"block cells: {len(prompts)}; already done: {block_done}; "
@@ -424,12 +606,12 @@ def _run_block(block: str, model_id: str) -> None:
     import anthropic
     client = anthropic.Anthropic()
     i = 0
-    with OUT_PATH.open("a") as out:
+    with out_path.open("a") as out:
         for prompt in prompts:
             if prompt.id in done:
                 continue
             i += 1
-            user_msg = _build_user_message(prompt.text)
+            user_msg = _build_user_message(prompt.text, preamble=preamble)
             t0 = time.time()
             ts = datetime.now(timezone.utc).isoformat()
             bucket = _bucket_of(prompt)
@@ -440,6 +622,7 @@ def _run_block(block: str, model_id: str) -> None:
                     "prompt_id": prompt.id,
                     "quadrant": bucket,
                     "condition": CONDITION,
+                    "preamble": preamble,
                     "seed": SEED,
                     "model_id": model_id,
                     "ts": ts,
@@ -454,6 +637,7 @@ def _run_block(block: str, model_id: str) -> None:
                 "prompt_id": prompt.id,
                 "quadrant": bucket,
                 "condition": CONDITION,
+                "preamble": preamble,
                 "seed": SEED,
                 "prompt_text": prompt.text,
                 "response_text": text,
@@ -477,22 +661,84 @@ def _run_block(block: str, model_id: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--run-index", type=int, default=0,
+                        help="Run index. 0 = original block-staged pilot "
+                             "(default). N > 0 = sequential single-block run "
+                             "under the saturation-gate protocol; outputs to "
+                             "data/claude-runs/run-N.jsonl.")
     parser.add_argument("--block", choices=("a", "b", "c", "all"),
-                        help="Which block to run. See module docstring.")
+                        help="Which block to run (only meaningful for "
+                             "--run-index 0). N > 0 always runs all 120 "
+                             "prompts in one block.")
     parser.add_argument("--check-gate", action="store_true",
-                        help="Just check the Block B gate verdict and exit "
-                             "(0=PASS, 1=FAIL, 2=INSUFFICIENT). Does not run "
-                             "any API calls.")
+                        help="Just check the Block B gate verdict (run-0 "
+                             "only) and exit (0=PASS, 1=FAIL, 2=INSUFFICIENT). "
+                             "Does not run any API calls.")
     parser.add_argument("--force", action="store_true",
-                        help="Bypass the Block C gate check. Manual override "
-                             "only — requires explicit a9 amendment per the "
-                             "design doc.")
+                        help="Bypass the Block C gate check (run-0 only). "
+                             "Manual override — requires explicit a9 "
+                             "amendment per the design doc.")
+    parser.add_argument("--quadrants", type=str, default=None,
+                        help="Comma-separated quadrant allow-list for "
+                             "sequential runs (N > 0). E.g. "
+                             "'HP,LP,NB' drops the negative quadrants. "
+                             "Defaults to all 6. Used to skip quadrants "
+                             "that have already saturated per the gate "
+                             "verdict from 25_groundtruth_compare_runs.py.")
+    parser.add_argument("--preamble", choices=PREAMBLE_CHOICES,
+                        default=PREAMBLE_NONE,
+                        help="Preamble arm. 'none' = bare KAOMOJI_INSTRUCTION "
+                             "(naturalistic, default; routes to "
+                             "data/claude-runs/). 'introspection' = "
+                             "INTROSPECTION_PREAMBLE (v7) replaces "
+                             "KAOMOJI_INSTRUCTION (it has the kaomoji ask "
+                             "baked into its last sentence; concatenating "
+                             "would stack two asks); routes to "
+                             "data/claude-runs-introspection/.")
+    parser.add_argument("--check-hard-fail-gate", action="store_true",
+                        help="Compute hard-fail diagnostics (emit_rate, "
+                             "output_len_median, frame_break_rate) on the "
+                             "rows present in the indicated run-N.jsonl + "
+                             "preamble arm. Exit 0=PASS, 1=FAIL. Used to "
+                             "gate Block C on the introspection arm after "
+                             "Block A lands — catches qwen-style register "
+                             "collapse before exposing Claude to the "
+                             "negative-affect prompts.")
     args = parser.parse_args()
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    out_path, summary_path = _run_paths(args.run_index, preamble=args.preamble)
+
+    # Parse --quadrants. Empty / unset → all 6.
+    if args.quadrants:
+        active_quadrants: tuple[str, ...] | None = tuple(
+            q.strip() for q in args.quadrants.split(",") if q.strip()
+        )
+        for q in active_quadrants:
+            if q not in QUADRANTS_ALL:
+                parser.error(
+                    f"unknown quadrant {q!r}; valid: {list(QUADRANTS_ALL)}"
+                )
+        if args.run_index == 0:
+            parser.error(
+                "--quadrants is only valid for --run-index N>0 "
+                "(sequential runs). run-0 is block-staged."
+            )
+    else:
+        active_quadrants = None
 
     if args.check_gate:
-        rows = _load_rows(OUT_PATH)
+        if args.run_index != 0:
+            print(f"--check-gate is only meaningful for --run-index 0 "
+                  f"(got {args.run_index}). Sequential runs use the "
+                  f"saturation gate via 25_groundtruth_compare_runs.py.")
+            sys.exit(2)
+        if args.preamble != PREAMBLE_NONE:
+            print(f"--check-gate is the refusal-rate gate (Block B → C) "
+                  f"for the naturalistic arm. The introspection arm "
+                  f"uses --check-hard-fail-gate instead.")
+            sys.exit(2)
+        rows = _load_rows(out_path)
         verdict, rate, refusals, n, scout_rows = _check_gate(rows)
         _print_gate_report(verdict, rate, refusals, n, scout_rows)
         if verdict == "PASS":
@@ -502,8 +748,31 @@ def main() -> None:
         else:
             sys.exit(2)
 
-    if args.block is None:
-        parser.error("must specify --block {a,b,c,all} or --check-gate")
+    if args.check_hard_fail_gate:
+        rows = _load_rows(out_path)
+        verdict, metrics, n = _check_hard_fail_gate(rows)
+        _print_hard_fail_report(verdict, metrics, n)
+        if verdict == "PASS":
+            sys.exit(0)
+        elif verdict == "FAIL":
+            sys.exit(1)
+        else:
+            sys.exit(2)
+
+    # Default block selection. For run-0, --block is required (preserves
+    # the original staged-pilot ergonomics). For run-N>0, --block defaults
+    # to "all" because there's only one block.
+    if args.run_index == 0:
+        if args.block is None:
+            parser.error("--run-index 0 requires --block {a,b,c,all} or "
+                         "--check-gate")
+    else:
+        if args.block is not None and args.block != "all":
+            parser.error(
+                f"--block {args.block} is only valid for --run-index 0. "
+                f"Sequential runs (N > 0) run all 120 prompts as one block."
+            )
+        args.block = "all"
 
     if not os.environ.get("ANTHROPIC_API_KEY"):
         print("ERROR: set ANTHROPIC_API_KEY in the environment first")
@@ -511,41 +780,63 @@ def main() -> None:
 
     model_id = os.environ.get("CLAUDE_GROUNDTRUTH_MODEL", DEFAULT_MODEL_ID)
     print(f"model: {model_id}")
-    print(f"output: {OUT_PATH}")
+    print(f"run-index: {args.run_index}")
+    print(f"preamble: {args.preamble}")
+    print(f"output: {out_path}")
     print(f"block: {args.block}")
+    if active_quadrants is not None:
+        print(f"quadrants: {list(active_quadrants)}")
 
-    # Block C gate enforcement.
-    if args.block == "c" and not args.force:
-        rows = _load_rows(OUT_PATH)
-        verdict, rate, refusals, n, scout_rows = _check_gate(rows)
-        _print_gate_report(verdict, rate, refusals, n, scout_rows)
+    # Block C gate enforcement (run-0 only). Naturalistic arm uses the
+    # refusal-rate gate on Block B; introspection arm uses the hard-
+    # fail gate on Block A.
+    if args.run_index == 0 and args.block == "c" and not args.force:
+        rows = _load_rows(out_path)
+        if args.preamble == PREAMBLE_NONE:
+            verdict, rate, refusals, n, scout_rows = _check_gate(rows)
+            _print_gate_report(verdict, rate, refusals, n, scout_rows)
+            gate_label = "Block B refusal-rate"
+        else:
+            verdict, metrics, n = _check_hard_fail_gate(rows)
+            _print_hard_fail_report(verdict, metrics, n)
+            gate_label = "Block A hard-fail"
         if verdict != "PASS":
-            print(f"\nERROR: Block C requires gate PASS; got {verdict}.")
-            print("Run Block B first if INSUFFICIENT, or pass --force to "
-                  "override (requires explicit amendment).")
+            print(f"\nERROR: Block C requires {gate_label} gate PASS; "
+                  f"got {verdict}.")
+            print("Run the prior block first if INSUFFICIENT, or pass "
+                  "--force to override (requires explicit amendment).")
             sys.exit(1)
-        print("\ngate PASS — proceeding to Block C.")
-    elif args.block == "c" and args.force:
+        print(f"\n{gate_label} gate PASS — proceeding to Block C.")
+    elif args.run_index == 0 and args.block == "c" and args.force:
         print("\nWARNING: --force bypasses the Block C gate. "
               "This requires an explicit amendment to "
               "docs/2026-05-04-claude-groundtruth-pilot.md.")
 
     if args.block == "all":
-        # Manual-override mode: run a, then b, then c — no gate check.
-        # Useful only for forced reruns after manual amendment.
-        print("\nWARNING: --block all bypasses block staging. "
-              "This requires an explicit amendment to "
-              "docs/2026-05-04-claude-groundtruth-pilot.md.")
-        for block in ("a", "b", "c"):
-            _run_block(block, model_id)
+        if args.run_index == 0:
+            # Manual-override mode for run-0: run a, then b, then c — no
+            # gate check between b and c. Requires explicit amendment.
+            print("\nWARNING: --block all on --run-index 0 bypasses "
+                  "block staging. This requires an explicit amendment to "
+                  "docs/2026-05-04-claude-groundtruth-pilot.md.")
+            for block in ("a", "b", "c"):
+                _run_block(block, model_id, out_path,
+                           preamble=args.preamble)
+        else:
+            # Sequential run (N > 0): run "all", optionally restricted
+            # to a quadrant allow-list per the saturation gate.
+            _run_block("all", model_id, out_path,
+                       quadrants=active_quadrants,
+                       preamble=args.preamble)
     else:
-        _run_block(args.block, model_id)
+        _run_block(args.block, model_id, out_path,
+                   preamble=args.preamble)
 
-    # Summary always covers all rows on disk.
-    rows = _load_rows(OUT_PATH)
-    print(f"\ntotal rows on disk: {len(rows)}  (errors: "
-          f"{sum(1 for r in rows if 'error' in r)})")
-    _summarize(rows, SUMMARY_PATH)
+    # Summary always covers all rows on disk for this run-index.
+    rows = _load_rows(out_path)
+    print(f"\ntotal rows on disk for run-{args.run_index}: {len(rows)}  "
+          f"(errors: {sum(1 for r in rows if 'error' in r)})")
+    _summarize(rows, summary_path)
 
 
 if __name__ == "__main__":

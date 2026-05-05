@@ -39,6 +39,8 @@ import re
 import pandas as pd
 from sklearn.metrics import cohen_kappa_score
 
+from llmoji_study.jsd import js, normalize, similarity
+
 from llmoji_study.config import DATA_DIR
 
 QUADRANTS = ["HP", "LP", "HN-D", "HN-S", "LN", "NB"]
@@ -111,10 +113,28 @@ def main() -> None:
     print(f"discovered {len(summaries)} encoders: {sorted(summaries)}")
 
     enc_preds: dict[str, dict[str, str]] = {}
+    enc_softmax: dict[str, dict[str, list[float]]] = {}
     for enc, path in summaries.items():
         s = pd.read_csv(path, sep="\t", keep_default_na=False, na_values=[""])
         enc_preds[enc] = dict(zip(s["first_word"].astype(str),
                                   s["predicted_quadrant"].astype(str)))
+        # Build face → 6-vector softmax for JSD computation.
+        sm: dict[str, list[float]] = {}
+        for _, row in s.iterrows():
+            f = str(row["first_word"])
+            d = {q: float(row.get(f"softmax_{q}", 0.0) or 0.0) for q in QUADRANTS}
+            sm[f] = normalize(d, QUADRANTS)
+        enc_softmax[enc] = sm
+
+    # Per-face empirical distribution (from emit-count columns) for JSD eval.
+    face_dist: dict[str, list[float]] = {}
+    for f in face_meta.index:
+        row = gt[gt["first_word"] == f].iloc[0] if (gt["first_word"] == f).any() else None
+        if row is None:
+            continue
+        d = {q: int(row.get(f"total_emit_{q}", 0) or 0) for q in QUADRANTS}
+        if sum(d.values()) > 0:
+            face_dist[f] = normalize(d, QUADRANTS)
 
     # Build per-(encoder, origin) accuracy + kappa.
     rows = []
@@ -135,10 +155,22 @@ def main() -> None:
                 k = cohen_kappa_score(y_emp, y_pred, labels=QUADRANTS)
             except ValueError:
                 k = float("nan")
+            # Per-face JSD between encoder softmax and empirical distribution;
+            # mean across faces in this (encoder, origin) cell.
+            sm_dict = enc_softmax[enc]
+            jsds = [
+                js(sm_dict[f], face_dist[f])
+                for f in faces_in_enc
+                if f in face_dist and f in sm_dict
+            ]
+            mean_jsd = sum(jsds) / len(jsds) if jsds else float("nan")
+            sim = similarity(mean_jsd) if jsds else float("nan")
             rows.append({
                 "encoder": enc,
                 "origin": o,
                 "n": n,
+                "similarity": sim,
+                "mean_jsd": mean_jsd,
                 "n_correct": n_correct,
                 "accuracy": n_correct / n if n > 0 else 0.0,
                 "kappa": k,

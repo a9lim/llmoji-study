@@ -128,6 +128,14 @@ def _parse_args() -> argparse.Namespace:
                         "of mean-over-all. Empirically (Claude-GT, May 2026) "
                         "k=5 is a robust one-size-fits-all on 20-prompts-per-"
                         "quadrant runs. Set 0 or omit to use mean-over-all.")
+    p.add_argument("--no-incremental", action="store_true",
+                   help="Re-score every (face, prompt) cell from scratch. "
+                        "Default behavior is incremental: load the existing "
+                        "per-cell parquet (if any), identify cells not yet "
+                        "scored, score only those, and concat-write back to "
+                        "the same parquet. Useful after the union grows "
+                        "(e.g. new Claude runs land) to avoid re-scoring "
+                        "the unchanged ~91%% of cells.")
     return p.parse_args()
 
 
@@ -475,56 +483,7 @@ def main() -> None:
     print(f"  using {len(prompts)} prompts x {len(faces)} faces  "
           f"= {len(prompts) * len(faces)} (face, prompt) cells")
 
-    print(f"loading {M.model_id} via SaklasSession ...")
-    t_load = time.time()
-    from saklas import SaklasSession  # noqa: E402
-    probes = PROBE_CATEGORIES if M.probe_calibrated else []
-    if not M.probe_calibrated:
-        print(f"  {M.short_name}: uncalibrated (probes=[]); face_likelihood "
-              f"only reads LM-head logits, so this is fine")
-    with SaklasSession.from_pretrained(
-        M.model_id, device="auto", probes=probes,
-    ) as session:
-        if maybe_override_ministral_chat_template(session):
-            print(f"  ministral: overrode chat_template with FP8-instruct's "
-                  f"({len(session.tokenizer.chat_template)} chars) so "
-                  f"prefix matches v3 generation")
-        if maybe_override_gpt_oss_chat_template(session):
-            print(f"  gpt_oss: pinned harmony `final` channel in chat_template")
-        if maybe_override_rinna_chat_template(session):
-            print(f"  rinna: installed native ユーザー:/システム: chat_template "
-                  f"({len(session.tokenizer.chat_template)} chars)")
-        print(f"  loaded in {time.time() - t_load:.1f}s")
-        model = session.model
-        tokenizer = session.tokenizer
-        device = session.device
-        model.train(False)  # disable dropout etc; equivalent to model.eval()
-
-        rows: list[dict] = []
-        t0 = time.time()
-        for pi, prompt in enumerate(prompts):
-            q = _quadrant_of(prompt)
-            prefix_ids = _build_prefix_ids(tokenizer, prompt, instruction=instruction)
-            t_p = time.time()
-            scored = _score_faces_for_prompt(
-                model, tokenizer, prefix_ids, faces,
-                face_batch=args.face_batch, device=device,
-            )
-            for face, (lp, n_tok) in zip(faces, scored):
-                rows.append({
-                    "first_word": face,
-                    "prompt_id": prompt.id,
-                    "quadrant": q,
-                    "log_prob": float(lp),
-                    "n_face_tokens": int(n_tok),
-                    "log_prob_per_token": float(lp / n_tok) if n_tok > 0 else float("nan"),
-                })
-            print(f"  [{pi+1}/{len(prompts)}] {prompt.id} ({q}) "
-                  f"prefix_len={prefix_ids.shape[0]} "
-                  f"({time.time() - t_p:.1f}s)")
-        print(f"\nscored {len(rows)} cells in {time.time() - t0:.1f}s")
-
-    rows_df = pd.DataFrame(rows)
+    # Compute output paths upfront so we can check existing scoring.
     if args.prompt_lang == "jp" and args.prompt_body == "jp":
         suffix = "_jpfull"
     elif args.prompt_body == "jp":
@@ -540,8 +499,105 @@ def main() -> None:
         stem = Path(_preamble_file).stem.replace("introspection_", "")
         suffix = f"{suffix}_{stem}primed"
     rows_path = DATA_DIR / f"face_likelihood_{M.short_name}{suffix}.parquet"
+
+    # Incremental: load existing scoring (if any) and skip already-scored
+    # (face, prompt_id) cells. Default behavior; --no-incremental forces
+    # full rescore.
+    incremental = not args.no_incremental
+    existing_rows: pd.DataFrame | None = None
+    already_scored: set[tuple[str, str]] = set()
+    if incremental and rows_path.exists():
+        existing_rows = pd.read_parquet(rows_path)
+        already_scored = set(zip(
+            existing_rows["first_word"].astype(str),
+            existing_rows["prompt_id"].astype(str),
+        ))
+        print(f"  incremental: loaded {len(existing_rows)} existing rows "
+              f"from {rows_path.name}")
+
+    # Plan the work per prompt — what (face, prompt) cells need scoring?
+    faces_per_prompt: dict[str, list[str]] = {}
+    n_to_score = 0
+    for prompt in prompts:
+        ftodo = [f for f in faces if (f, prompt.id) not in already_scored]
+        faces_per_prompt[prompt.id] = ftodo
+        n_to_score += len(ftodo)
+    total_cells = len(faces) * len(prompts)
+    print(f"  cells to score: {n_to_score} / {total_cells}  "
+          f"(skipping {total_cells - n_to_score} already-scored)")
+
+    new_rows: list[dict] = []
+    if n_to_score > 0:
+        print(f"loading {M.model_id} via SaklasSession ...")
+        t_load = time.time()
+        from saklas import SaklasSession  # noqa: E402
+        probes = PROBE_CATEGORIES if M.probe_calibrated else []
+        if not M.probe_calibrated:
+            print(f"  {M.short_name}: uncalibrated (probes=[]); face_likelihood "
+                  f"only reads LM-head logits, so this is fine")
+        with SaklasSession.from_pretrained(
+            M.model_id, device="auto", probes=probes,
+        ) as session:
+            if maybe_override_ministral_chat_template(session):
+                print(f"  ministral: overrode chat_template with FP8-instruct's "
+                      f"({len(session.tokenizer.chat_template)} chars) so "
+                      f"prefix matches v3 generation")
+            if maybe_override_gpt_oss_chat_template(session):
+                print(f"  gpt_oss: pinned harmony `final` channel in chat_template")
+            if maybe_override_rinna_chat_template(session):
+                print(f"  rinna: installed native ユーザー:/システム: chat_template "
+                      f"({len(session.tokenizer.chat_template)} chars)")
+            print(f"  loaded in {time.time() - t_load:.1f}s")
+            model = session.model
+            tokenizer = session.tokenizer
+            device = session.device
+            model.train(False)  # disable dropout etc — inference mode
+
+            t0 = time.time()
+            for pi, prompt in enumerate(prompts):
+                ftodo = faces_per_prompt[prompt.id]
+                if not ftodo:
+                    continue  # all faces already scored for this prompt
+                q = _quadrant_of(prompt)
+                prefix_ids = _build_prefix_ids(tokenizer, prompt, instruction=instruction)
+                t_p = time.time()
+                scored = _score_faces_for_prompt(
+                    model, tokenizer, prefix_ids, ftodo,
+                    face_batch=args.face_batch, device=device,
+                )
+                for face, (lp, n_tok) in zip(ftodo, scored):
+                    new_rows.append({
+                        "first_word": face,
+                        "prompt_id": prompt.id,
+                        "quadrant": q,
+                        "log_prob": float(lp),
+                        "n_face_tokens": int(n_tok),
+                        "log_prob_per_token": float(lp / n_tok) if n_tok > 0 else float("nan"),
+                    })
+                print(f"  [{pi+1}/{len(prompts)}] {prompt.id} ({q}) "
+                      f"prefix_len={prefix_ids.shape[0]} scored {len(ftodo)} "
+                      f"({time.time() - t_p:.1f}s)")
+            print(f"\nscored {len(new_rows)} new cells in {time.time() - t0:.1f}s")
+    else:
+        print("  nothing to score — every cell already in the existing parquet.")
+
+    # Concat new rows with existing (if any) and write back to the same path.
+    new_rows_df = pd.DataFrame(new_rows) if new_rows else None
+    if existing_rows is not None and new_rows_df is not None:
+        rows_df = pd.concat([existing_rows, new_rows_df], ignore_index=True)
+    elif existing_rows is not None:
+        rows_df = existing_rows
+    elif new_rows_df is not None:
+        rows_df = new_rows_df
+    else:
+        # No existing, no new — shouldn't happen (faces × prompts > 0), but
+        # guard for empty union edge case.
+        raise SystemExit(
+            "no rows to write: face union or prompt set is empty"
+        )
     rows_df.to_parquet(rows_path, index=False)
-    print(f"wrote per-cell rows to {rows_path}")
+    print(f"wrote per-cell rows to {rows_path}  "
+          f"(total n={len(rows_df)}; +{len(new_rows)} new)")
 
     topk_arg = args.summary_topk if args.summary_topk and args.summary_topk > 0 else None
     summary = _summarize(rows_df, faces_df, summary_topk=topk_arg)

@@ -66,7 +66,9 @@ modal quadrant per face, not a pooled measure dominated by v3
 prompt distribution.
 
 New helper module: `llmoji_study/claude_gt.py::load_claude_gt(floor=1)`
-reads `data/claude_groundtruth_pilot.jsonl`, runs each `first_word`
+reads the union of `data/claude-runs/run-*.jsonl` (post-2026-05-04
+sequential-run scaling protocol; pre-protocol the path was
+`data/claude_groundtruth_pilot.jsonl`), runs each `first_word`
 through `canonicalize_kaomoji` (the pilot data ships uncanonicalized;
 matching to the union requires this), counts emits per (face,
 quadrant), returns `{canonical_face: (modal_quadrant, modal_n)}`

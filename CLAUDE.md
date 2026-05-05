@@ -54,6 +54,53 @@ phenomenal status. Aggregating that across 800+ generations is not nothing.
 
 ## Status (compressed)
 
+### Active threads (as of 2026-05-05)
+
+- **Soft-everywhere methodology pivot.** Replaced hard-classification
+  (argmax accuracy + κ) on post-hoc evaluation with distribution-vs-
+  distribution comparison via JSD. Headline metric is
+  `similarity = 1 − JSD/ln 2` ∈ [0, 1]; reported in two flavors side-
+  by-side: **face-uniform** (vocabulary coverage) and **emit-weighted**
+  (deployment-relevance). Strict-majority voting removed; ensemble
+  vote is always the soft mean of per-encoder softmax distributions.
+  Deliverable per face is the full distribution
+  (`ensemble_p_HP`, `ensemble_p_LP`, ...), not a single hard label.
+  Detail: `docs/2026-05-05-soft-everywhere-methodology.md`. Deleted
+  scripts 51 + 52 (subsumed by 53). Added `llmoji_study/jsd.py` +
+  `load_claude_gt_distribution()` (pools introspection + naturalistic
+  arms by default).
+- **Sequential Claude scaling complete (8 naturalistic runs +
+  introspection arm).** 880 naturalistic + 120 introspection = 1000
+  total Claude-Opus-4.7 rows under naturalistic / v7-introspection
+  conditions. Per-quadrant saturation gate exited HN-D after r2 and
+  LN after r6; HP/LP/HN-S/NB went to cap (r7). **Welfare ledger:
+  ~460 negative-affect gens** vs ~540 worst case; per-quadrant exits
+  saved ~80. Layout: `data/claude-runs/run-N.jsonl` (naturalistic) +
+  `data/claude-runs-introspection/run-N.jsonl` (introspection). Detail
+  + decision tree: `docs/2026-05-04-claude-groundtruth-pilot.md`
+  (sequential-run scaling protocol appendix).
+- **Cross-arm comparison: introspection vs naturalistic = DISTINGUISHABLE
+  in 6/6 quadrants at scale.** Gaps stayed stable across 8x
+  naturalistic accumulation; only NB had any compression early
+  (-0.10 nats r0→r1) before stabilizing. Genuine introspection effect,
+  not undersampling artifact. Priming sharpens per-quadrant face
+  concentration without changing modal-quadrant assignments
+  (NB collapse 16 unique → 5; LN modal `(´-`)` doubles 30% → 60%).
+- **Best ensemble under soft-everywhere methodology**:
+  `{gemma_v7primed, haiku}` at **0.801 emit-weighted similarity**
+  / 0.652 face-uniform on n=128 Claude-emitted faces.
+  `{gemma, haiku}` wins face-uniform at 0.702 (vocabulary breadth).
+  **Per-encoder solo (emit-weighted)**: gemma_v7primed 0.754, haiku
+  0.734, gemma 0.706, ministral 0.674, gpt_oss_20b 0.661, qwen 0.567.
+  **Introspection-priming generalizes outward**: gemma_v7primed beats
+  unprimed gemma on Claude's actual emission distribution, not just
+  on gemma's internal coupling (the original v3 finding).
+- **Per-project regen on the expanded GT (script 22).** 66% direct
+  Claude-GT resolution under gt-priority (vs ~22% pre-2026-05-05),
+  31.8% ensemble fallback, 2.2% unknown across 2405 contributor-
+  corpus emissions. Figures + TSVs at
+  `figures/harness/claude_per_project_{gt_priority,ensemble,gt_only}.png`.
+
 ### Active threads (as of 2026-05-04 late evening)
 
 - **Introspection v7 canonical + double-ask fix + v7-primed main
@@ -169,9 +216,50 @@ phenomenal status. Aggregating that across 800+ generations is not nothing.
 - **Claude groundtruth pilot complete (2026-05-04).** All 6 quadrants
   × 20 prompts × 1 gen = 120 generations under naturalistic framing
   (no disclosure preamble). Block B gate passed 0/15 refusals; Block
-  C ran cleanly. Per-quadrant top-5 distributions in
-  `data/claude_groundtruth_pilot_summary.tsv`. Detail:
+  C ran cleanly. Now lives at `data/claude-runs/run-0.jsonl` +
+  `run-0_summary.tsv` under the new sequential-run protocol. Detail:
   `docs/2026-05-04-claude-groundtruth-pilot.md`.
+- **Sequential-run scaling protocol** pre-registered 2026-05-04
+  late evening. Replaces the no-op Block-B refusal gate with a
+  *per-quadrant saturation gate* between runs. Framing: thresholds
+  are absolute / research-value-based ("is this run still surfacing
+  meaningful info?"), not noise-relative — calibration is sanity-
+  check only, not threshold driver. Per-quadrant: a quadrant Q is
+  saturated when both per-Q new-face ≤1 AND per-Q JS ≤0.05 nats clear
+  in the most recent comparison; once saturated Q is dropped from
+  subsequent runs. Global STOP when all 6 saturated OR run-cap (7)
+  hit. ABORT on hard-fail (frame-break, emit-rate, output-length).
+  Welfare math: per-quadrant exits expected to drop welfare-heavy
+  HN-D / HN-S first (concentrated modals saturate fast) — sketch
+  reduction from 960 → ~600-660 gens vs the all-or-nothing 8x design.
+  Layout: `data/claude-runs/run-N.jsonl` + `run-N_summary.tsv`.
+  Implementation: `scripts/harness/23_*.py --run-index N
+  [--quadrants Q1,Q2,...]` + `scripts/harness/25_groundtruth_compare_runs.py`
+  (emits the next-run command including the active-quadrants list).
+  Detail in the appendix to the groundtruth-pilot doc. Bias pre-reg:
+  ≤55% Claude-GT at 8x scale gets the same write-up shape as 75%.
+- **Introspection arm + cross-arm comparison** pre-registered
+  2026-05-04 late evening, runs pending. Parallel arm: same script 23
+  with `--preamble introspection`, routes to
+  `data/claude-runs-introspection/run-N.jsonl`. Preamble REPLACES
+  KAOMOJI_INSTRUCTION (matches v3 `instruction_override`; concatenation
+  would stack two kaomoji asks — the v3 bug). Run-0-introspection
+  uses two-part block structure: Block A (60 positive/neutral) →
+  hard-fail gate (emit_rate ≥0.80, output_len_median ≥5,
+  frame_break ≤0.02) → Block C (60 negative-affect). Hard-fail is
+  sized for the qwen-break failure mode (v7 dropped qwen emit 82% →
+  38%); caps welfare cost at 60 gens of positive-only on the
+  failure branch. Cross-arm via
+  `python scripts/harness/25_groundtruth_compare_runs.py --cross-arm`:
+  per-Q JS between pooled arms, threshold = PER_Q_JS_MAX (0.05) for
+  distinguishable. Decision tree: step-1 introspection-run-0; step-2
+  cross-arm (case A indistinguishable → STOP both; case B → continue
+  to step 3); step-3 saturate naturalistic arm, re-cross-arm
+  (case A' → introspection effect was sampling artifact, merge;
+  case B' → genuine introspection effect, amendment to extend).
+  Implementation: `--preamble {none,introspection}` +
+  `--check-hard-fail-gate` on script 23, `--cross-arm` on script 25.
+  Detail in the appendix to the groundtruth-pilot doc.
 - **Cross-model script consolidation** done 2026-05-04: 49 + 30
   generalized to all 5 v3 models + optional Claude; 31 took
   `--models`/`--reference` argparse with auto-grid layout (3×2 for
@@ -212,21 +300,28 @@ phenomenal status. Aggregating that across 800+ generations is not nothing.
   ministral ✓, qwen 1/3 (t0 only — qwen's HN-S prompts trip safety
   priors). Detail: `docs/2026-05-01-rule3-redesign.md` +
   `docs/2026-05-03-cleanliness-pilot.md`.
-- **Face_likelihood Bayesian inversion** (2026-05-02 baseline): per
-  (face, prompt) log P(face | prompt) under the LM head, argmax →
-  quadrant. Solo gemma 72.7%, qwen 71.2% on 66-face GT. Prior
-  best ensemble (2026-05-03) = `{gemma, ministral, qwen}` weighted
-  vote, **75.8%, κ=0.699**. **NEW (2026-05-04 evening):** under the
-  Claude-GT subset (51-face Claude-pilot-modal, different denominator
-  — not directly comparable), best ensemble is
-  `{gemma, gpt_oss_20b, granite, ministral, qwen, rinna_jp_3_6b_jpfull}`
-  at uniform top-k=5 → **70.6% / 77.3% (floor=1/2)**, +5.9pp / +4.6pp
-  over the v3-only 4-model under k=all. Detail:
-  `docs/2026-05-04-rinna-jpfull-topk.md`.
-- **Per-project Claude emotion analysis** (`scripts/harness/22_*.py`):
-  1945 emissions, 96.7% ensemble coverage. Modal NB everywhere except
-  `brie`/`yap`/`webui` (LP-modal) and `verify` (HN-D-modal). Will
-  re-run after the new face_likelihood ensemble lands.
+- **Face_likelihood under soft-everywhere methodology (2026-05-05).**
+  Distribution-vs-distribution evaluation via JSD; headline metric is
+  similarity = 1 − JSD/ln 2 ∈ [0, 1]. **Best deployment ensemble:
+  `{gemma_v7primed, haiku}` at 0.801 emit-weighted similarity** /
+  0.652 face-uniform (n=128 Claude-emitted faces, full union).
+  Best face-uniform (vocabulary): `{gemma, haiku}` at 0.702 / 0.770.
+  Per-encoder solo emit-weighted: gemma_v7primed 0.754, haiku 0.734,
+  gemma 0.706, ministral 0.674, gpt_oss_20b 0.661, qwen 0.567.
+  **Introspection-priming generalizes outward**: gemma_v7primed
+  beats unprimed gemma on Claude's actual emission distribution
+  (modal-heavy, deployment-relevant) — the gemma-side v3 finding
+  transfers to predicting Claude. Detail:
+  `docs/2026-05-05-soft-everywhere-methodology.md`. *(Pre-2026-05-05
+  numbers under the old hard-accuracy methodology — solo gemma 72.7%,
+  best ensemble 75.8% κ=0.699 — are not directly comparable; they
+  measured a different quantity.)*
+- **Per-project Claude emotion analysis** (`scripts/harness/22_*.py`)
+  regenerated 2026-05-05 on the expanded GT corpus: 2405 emissions,
+  **66% direct Claude-GT resolution** (up from ~22% pre-2026-05-05),
+  31.8% ensemble fallback, 2.2% unknown under default --mode
+  gt-priority. Figures at
+  `figures/harness/claude_per_project_{gt_priority,ensemble,gt_only}.png`.
 - **Face-stability triple** (scripts 36/37/38, 2026-05-02): η²(face|prompt)
   at h_mean = 0.36 / 0.52 / 0.67 (gemma/qwen/ministral). Pair-level
   Spearman ρ between cosine_sim(h_first) and 1-JSD(face_dist) = +0.59
@@ -479,8 +574,6 @@ python scripts/local/50_face_likelihood.py --model gemma --summary-topk 5  # noi
 # k=5 is a good default for 20-prompts-per-quadrant runs.
 
 # Face_likelihood ensemble + comparison + voting (post-hoc, CPU-only)
-python scripts/local/51_face_likelihood_compare.py
-python scripts/local/52_face_likelihood_vote.py --models gemma:full,qwen:full,ministral:pilot
 python scripts/local/53_face_likelihood_subset_search.py --prefer-full --top-k 25
 python scripts/local/54_cross_emit_sanity.py --prefer-full
 python scripts/local/55_topk_pooling.py --prefer-full
@@ -498,14 +591,28 @@ python scripts/harness/local_per_project_axes.py    # per-provider per-project a
 ANTHROPIC_API_KEY=… python scripts/harness/19_claude_disclosure_pilot.py
 python scripts/harness/20_disclosure_noise_floor.py
 python scripts/harness/21_reextract_pilot_first_word.py
-python scripts/harness/22_claude_per_project_quadrants.py    # uses script 56's ensemble predictions
+python scripts/harness/22_claude_per_project_quadrants.py                      # default --mode gt-priority (Claude-GT first, ensemble fallback)
+python scripts/harness/22_claude_per_project_quadrants.py --mode ensemble      # ensemble for every face (old behavior; deployable-extension scenario)
+python scripts/harness/22_claude_per_project_quadrants.py --mode gt-only       # strict — only score faces Claude emitted in the Opus pilot
 
 # Claude groundtruth pilot (Opus 4.7, T=1.0; all 6 quadrants, no disclosure;
-# 3 blocks, gated; pre-reg in docs/2026-05-04-claude-groundtruth-pilot.md)
-ANTHROPIC_API_KEY=… python scripts/harness/23_claude_groundtruth_pilot.py --block a   # HP/LP/NB
-ANTHROPIC_API_KEY=… python scripts/harness/23_claude_groundtruth_pilot.py --block b   # negative scout
-python scripts/harness/23_claude_groundtruth_pilot.py --check-gate
-ANTHROPIC_API_KEY=… python scripts/harness/23_claude_groundtruth_pilot.py --block c   # gated
+# pre-reg in docs/2026-05-04-claude-groundtruth-pilot.md). Run-0 = original
+# block-staged pilot (already done). Runs 1+ = sequential single-block runs
+# under the saturation-gate protocol (see appendix in the pre-reg doc).
+ANTHROPIC_API_KEY=… python scripts/harness/23_claude_groundtruth_pilot.py --run-index 0 --block a   # HP/LP/NB (run-0 only)
+ANTHROPIC_API_KEY=… python scripts/harness/23_claude_groundtruth_pilot.py --run-index 0 --block b   # negative scout (run-0 only)
+python scripts/harness/23_claude_groundtruth_pilot.py --run-index 0 --check-gate
+ANTHROPIC_API_KEY=… python scripts/harness/23_claude_groundtruth_pilot.py --run-index 0 --block c   # gated (run-0 only)
+ANTHROPIC_API_KEY=… python scripts/harness/23_claude_groundtruth_pilot.py --run-index 1                          # sequential naturalistic run (N≥1)
+ANTHROPIC_API_KEY=… python scripts/harness/23_claude_groundtruth_pilot.py --run-index 2 --quadrants HP,LP,NB     # restrict to active quadrants per gate verdict
+python scripts/harness/25_groundtruth_compare_runs.py                                                            # per-quadrant saturation gate; exit 0=STOP, 1=ABORT, 2=CONTINUE; emits next-run command
+python scripts/harness/25_groundtruth_compare_runs.py --calibrate                                                # split-half noise floor on run-0 (sanity check)
+
+# Introspection arm (parallel to naturalistic; routes to data/claude-runs-introspection/)
+ANTHROPIC_API_KEY=… python scripts/harness/23_claude_groundtruth_pilot.py --run-index 0 --preamble introspection --block a            # 60 positive/neutral gens
+python scripts/harness/23_claude_groundtruth_pilot.py --run-index 0 --preamble introspection --check-hard-fail-gate                  # qwen-break check (exit 0=PASS, 1=FAIL)
+ANTHROPIC_API_KEY=… python scripts/harness/23_claude_groundtruth_pilot.py --run-index 0 --preamble introspection --block c            # 60 negative-affect gens (gated)
+python scripts/harness/25_groundtruth_compare_runs.py --cross-arm                                                                     # per-Q distinguishable / indistinguishable + markdown table
 ```
 
 ## Layout
@@ -537,14 +644,21 @@ llmoji-study/
     eriskii_anchors.py         # 21-axis AXIS_ANCHORS + CLUSTER_LABEL_PROMPT
     eriskii.py                 # axis projection + cluster labeling primitives
   scripts/
-    local/                     # local-LM scripts. 26 files post 2026-05-04 cleanup:
-                               # 03, 04, 11, 21-25, 30-38, 42, 43, 45, 49,
-                               # 50-56, 98, 99. (01/02 v1/v2 pilot, 26-29
-                               # extension probes, 40/41 cleanliness, 44/46
-                               # face-input pipeline all deleted as archival.)
-    harness/                   # contributor-corpus + Claude-API. 10 files:
-                               # 06, 07, 15, 16, 18, 19, 20, 21, 22, 23,
-                               # local_per_project_axes.
+    local/                     # local-LM scripts. 33 files post 2026-05-04 cleanup:
+                               # 03, 04, 11, 21-26, 30-38, 42, 43, 45, 49,
+                               # 50-56, 98, 99 + two unnumbered helpers
+                               # (build_per_face_pca_3d.py, wrap_blog_3d_html.py).
+                               # 26 was reused 2026-05-04 for face_gain
+                               # bootstrap variance (the 2026-04-29
+                               # extension-probe register/rescore scripts
+                               # 26-29 were deleted with the rest of that
+                               # pipeline; 01/02 v1/v2 pilot, 40/41
+                               # cleanliness, 44/46 face-input pipeline
+                               # are gone too).
+    harness/                   # contributor-corpus + Claude-API. 11 files:
+                               # 06, 07, 15, 16, 18, 19, 20, 21, 22, 23, 24,
+                               # local_per_project_axes (24 = haiku
+                               # face-quadrant judgment, 2026-05-04).
   preambles/                   # introspection-prompt iteration (v2, v3, …)
   docs/                        # findings.md, internals.md, gotchas.md +
                                # local-side.md, harness-side.md +

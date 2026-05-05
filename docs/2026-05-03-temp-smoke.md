@@ -1,6 +1,11 @@
 # Temperature smoke — T=0.7 → T=1.0 marginal-distribution test
 
-**Status:** PROPOSED. Awaiting execution.
+**Status:** EXECUTED 2026-05-03 — gemma + qwen pilots fired path-A
+(temp doesn't materially shift kaomoji distribution at h_first).
+Verdict captured in `data/temp_smoke_verdict.md`; full v3 main rerun
+at T=1.0 followed and now lives at `data/{gemma,qwen,ministral,
+gpt_oss_20b,granite}_emotional_raw.jsonl` (legacy T=0.7 archived as
+`*_temp0.7.{jsonl,tsv}`).
 
 **Date:** 2026-05-03.
 

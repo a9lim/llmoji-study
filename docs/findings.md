@@ -1,7 +1,15 @@
 # Findings
 
 Detailed status + pipeline-by-pipeline findings. Top-level overview lives
-in CLAUDE.md; this doc holds the full numbers and arguments.
+in CLAUDE.md; this doc holds the full numbers and arguments. The
+canonical research-side methodology summary is in
+[`local-side.md`](local-side.md); the historical record (v1 / v2
+steering pilots, single-layer reads, the gemma-vs-qwen 1D-vs-2D
+framing, pre-cleanliness numbers, the face-input bridge, extension
+probes, introspection iterations v0 through v6) lives in
+[`previous-experiments.md`](previous-experiments.md). When this doc
+references a "historical" or "pre-2026-05-XX" finding, that's where
+the full earlier framing is preserved.
 
 ## Current state (2026-05-04)
 
@@ -560,13 +568,21 @@ dict-keyed fields (`extension_probe_means` /
 `extension_probe_scores_t0` / `_tlast`) on the JSONL rows so
 `SampleRow.probe_scores_t0`'s list schema is unchanged.
 
-`scripts/local/26_register_extension_probes.py` does a one-time per-model
+`scripts/local/26_register_extension_probes.py` did a one-time per-model
 materialize + bootstrap (~5–10s/probe extraction, gradient-free, no
-generations). `scripts/local/27_v3_extension_probe_rescore.py` re-scores
+generations). `scripts/local/27_v3_extension_probe_rescore.py` re-scored
 the existing 800-row v3 sidecars with the extension probes
 (filling `extension_probe_*` fields) — also no generations, just
 `monitor.score_single_token` over saved h_first/h_last/h_mean per
-row. Both scripts respect `$LLMOJI_MODEL`.
+row. Both scripts respected `$LLMOJI_MODEL`. **Both deleted 2026-05-04**
+along with the rest of the extension-probe pipeline (28/29) — the
+extension-probe theoretical premise leaned on `powerful.powerless`
+reading PAD dominance, which rule 3a's analysis showed it doesn't.
+`fearful.unflinching` survived as a direct probe in the canonical
+`PROBES` list. Pre-2026-05-04 v3 sidecars retain the orphan dict-keyed
+`extension_probe_scores_*` fields; `available_extension_probes(df)`
+in `llmoji_study.emotional_analysis` surfaces them if any analysis
+needs them.
 
 **Auto-discovery side-finding:** the working saklas repo at
 `/Users/a9lim/Work/saklas/saklas/data/vectors/` ships three
@@ -698,18 +714,24 @@ rather than re-state.
 
 ## Pipelines
 
-### Pilot v1/v2 — steering-as-causal-handle (gemma)
+### Pilot v1 / v2 — steering-as-causal-handle (gemma, archival)
 
-Six arms (`baseline`, `kaomoji_prompted`, `steered_{happy,sad,angry,calm}`),
-30 prompts × 5 seeds × 6 = 900 generations, α=0.5 on steered arms. Probes:
-`happy.sad`, `angry.calm`, `confident.uncertain`, `warm.clinical`,
-`humorous.serious`.
+Two pilots on gemma, one axis each: v1 used `happy.sad`, v2 used
+`angry.calm`. 30 prompts × 5 seeds × 6 arms = 900 generations
+each. α=0.5 on steered arms. Five monitor probes captured per
+generation. Steering acted as a clean causal handle (positive-pole
+fraction 0.000 / 0.713 / 1.000 across negative-steer / unsteered /
+positive-steer arms on `happy.sad`); the correlational signal at
+token 0 was much weaker; cluster structure collapsed to a single
+valence direction (Pearson(mean happy.sad, mean angry.calm) across
+faces = −0.94). v3 picked up the framing implications — naturalistic
+prompting, no steering, hidden-state instead of probe-scalar,
+Russell quadrants instead of one bipolar axis.
 
-**Findings (pre-refactor, valence-collapse-confounded):** Rules 1–2 pass on
-both axes; Rule 3 fails informatively (probes project onto a single valence
-direction; PC1 ate 89% of pooled probe-space variance). v2's "valence-bimodal
-repertoire" replaced v1's "unmarked/marked-affect" reading. Both need
-re-reading from the v1/v2 hidden-state re-run before writeup.
+The scripts (01, 02) were deleted 2026-05-04 along with the
+gemma-tuned `TAXONOMY` machinery. Full v1 / v2 writeup in
+[`previous-experiments.md`](previous-experiments.md) §
+"v1 / v2 — steering as causal handle on gemma".
 
 ### Pilot v3 — naturalistic emotional disclosure (gemma)
 
@@ -765,13 +787,12 @@ emergence analysis showed L57 silhouette = 0.117 vs L31 silhouette
   mixes; pure-quadrant faces stay at endpoints. Palette: HN red, HP gold,
   LP green, LN blue, NB gray.
 
-**Pre-2026-04-28 numbers at L57 (kept for cross-checking against
-prior writeups):** PCA PC1 12.98% / PC2 7.49%; per-quadrant centroids
-HN +7 / LN +7 (collapsed); within-kaomoji h_mean consistency 0.92–0.99
-across faces. The L57 findings led to the "gemma 1D-affect-with-
-arousal-modifier vs qwen 2D Russell" framing — see "v3 follow-on
-analyses" below; that framing dissolved once gemma was read at the
-right layer.
+**Pre-2026-04-28 numbers at L57** (PCA PC1 12.98% / PC2 7.49%; HN
+and LN collapsed on PC2; within-kaomoji h_mean consistency 0.92–0.99
+across faces) and the "gemma 1D-affect-with-arousal-modifier vs qwen
+2D Russell" framing they motivated are in
+[`previous-experiments.md`](previous-experiments.md) §
+"gemma 1D vs qwen 2D framing".
 
 ### Pilot v3 — Qwen3.6-27B replication
 
@@ -991,7 +1012,9 @@ supplementary:
 
 ### Triplet Procrustes (2026-05-01, post-supp, HN split active)
 
-`scripts/local/31_v3_triplet_procrustes.py` extends the pairwise gemma↔qwen
+`scripts/local/31_v3_quadrant_procrustes.py` (renamed from
+`31_v3_triplet_procrustes.py` 2026-05-04 when generalized from 3
+models to the 5-model v3 main lineup) extends the pairwise gemma↔qwen
 Procrustes from script 23 to all three models, on the supp-augmented
 balanced data with HN-D / HN-S as separate categories. Each model
 fits PCA(2) on its own filtered hidden states at its preferred layer
@@ -1487,8 +1510,8 @@ leveraged on ministral; the reverse-direction work (saklas-style
 contrastive PCA + steering) gets more bang per α on the
 reverse-biased model.
 
-**31 3D rework (same date)**: `scripts/local/31_v3_triplet_procrustes.py`
-now renders one interactive 4-panel HTML at
+**31 3D rework (same date)**: `scripts/local/31_v3_quadrant_procrustes.py`
+(renamed 2026-05-04, see above) now renders one interactive 4-panel HTML at
 `figures/local/cross_model/fig_v3_triplet_procrustes_3d.html` (gemma /
 qwen / ministral 3D centroids + Procrustes-aligned overlay) instead of
 three PC-pair PNGs. 3D residuals: **qwen 7.73, ministral 14.50** (both
@@ -1499,7 +1522,15 @@ PC2-axis flip, halving its apparent residual from the 2D 23.0 to 3D
 of ministral from gemma is ~2× qwen's, not ~3× as the 2D PC1×PC2
 view suggested. Old PC-pair PNGs deleted.
 
-### Claude-faces ↔ local-model face-input bridge — fused pipeline (2026-05-02)
+### Claude-faces ↔ local-model face-input bridge — fused pipeline (2026-05-02; deprecated 2026-05-04)
+
+> **Status (2026-05-04):** the entire face-input encoder pipeline
+> (scripts 44/46, the encoder-specific `data/face_h_first_<m>.parquet`
+> tables, the joint-PCA+cosine-NN bridge) has been deleted. Its sole
+> downstream user — script 50 face_likelihood — now reads the
+> canonical `data/v3_face_union.parquet` (script 45). The numbers
+> below are the historical record of why the bridge was tried, what
+> it found, and why it didn't survive into the post-cleanup canon.
 
 Canonical approach: face strings through a local model's face-input
 forward pass (kaomoji-instruction system prompt, face string as user
@@ -1756,10 +1787,13 @@ Pipeline: `scripts/local/50_face_likelihood.py --model {gemma,qwen}
 {--pilot|--full}`. Outputs:
 `data/face_likelihood_<m>{,_pilot}.parquet` (per-cell rows) and
 `data/face_likelihood_<m>{,_pilot}_summary.tsv` (per-face quadrant
-scores + softmax + argmax + ground truth merge). Reuses the face
-union from `data/face_h_first_<m>.parquet` (script 46) so the same
-faces classified by joint-PCA+NN are the ones classified here, by a
-different signal — direct cross-comparison is built in.
+scores + softmax + argmax + ground truth merge). At writeup time
+the face union came from `data/face_h_first_<m>.parquet` (script 46),
+so script 50 and the joint-PCA+NN bridge classified the same faces
+by different signals. **Post 2026-05-04** the face_h_first pipeline
+(scripts 44/46) was deleted and script 50 reads the canonical
+`data/v3_face_union.parquet` (script 45) instead — pooling v3 main
++ Claude pilot + in-the-wild contributor data.
 
 Detail: `docs/2026-05-02-face-likelihood.md`.
 

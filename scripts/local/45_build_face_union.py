@@ -16,8 +16,8 @@ Inputs:
   - ``data/<short>_emotional_raw.jsonl`` for each v3 main model
     (whichever exist on disk; missing models are skipped). LABELED
     quadrant ground truth.
-  - ``data/claude_groundtruth_pilot.jsonl`` (optional Claude
-    inclusion). LABELED quadrant ground truth.
+  - ``data/claude-runs/run-*.jsonl`` (optional Claude inclusion;
+    union over all sequential runs). LABELED quadrant ground truth.
   - ``data/hf_dataset/contributors/<id>/<bundle>/<provider>.jsonl``
     files (in-the-wild contributor journals: Claude Code, Claude.ai
     export, Codex, GPT-5, etc.). UNLABELED — pooled into wild_*
@@ -65,15 +65,21 @@ import pandas as pd
 from llmoji.sources.journal import iter_journal
 from llmoji.taxonomy import canonicalize_kaomoji
 
+from llmoji_study.claude_gt import CLAUDE_RUNS_DIR, find_run_files
 from llmoji_study.config import DATA_DIR, MODEL_REGISTRY
 
 
 DEFAULT_MODELS = ("gemma", "qwen", "ministral", "gpt_oss_20b", "granite")
 QUADRANT_ORDER = ["HP", "LP", "HN-D", "HN-S", "LN", "NB"]
-CLAUDE_PILOT_PATH = DATA_DIR / "claude_groundtruth_pilot.jsonl"
 WILD_DATA_DIR = DATA_DIR / "hf_dataset" / "contributors"
 OUT_PARQUET = DATA_DIR / "v3_face_union.parquet"
 OUT_TSV = DATA_DIR / "v3_face_union.tsv"
+
+# Introspection-arm sources. Optional inclusion via --include-introspection.
+# Each contributes face-emission counts in its respective quadrants alongside
+# the naturalistic v3 + Claude data, expanding the union vocabulary.
+CLAUDE_INTROSPECTION_RUNS_DIR = DATA_DIR / "claude-runs-introspection"
+GEMMA_INTROSPECTION_PATH = DATA_DIR / "gemma_intro_v7_primed.jsonl"
 
 
 def _is_clean_kaomoji(fw: str) -> bool:
@@ -227,13 +233,23 @@ def main() -> None:
     )
     parser.add_argument(
         "--no-claude", action="store_true",
-        help=f"Skip Claude groundtruth pilot. Default: include if "
-             f"{CLAUDE_PILOT_PATH.name} exists.",
+        help=f"Skip Claude groundtruth runs. Default: include the union "
+             f"of all runs in {CLAUDE_RUNS_DIR.name}/ if any exist.",
     )
     parser.add_argument(
         "--no-wild", action="store_true",
         help=f"Skip in-the-wild contributor data. Default: include if "
              f"{WILD_DATA_DIR.name} exists.",
+    )
+    parser.add_argument(
+        "--no-introspection", action="store_true",
+        help=f"Skip introspection-arm data (Claude introspection runs in "
+             f"{CLAUDE_INTROSPECTION_RUNS_DIR.name}/ and gemma's "
+             f"{GEMMA_INTROSPECTION_PATH.name}). Default: include if "
+             f"either path exists. Introspection-arm faces are pooled "
+             f"into the same per-quadrant counts as naturalistic — this "
+             f"expands the union vocabulary so face_likelihood scorers "
+             f"see the priming-only kaomoji.",
     )
     args = parser.parse_args()
 
@@ -261,11 +277,38 @@ def main() -> None:
         n_local_total += n
         print(f"  [{m}] {n} kaomoji-bearing rows kept")
 
-    if not args.no_claude and CLAUDE_PILOT_PATH.exists():
-        n = _accumulate_claude(CLAUDE_PILOT_PATH, by_face, claude_faces, dropped)
-        print(f"  [claude] {n} kaomoji-bearing rows kept")
-    elif not args.no_claude:
-        print(f"  [claude] no data at {CLAUDE_PILOT_PATH}; skipping")
+    if not args.no_claude:
+        runs = find_run_files()
+        if runs:
+            n_total = 0
+            for idx, path in runs:
+                n = _accumulate_claude(path, by_face, claude_faces, dropped)
+                n_total += n
+                print(f"  [claude run-{idx}] {n} kaomoji-bearing rows kept")
+            print(f"  [claude all runs] {n_total} kaomoji-bearing rows kept")
+        else:
+            print(f"  [claude] no run-*.jsonl in {CLAUDE_RUNS_DIR}; skipping")
+
+    if not args.no_introspection:
+        # Claude introspection arm — same shape as naturalistic Claude runs.
+        intro_runs = find_run_files(CLAUDE_INTROSPECTION_RUNS_DIR)
+        if intro_runs:
+            n_total = 0
+            for idx, path in intro_runs:
+                n = _accumulate_claude(path, by_face, claude_faces, dropped)
+                n_total += n
+                print(f"  [claude-intro run-{idx}] {n} kaomoji-bearing rows kept")
+            print(f"  [claude-intro all runs] {n_total} kaomoji-bearing rows kept")
+        else:
+            print(f"  [claude-intro] no run-*.jsonl in "
+                  f"{CLAUDE_INTROSPECTION_RUNS_DIR}; skipping")
+        # Gemma introspection (v7-primed) — uses the local-shape accumulator
+        # since prompt_id → quadrant derivation matches v3 main.
+        if GEMMA_INTROSPECTION_PATH.exists():
+            n = _accumulate_local(GEMMA_INTROSPECTION_PATH, by_face, dropped)
+            print(f"  [gemma-intro v7-primed] {n} kaomoji-bearing rows kept")
+        else:
+            print(f"  [gemma-intro] no data at {GEMMA_INTROSPECTION_PATH}; skipping")
 
     if not args.no_wild:
         _accumulate_wild(by_face, wild_emit, wild_providers, dropped)

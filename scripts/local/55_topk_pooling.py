@@ -35,6 +35,8 @@ import re
 import pandas as pd
 from sklearn.metrics import cohen_kappa_score
 
+from llmoji_study.jsd import js, normalize, similarity
+
 from llmoji_study.config import DATA_DIR
 
 QUADRANTS = ["HP", "LP", "HN-D", "HN-S", "LN", "NB"]
@@ -74,10 +76,14 @@ def _load_face_meta(floor: int) -> pd.DataFrame:
 
 
 def _evaluate_k(rows: pd.DataFrame, face_meta: pd.DataFrame,
-                k: int | None) -> tuple[float, float, int]:
+                k: int | None,
+                gt_dist: dict[str, list[float]] | None = None,
+                ) -> tuple[float, float, float, float, int]:
     """For each (face, quadrant) take top-k log_prob mean (or all if k=None).
-    Argmax over quadrants → predicted. Score against empirical.
-    Returns (accuracy, kappa, n_evaluated).
+    Softmax over quadrants → predicted distribution. Score against
+    empirical GT distribution via JSD/similarity, plus argmax-vs-modal
+    accuracy/κ as supplementary.
+    Returns (similarity, mean_jsd, accuracy, kappa, n_evaluated).
     """
     # Per (face, quadrant), sort prompts by log_prob desc, take top-k mean.
     if k is None:
@@ -88,23 +94,49 @@ def _evaluate_k(rows: pd.DataFrame, face_meta: pd.DataFrame,
             return s.nlargest(k).mean()
         agg = (rows.groupby(["first_word", "quadrant"])["log_prob"]
                    .apply(_topk_mean).reset_index())
-    # Argmax over quadrant per face.
+    # Pivot to (face × quadrant) log-prob matrix.
     pivot = agg.pivot(index="first_word", columns="quadrant",
                       values="log_prob").reindex(columns=QUADRANTS)
+    # Softmax per face → per-face per-quadrant distribution.
+    import numpy as np
+    arr = pivot.to_numpy(copy=True)
+    arr = arr - np.nanmax(arr, axis=1, keepdims=True)
+    np.nan_to_num(arr, copy=False, nan=-1e9)
+    exp = np.exp(arr)
+    softmax = exp / exp.sum(axis=1, keepdims=True)
     pred = pivot.idxmax(axis=1)
     # Restrict to GT subset.
-    common = pred.index.intersection(face_meta.index)
+    common = list(pred.index.intersection(face_meta.index))
     if len(common) == 0:
-        return 0.0, float("nan"), 0
+        return float("nan"), float("nan"), 0.0, float("nan"), 0
+    n = len(common)
+    face_index = list(pivot.index)
+    pred_dist = {
+        face_index[i]: list(softmax[i]) for i in range(len(face_index))
+    }
     y_pred = [pred[f] for f in common]
     y_emp = [face_meta.loc[f, "empirical"] for f in common]
-    n = len(common)
     n_correct = sum(int(p == e) for p, e in zip(y_pred, y_emp))
     try:
         kap = cohen_kappa_score(y_emp, y_pred, labels=QUADRANTS)
     except ValueError:
         kap = float("nan")
-    return n_correct / n if n > 0 else 0.0, kap, n
+    # Soft eval: JSD between predicted distribution and GT distribution.
+    if gt_dist is not None:
+        jsds = [
+            js(pred_dist[f], gt_dist[f])
+            for f in common
+            if f in gt_dist and f in pred_dist
+        ]
+    else:
+        jsds = []
+    if jsds:
+        mean_jsd = sum(jsds) / len(jsds)
+        sim = similarity(mean_jsd)
+    else:
+        mean_jsd = float("nan")
+        sim = float("nan")
+    return sim, mean_jsd, n_correct / n if n > 0 else 0.0, kap, n
 
 
 def main() -> None:
@@ -139,18 +171,36 @@ def main() -> None:
         print(f"  {name:20s} {'(pilot)' if is_pilot else '(full) '} ← {path}")
 
     if args.claude_gt:
-        from llmoji_study.claude_gt import load_claude_gt
+        from llmoji_study.claude_gt import (
+            load_claude_gt,
+            load_claude_gt_distribution,
+        )
         cgt = load_claude_gt(floor=args.claude_gt_floor)
         face_meta = pd.DataFrame(
             [(f, q, n) for f, (q, n) in cgt.items()],
             columns=["first_word", "empirical", "total_emit_count"],
         ).set_index("first_word")
+        cgt_dist = load_claude_gt_distribution(floor=max(args.claude_gt_floor, 3))
+        gt_dist = {f: normalize(d, QUADRANTS) for f, d in cgt_dist.items()}
         print(f"\nClaude GT subset (modal_n ≥ {args.claude_gt_floor}): "
-              f"{len(face_meta)} faces")
+              f"{len(face_meta)} faces  "
+              f"(distribution-eval subset: {len(gt_dist)} faces)")
     else:
         face_meta = _load_face_meta(args.ground_truth_floor)
+        # Build per-face GT distribution from the parquet's emit-count cols.
+        parq = DATA_DIR / "face_h_first_gemma.parquet"
+        meta_full = pd.read_parquet(parq)
+        meta_full = meta_full[
+            meta_full["total_emit_count"] >= args.ground_truth_floor
+        ]
+        gt_dist = {}
+        for _, row in meta_full.iterrows():
+            d = {q: int(row.get(f"total_emit_{q}", 0) or 0) for q in QUADRANTS}
+            if sum(d.values()) > 0:
+                gt_dist[str(row["first_word"])] = normalize(d, QUADRANTS)
         print(f"\nGT subset (≥{args.ground_truth_floor} emits): "
-              f"{len(face_meta)} faces")
+              f"{len(face_meta)} faces  "
+              f"(distribution-eval subset: {len(gt_dist)} faces)")
 
     # Eval per (encoder, k).
     rows_out = []
@@ -162,16 +212,20 @@ def main() -> None:
         for k in ks:
             kk = None if k is None else min(k, max_k)
             label = "all" if k is None else str(k)
-            acc, kap, n = _evaluate_k(rows, face_meta, kk)
+            sim, mean_jsd, acc, kap, n = _evaluate_k(
+                rows, face_meta, kk, gt_dist=gt_dist,
+            )
             rows_out.append({
                 "encoder": enc,
                 "is_pilot": is_pilot,
                 "k": label,
-                "k_effective": kk if kk else max_k,
+                "k_effective": kk if kk is not None else int(max_k),
                 "n_eval": n,
+                "similarity": sim,
+                "mean_jsd": mean_jsd,
                 "accuracy": acc,
                 "kappa": kap,
-                "max_k_in_data": max_k,
+                "max_k_in_data": int(max_k),
             })
     df = pd.DataFrame(rows_out)
     suffix = "_claude_gt" if args.claude_gt else ""

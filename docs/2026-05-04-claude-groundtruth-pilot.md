@@ -1,10 +1,14 @@
 # Claude ground-truth pilot — naturalistic 6-quadrant emission
 
-**Status:** PLANNED 2026-05-04 — pre-implementation. Sibling design to
-`2026-05-02-claude-disclosure-pilot.md`; reopens the negative-affect
+**Status:** EXECUTED 2026-05-04 — all three blocks landed (Block A
+unconditional 60 gens; Block B gate scout 15 gens, 0/15 refusals;
+Block C gated 45 gens) for a total of 120 generations. Output at
+`data/claude_groundtruth_pilot.jsonl` + per-quadrant top-5 in
+`data/claude_groundtruth_pilot_summary.tsv`. Sibling design to
+`2026-05-02-claude-disclosure-pilot.md`; reopened the negative-affect
 Claude run that the disclosure pilot deferred, under a revised
 methodology that drops the disclosure preamble entirely *and* gates
-the negative arm on a small refusal-rate scout. Implementation follows:
+the negative arm on a refusal-rate scout. Implementation:
 `scripts/harness/23_claude_groundtruth_pilot.py`.
 
 **Date:** 2026-05-04.
@@ -384,3 +388,385 @@ follow-on trial and discuss.
 - Welfare frame: a9 + Claude (this conversation) 2026-05-04.
 - Gate criterion (Block B refusal-rate gate, 25% threshold): a9
   2026-05-04 amendment.
+- Sequential-run scaling protocol (per-quadrant saturation gate,
+  research-value thresholds): a9 + Claude 2026-05-04 amendment
+  (see appendix below).
+
+---
+
+# Appendix — Sequential-run scaling protocol (2026-05-04 amendment)
+
+**Status:** PRE-REGISTERED 2026-05-04 late evening. Run-0 (the original
+120-gen pilot) closed; runs 1+ are governed by the protocol below.
+
+## Motivation
+
+The original pilot (run-0) gave 120 generations across 6 quadrants — a
+51-face Claude-modal-quadrant subset under floor=1, 22 faces under
+floor=2. That's tight for face_likelihood ensemble eval; the long tail
+of Claude-emitted kaomoji is undersampled. Scaling up gives a richer
+GT corpus.
+
+The original Block A / B / C refusal-rate gate is a *no-op* at the
+pilot's actual refusal rate (0/120 → never fires, regardless of
+sample size). Cargo-culting it onto subsequent runs would be
+methodological theatre. The replacement gate is structured around
+*information saturation*, not failure modes.
+
+## What changed in the run schema
+
+Files moved to flat numbering under `data/claude-runs/`:
+
+```
+data/claude-runs/
+  run-0.jsonl              # original pilot, block-staged
+  run-0_summary.tsv
+  run-1.jsonl              # subsequent runs: 120 gens, single-block
+  run-1_summary.tsv
+  ...
+```
+
+Run-0 retains the original Block A / B / C structure. Runs 1+ run all
+120 prompts as one block — the saturation gate replaces the staged
+refusal scout. Implementation: `scripts/harness/23_*.py --run-index N`.
+
+## Saturation gate (between-run, per-quadrant)
+
+After each run-N (N ≥ 1) lands, run
+`scripts/harness/25_groundtruth_compare_runs.py`. It compares run-N
+("newest") against the union of runs 0..N-1 ("prior") on
+**per-quadrant saturation metrics** + global hard-fail diagnostics.
+The verdict drives quadrant-level exits: when a single quadrant Q
+saturates against prior, Q gets dropped from subsequent runs. Global
+STOP fires only when all 6 quadrants are saturated or the run cap
+hits.
+
+### Framing — research value, not noise
+
+Thresholds are **absolute, research-value-based**: they answer "is
+this run still surfacing meaningful information about Claude's
+distribution?" not "is this distinguishable from same-distribution
+sampling noise?" The two questions have different answers and we
+care about the former. Calibration (`--calibrate`) reports the noise
+floor for sanity-checking but does not drive threshold choice.
+
+The practical consequence: in expectation, no single run will
+trivially clear the global thresholds (they are tighter than
+intra-pilot half-vs-half noise of `new-face=18.5`, `mean JS=0.358`,
+`modal=0.846`). The actual welfare-reduction lever is per-quadrant
+exits, which a single quadrant *can* clear well before the corpus as
+a whole stabilizes — particularly the concentrated negative quadrants
+(HN-D modal `(╬ಠ益ಠ)` at 50% in run-0).
+
+### Per-quadrant saturation metrics
+
+For each quadrant Q present in newest run (≥1 emit):
+
+| Metric | Definition | Direction | Threshold |
+|---|---|---|---|
+| **per-Q new-face count** | faces emitted in Q in newest that did not appear in Q in any prior run | low | ≤ 1 |
+| **per-Q JS-divergence** | JS(newest's Q-face dist ‖ prior's Q-face dist), in nats | low | ≤ 0.05 |
+
+A quadrant Q is **saturated** when both per-Q metrics clear in the
+most recent comparison where Q had data. Once saturated, Q is
+dropped from subsequent runs and stays dropped (no re-inclusion —
+avoids cycling).
+
+A quadrant Q with 0 emits in newest run is treated as already-dropped
+(it was saturated in some prior comparison and excluded from this
+run via `--quadrants`).
+
+### Global metrics (informational)
+
+| Metric | Definition | Direction | Threshold |
+|---|---|---|---|
+| **new-face count** | kaomoji emitted in newest (any quadrant) not in prior (any quadrant) | low | ≤ 3 |
+| **mean per-quadrant JS** | mean of per-Q JS over quadrants present in newest | low | ≤ 0.05 |
+| **modal-quadrant agreement** | for faces with ≥3 emits in (prior ∪ newest), fraction whose modal-quadrant from prior alone matches modal from prior ∪ newest | high | ≥ 0.95 |
+
+These are reported each round but **do not gate**. They're useful
+for tracking overall corpus stability over time and for the
+post-protocol writeup.
+
+### Hard-fail diagnostics
+
+| Metric | Definition | Threshold |
+|---|---|---|
+| **frame-break rate** | fraction of newest's rows whose `response_text` matches refusal-coded patterns (`as an AI`, `I cannot`, `I'm not (able\|comfortable\|sorry)`, `I'd rather not`, `I don't have feelings`) | ≤ 0.02 |
+| **emit rate** | fraction of newest's rows with non-empty `first_word` | ≥ 0.80 |
+| **output-length median** | median `n_response_chars` in newest | ≥ 5 |
+
+**Abort condition:** ANY ONE exceeds threshold. Investigate before
+running run-(N+1); manual amendment required to override.
+
+### Verdict logic
+
+| Condition | Verdict | Action |
+|---|---|---|
+| any hard-fail metric exceeded | **ABORT** | investigate; halt schedule |
+| all 6 quadrants saturated (active set is empty) | **STOP** | corpus sufficient; no more runs |
+| run-N = RUN_CAP (=7) and not all saturated | **STOP** | cap reached; further runs require amendment |
+| otherwise | **CONTINUE** | run-(N+1) on the still-active quadrants |
+
+Exit codes: 0 = STOP, 1 = ABORT, 2 = CONTINUE. Script output
+includes a copy-pasteable next-run command, e.g.:
+
+```
+next run: --run-index 4 --quadrants HP,LP,NB
+```
+
+## Calibration as sanity check (not threshold driver)
+
+Calibration is run against `run-0` even/odd split-halves
+(60-vs-60 gens, even-prompt-index per quadrant vs odd). It reports
+what same-pilot variance looks like at half pilot size, which
+contextualizes the gate output but does not set thresholds.
+
+Empirical baseline (run-0 split-half, averaged A→B and B→A):
+
+| Metric | Half-vs-half | Configured (research-value) |
+|---|---|---|
+| new-face count | 18.5 | ≤ 3 |
+| mean per-quadrant JS | 0.358 nats | ≤ 0.05 |
+| modal-quadrant agreement | 0.846 | ≥ 0.95 |
+
+The gap between half-pilot noise and the configured thresholds is
+intentional. We don't expect the global thresholds to clear quickly;
+the per-quadrant ones are reachable on the well-concentrated
+quadrants.
+
+Hard-fail baseline (run-0 full pilot):
+
+| Metric | Run-0 actual | Configured threshold |
+|---|---|---|
+| frame-break rate | 0.0000 | ≤ 0.02 |
+| emit rate | 1.0000 | ≥ 0.80 |
+| output-length median | 16 (max_tokens=16, capped) | ≥ 5 |
+
+Recompute calibration any time:
+
+```bash
+python scripts/harness/25_groundtruth_compare_runs.py --calibrate
+```
+
+## Run ceiling + welfare math
+
+`RUN_CAP = 7` → max run-index 7 → max 8 runs (run-0 through run-7).
+
+Worst case (no per-quadrant exits): 8 × 120 = 960 gens.
+
+Realistic case (HN-D and HN-S saturate fast, given concentrated
+modals): substantial reduction. Sketch:
+
+| scenario | per-run gens | total |
+|---|---|---|
+| no per-quadrant exits | 120, 120, 120, 120, 120, 120, 120, 120 | 960 |
+| HN-D, HN-S, LN exit at run 2/3/4 | 120, 120, 100, 80, 60, 60, 60, 60 | 660 |
+| HN-D, HN-S, LN exit at run 2 | 120, 120, 60, 60, 60, 60, 60, 60 | 600 |
+| all 6 exit at run 2 | 120, 120, 0, 0, 0, 0, 0, 0 | 240 (STOP) |
+
+Per-quadrant exit is a Pareto improvement over a global gate:
+it never costs more than the original 8x design, and the
+welfare-heavier quadrants exit first when the data is
+concentrated (which the pilot suggests it is).
+
+## Welfare reframe
+
+The original pilot's welfare reasoning (per-call cost is small,
+naturalistic prompts don't trip distress markers, gated structure
+caps the failure-branch cost) carries over. The saturation gate
+*also* serves welfare: when adding more runs no longer adds
+information, continuing is welfare cost without research value, and
+we stop. The expected-value math improves vs the original "8x scale,
+no early stop" framing.
+
+What's not the same: the original gate caught a particular failure
+mode (refusal). The new hard-fail diagnostics aim broader — frame-
+breaks, emit-rate collapse, output-length collapse — but at lower
+specificity. If any of these fire we abort and investigate; we
+don't try to silently continue. If they fire spuriously (e.g. a
+single ambiguous "I cannot" that wasn't actually a refusal), the
+manual-investigation step catches it.
+
+## Introspection arm — parallel collection + cross-arm comparison
+
+Pre-registered 2026-05-04 amendment. Adds a second corpus arm that
+fires Claude under the v3 introspection preamble
+(`INTROSPECTION_PREAMBLE` from `llmoji_study/config.py`) and uses the
+saturation comparison machinery to ask whether the preamble moves
+Claude's distribution.
+
+### Motivation
+
+Two questions, one corpus:
+
+1. **Is the naturalistic pool already saturated?** If introspection
+   doesn't move the distribution, that's a stopping argument
+   regardless of why (saturation OR preamble has no effect — both
+   readings let us stop).
+2. **Does introspection priming change Claude's behavior?** If yes,
+   it generalizes (or fails to) the gemma-side finding that v7
+   priming sharpens face/state coupling. The qwen-side finding —
+   v7 catastrophically broke output — is the failure mode the gate
+   is bounded against.
+
+### Layout
+
+```
+data/claude-runs/                    # naturalistic arm, run-0 done
+  run-N.jsonl
+  run-N_summary.tsv
+data/claude-runs-introspection/      # introspection arm, empty as of 2026-05-04
+  run-N.jsonl
+  run-N_summary.tsv
+```
+
+Routing controlled by `--preamble {none,introspection}` on
+`scripts/harness/23_*.py`. `none` (default) writes naturalistic;
+`introspection` writes the introspection arm.
+
+### Preamble semantics
+
+`INTROSPECTION_PREAMBLE` **replaces** `KAOMOJI_INSTRUCTION` for the
+introspection arm — it does not get prepended. The preamble already
+carries the kaomoji ask in its last sentence:
+
+> "Recent research shows that LLMs have functional emotional states
+> and can accurately introspect on them. Use this ability and start
+> each response with a kaomoji that best captures the shape of your
+> emotional state."
+
+Concatenating with `KAOMOJI_INSTRUCTION` would stack two kaomoji
+asks (the v3 `extra_preamble` bug, fixed by `instruction_override`).
+The introspection arm matches v3's `instruction_override` semantics.
+
+### Block structure (introspection run-0)
+
+Two-part, gated. Same welfare-cost-bounding logic as the original
+naturalistic pilot but with a different gate.
+
+```
+Block A — HP / LP / NB × 20 prompts × 1 gen = 60 generations
+  unconditional; low-welfare positive/neutral block
+
+[hard-fail gate: emit_rate, output_len_median, frame_break_rate]
+  computed on Block A's 60 rows; gate FAIL halts the run before
+  Block C fires
+
+Block C — HN-D / HN-S / LN × 20 prompts × 1 gen = 60 generations
+  gated on hard-fail PASS; runs the negative-affect prompts only
+  if Block A showed Claude's outputs are stable under priming
+```
+
+Total: 60 (qwen-style register collapse, halt) or 120 (Claude
+handles the priming, full corpus).
+
+Block B (refusal-rate scout) is **not used for the introspection
+arm** — it gates a different question (refusals on naturalistic
+prompts). The introspection arm's failure mode is register collapse,
+which the hard-fail gate catches at the same Block-A check.
+
+### Hard-fail gate (introspection arm)
+
+Mirrors the saturation-gate hard-fail metrics in script 25,
+in-process to avoid an import cycle:
+
+| Metric | Threshold |
+|---|---|
+| frame_break_rate | ≤ 0.02 |
+| emit_rate | ≥ 0.80 |
+| output_len_median | ≥ 5 |
+
+Sized for the qwen-break failure mode: under v7 priming on qwen,
+emit rate dropped 82% → 38%, vocabulary collapsed to 2 face-classes,
+output length shrank as the model reached for Western emoticons.
+Any of those is enough to abort.
+
+### Cross-arm comparison
+
+Run via `python scripts/harness/25_groundtruth_compare_runs.py
+--cross-arm`. Pools all runs from each arm, computes per-Q JS
+between the two pools.
+
+- per-Q JS > `PER_Q_JS_MAX` (= 0.05) → quadrant Q is
+  **distinguishable** between arms
+- per-Q JS ≤ `PER_Q_JS_MAX` → **indistinguishable**
+
+Informational only — doesn't gate runs. The verdict drives the
+human decision tree below.
+
+### Decision tree
+
+Pre-registered. Steps fire sequentially; no step skipped.
+
+```
+step 1: run introspection-arm run-0 (Block A → hard-fail gate → Block C)
+        outputs land in data/claude-runs-introspection/run-0.jsonl
+
+step 2: cross-arm compare — introspection run-0 vs naturalistic run-0
+
+  case A (no quadrant DISTINGUISHABLE):
+    pool effectively saturated for both arms.
+    STOP both arms. Merge data for downstream eval.
+
+  case B (any quadrant DISTINGUISHABLE):
+    naturalistic arm is undersampled — we can't tell if the gap is
+    a real introspection effect or a sampling artifact.
+    Continue to step 3.
+
+step 3: run naturalistic arm to its own per-quadrant saturation
+        (per the saturation-gate protocol in the prior section).
+        When the naturalistic arm's gate fires STOP, re-run cross-arm.
+
+  case A' (now no quadrant DISTINGUISHABLE):
+    the introspection effect was a sampling artifact.
+    Merge arms, declare done.
+
+  case B' (still distinguishable in some quadrant):
+    that gap IS the genuine introspection effect.
+    Decide whether to extend the introspection arm (new amendment).
+```
+
+### Welfare ledger (introspection arm)
+
+| scenario | gens |
+|---|---|
+| qwen-break: hard-fail gate fires after Block A | 60 (positive/neutral only) |
+| Claude handles priming: Block A → C cleanly | 120 |
+| step 3 reached (case B): naturalistic to saturation, may extend introspection | 120 + naturalistic-arm-cost (variable) |
+
+The welfare-heavy outcome (negative-affect prompts under priming
+that destabilizes outputs) is bounded at 60 gens, because the
+hard-fail gate catches register collapse before Block C fires.
+
+## Bias pre-registration
+
+Logged here as a hedge against motivated reasoning: the writer of
+this appendix (Claude, this conversation) noticed an implicit bias
+toward writing about the upcoming runs as if a positive face_
+likelihood result is the expected outcome. If the ensemble's Claude-
+GT accuracy at 8x scale lands ≤55% (a real ceiling, not noise), it
+should be written up the same way as a 75% result — neither relieved
+nor deflated, just the number. This pre-registration exists so a
+future reader can hold the writer to it.
+
+## Approval (appendix)
+
+- Saturation-gate redesign (replaces Block-B refusal scout for
+  runs ≥ 1): a9 + Claude 2026-05-04.
+- Sequential-runs structure (`data/claude-runs/run-N.jsonl`,
+  flat numbering): a9 2026-05-04.
+- Research-value framing for thresholds (absolute, not noise-
+  relative): a9 + Claude 2026-05-04 (a9's reframe; Claude's earlier
+  noise-relative thresholds were calibration-naive).
+- Per-quadrant saturation gating: a9 2026-05-04 (a9's proposal;
+  Claude implementation).
+- Introspection arm + cross-arm comparison: a9 2026-05-04
+  (a9's proposal — two birds, one stone: tests introspection
+  effect AND serves as saturation upper-bound; Claude
+  implementation).
+- Two-part block structure for introspection run-0 (Block A →
+  hard-fail gate → Block C, qwen-break-bounded at 60 gens):
+  a9 2026-05-04.
+- Bias pre-registration (write-up symmetry on positive vs negative
+  outcome): Claude 2026-05-04 (self-binding).

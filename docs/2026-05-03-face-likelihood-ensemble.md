@@ -393,12 +393,15 @@ Open questions before building:
   `probe_calibrated=False` flag handling, `torch.ldexp` MPS patch
   for gpt_oss_20b, `PILOT_FACES=200`, pilot floor lowered to ≥1
   for full v3-emitted coverage)
-- `scripts/local/51_face_likelihood_compare.py` — fixed 2-encoder
-  gemma-vs-qwen disagreement audit
-- `scripts/local/52_face_likelihood_vote.py` — N-way voting with
-  per-model `:pilot`/`:full` mode override
+- ~~`scripts/local/51_face_likelihood_compare.py`~~ — deleted
+  2026-05-04 late evening; subsumed by 53's exhaustive subset search
+- ~~`scripts/local/52_face_likelihood_vote.py`~~ — deleted 2026-05-04
+  late evening; subsumed by 53 (which evaluates singletons + every
+  subset including the original three-way) under the soft-everywhere
+  methodology shift
 - `scripts/local/53_face_likelihood_subset_search.py` — exhaustive
-  2^N − 1 subset search + Cohen's κ
+  2^N − 1 subset search by mean JSD + similarity (refactored
+  2026-05-04 from hard-accuracy + κ to distribution-vs-distribution)
 - `scripts/local/54_cross_emit_sanity.py` — per-(encoder × emit-origin)
   accuracy and κ
 - `scripts/local/55_topk_pooling.py` — top-k per-prompt aggregation
