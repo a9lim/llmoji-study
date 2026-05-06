@@ -236,17 +236,31 @@ EMOTIONAL_EXPERIMENT = "gemma"
 # aggregated corpus instead of running it locally.
 #
 # Single source of truth for the harness side:
-#   ``a9lim/llmoji`` on HuggingFace, 1.1 layout
+#   ``a9lim/llmoji`` on HuggingFace, current layout
 #   ``contributors/<32-hex>/bundle-<UTC>/{manifest.json,
 #       <sanitized-source-model>.jsonl, ...}``,
-# with backwards-compat for 1.0 bundles whose synthesizer output is in
-# a single ``descriptions.jsonl`` per bundle.
+# with backwards-compat for older bundles in ``descriptions.jsonl``
+# (1.0) and ``synthesis_description: str`` (1.1) shapes.
 #
-# `scripts/60_corpus_pull.py` snapshot-downloads to
+# llmoji 2.0 changed the per-row shape from a free-form
+# ``synthesis_description: str`` to a structured
+# ``synthesis: {primary_affect, stance_modality_function}`` adjective
+# bag drawn from the locked LEXICON (a 46-word vocabulary spanning
+# Russell's circumplex anchors plus orthogonal extension axes:
+# functional / stance / modality / confidence). The v2 manifest
+# carries ``lexicon_version`` so consumers can refuse to mix lexicon
+# rotations in one PCA. ``scripts/harness/60_corpus_pull.py``
+# detects the version, flattens v2 ``synthesis`` to a comma-separated
+# adjective string for the legacy ``description`` field that the
+# embedding code already reads, and ALSO preserves the structured
+# ``synthesis`` object verbatim so future code can switch to bag-of-
+# words PCA on the lexicon directly.
+#
+# `scripts/harness/60_corpus_pull.py` snapshot-downloads to
 # ``CLAUDE_DATASET_DIR``, walks every bundle's ``*.jsonl``, then
-# flattens by canonical kaomoji form (pooling across contributors and
-# source models) into ``CLAUDE_DESCRIPTIONS_PATH`` for the rest of
-# the pipeline. Per-source-model metadata is preserved in each
+# flattens by canonical kaomoji form (pooling across contributors
+# and source models) into ``CLAUDE_DESCRIPTIONS_PATH`` for the rest
+# of the pipeline. Per-source-model metadata is preserved in each
 # per-description record so downstream can group / filter by it.
 CLAUDE_HF_REPO = "a9lim/llmoji"
 CLAUDE_DATASET_DIR = DATA_DIR / "harness" / "hf_dataset"

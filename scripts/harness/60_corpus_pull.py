@@ -2,38 +2,48 @@
 ``a9lim/llmoji`` HuggingFace dataset and flatten it into a single
 per-canonical-kaomoji JSONL.
 
-The dataset is in 1.1 layout, with backwards-compat for 1.0 bundles
-that haven't been re-analyzed yet:
+The dataset has shipped in three layouts; this script reads all
+three:
 
     contributors/<32-hex>/bundle-<UTC>/
-        manifest.json                       # 1.0 + 1.1
-        <sanitized-source-model>.jsonl ...  # 1.1, one per source model
-        descriptions.jsonl                  # 1.0, single pooled file
+        manifest.json                       # 1.0 + 1.1 + 2.0
+        <sanitized-source-model>.jsonl ...  # 1.1 + 2.0, one per source model
+        descriptions.jsonl                  # 1.0 only, single pooled file
 
-In 1.1, each `<source-model>.jsonl` carries one row per canonical
-kaomoji as that specific source model wrote it:
+Per-row schemas across versions:
 
-    {"kaomoji": "(◕‿◕)", "count": 47,
-     "synthesis_description": "..."}
+  - 1.0 (``descriptions.jsonl`` only):
+        {"kaomoji": "(◕‿◕)", "count": 47,
+         "haiku_synthesis_description": "..."}
+  - 1.1 (``<source-model>.jsonl``, one per source model):
+        {"kaomoji": "(◕‿◕)", "count": 47,
+         "synthesis_description": "..."}  # free-form prose
+  - 2.0 (``<source-model>.jsonl``, manifest carries
+        ``lexicon_version``):
+        {"kaomoji": "(◕‿◕)", "count": 47,
+         "synthesis": {
+           "primary_affect": ["cheerful"],
+           "stance_modality_function": ["warm", "sincere"]
+         }}  # structured adjective bag from the locked LEXICON
 
-The filename stem is the sanitized source-model id
-(``llmoji._util.sanitize_model_id_for_path``: lowercase, ``/`` →
-``__``, ``:`` → ``-``). Per-machine pooling already happened on the
-contributor side; cross-source-model and cross-contributor pooling
-happens here.
+For v2 rows we flatten the structured ``synthesis`` object to a
+comma-separated adjective string and write it under ``description``,
+so existing embedders in ``claude_faces.py`` keep working without
+changes; the structured ``synthesis`` object is also preserved
+verbatim in the per-description record so future research-side
+consumers can read it as a bag-of-words vector instead.
 
-The 1.0 ``descriptions.jsonl`` rows used the field name
-``haiku_synthesis_description`` and weren't split by source model;
-we read those as-is and tag them with ``source_model = "_pre_1_1"``
-so downstream can opt into / out of legacy bundles.
+The 1.0 ``descriptions.jsonl`` rows weren't split by source model;
+we tag them with ``source_model = "_pre_1_1"`` so downstream can
+opt into / out of legacy bundles.
 
-We snapshot-download the dataset, walk every bundle, canonicalize each
-kaomoji form via ``llmoji.taxonomy.canonicalize_kaomoji`` (so
-near-duplicate forms across contributors merge correctly), and write a
-flat ``data/harness/claude_descriptions.jsonl`` with one row per canonical form
-plus all its per-bundle / per-source-model descriptions. Downstream
-scripts (07/15/16/18) read this file and don't need to know the
-dataset layout.
+We snapshot-download the dataset, walk every bundle, canonicalize
+each kaomoji form via ``llmoji.taxonomy.canonicalize_kaomoji`` (so
+near-duplicate forms across contributors merge correctly), and write
+a flat ``data/harness/claude_descriptions.jsonl`` with one row per
+canonical form plus all its per-bundle / per-source-model
+descriptions. Downstream scripts (07/15/16/18) read this file and
+don't need to know the dataset layout.
 
 Output schema, one JSON object per line:
 
@@ -47,18 +57,31 @@ Output schema, one JSON object per line:
       "source_models": ["claude-sonnet-...","gpt-5.4-..."],
       "synthesis_backends": ["anthropic"],    # union across descs
       "descriptions": [
-        {"description": "...",
+        {"description": "...",                  # str, flattened from
+                                                # synthesis (v2) or copied
+                                                # verbatim (v1.x)
          "count": 47,
          "contributor": "abc...",
          "source_model": "claude-sonnet-4-5-20250929",
          "synthesis_model_id": "claude-haiku-4-5-20251001",
          "synthesis_backend": "anthropic",
          "providers": ["claude_code-hook"],
-         "llmoji_version": "1.1.0",
-         "bundle": "bundle-..."},
+         "llmoji_version": "2.0.0",
+         "bundle": "bundle-...",
+         "synthesis": {                         # v2 only — the
+           "primary_affect": [...],             #   structured bag
+           "stance_modality_function": [...]    #   preserved verbatim
+         },
+         "lexicon_version": 1                   # v2 only
+        },
         ...
       ]
     }
+
+TODO: when v3 lands and rotates the LEXICON, this script will need
+to either re-bin v2 cells against the v3 lexicon or refuse to mix
+lexicon versions in one PCA. Filter on
+``description["lexicon_version"]`` at the consumer side.
 
 Usage:
     python scripts/60_corpus_pull.py [--repo a9lim/llmoji] [--revision main]
@@ -223,6 +246,12 @@ def main(argv: list[str] | None = None) -> int:
             "anthropic" if manifest.get("haiku_model_id") else ""
         )
         llmoji_version = manifest.get("llmoji_version", "")
+        # v2 bundles stamp ``lexicon_version`` in the manifest;
+        # v1.x bundles don't. Presence of the key signals the
+        # row is a structured ``synthesis: {primary_affect,
+        # stance_modality_function}`` object rather than the
+        # legacy free-form ``synthesis_description: str``.
+        lexicon_version = manifest.get("lexicon_version")
 
         for jsonl_path in jsonl_paths:
             source_model = _resolve_source_model(jsonl_path)
@@ -236,14 +265,31 @@ def main(argv: list[str] | None = None) -> int:
                     continue
                 canon = canonicalize_kaomoji(kao)
                 count = int(r.get("count", 0))
-                # 1.1 renamed haiku_synthesis_description →
-                # synthesis_description. Accept either; prefer the new
-                # name when both are present.
-                description = (
-                    r.get("synthesis_description")
-                    or r.get("haiku_synthesis_description")
-                    or ""
-                ).strip()
+                # Schema accumulator: v2 carries a structured
+                # ``synthesis`` object; v1.0 used
+                # ``haiku_synthesis_description`` (str); v1.1 used
+                # ``synthesis_description`` (str). We flatten v2
+                # to a comma-separated adjective string for the
+                # ``description`` field (so existing embedders in
+                # claude_faces.py keep working without changes)
+                # AND preserve the structured object verbatim under
+                # ``synthesis`` for future research-side consumers.
+                synthesis_obj = r.get("synthesis")
+                if isinstance(synthesis_obj, dict):
+                    primary = synthesis_obj.get("primary_affect") or []
+                    extension = synthesis_obj.get(
+                        "stance_modality_function"
+                    ) or []
+                    description = ", ".join(
+                        list(primary) + list(extension)
+                    ).strip()
+                else:
+                    synthesis_obj = None
+                    description = (
+                        r.get("synthesis_description")
+                        or r.get("haiku_synthesis_description")
+                        or ""
+                    ).strip()
                 if not description:
                     continue
                 agg = by_canon[canon]
@@ -254,7 +300,7 @@ def main(argv: list[str] | None = None) -> int:
                 agg["source_models"].add(source_model)
                 if synthesis_backend:
                     agg["synthesis_backends"].add(synthesis_backend)
-                agg["descriptions"].append({
+                desc_row = {
                     "description": description,
                     "count": count,
                     "contributor": contrib,
@@ -263,11 +309,22 @@ def main(argv: list[str] | None = None) -> int:
                     "synthesis_model_id": synthesis_model_id,
                     "synthesis_backend": synthesis_backend,
                     "providers": bundle_providers,
-                    # In 1.1 llmoji_version isn't on the row anymore;
-                    # we promote the manifest-level value so the per-
-                    # description record stays self-describing.
-                    "llmoji_version": r.get("llmoji_version") or llmoji_version,
-                })
+                    # In 1.1+ llmoji_version isn't on the row
+                    # anymore; we promote the manifest-level value
+                    # so the per-description record stays
+                    # self-describing.
+                    "llmoji_version": (
+                        r.get("llmoji_version") or llmoji_version
+                    ),
+                }
+                # v2 only — preserve the structured bag and the
+                # lexicon version so downstream PCA can choose
+                # whether to embed the flattened string or the
+                # bag-of-words vector.
+                if synthesis_obj is not None:
+                    desc_row["synthesis"] = synthesis_obj
+                    desc_row["lexicon_version"] = lexicon_version
+                agg["descriptions"].append(desc_row)
                 n_rows += 1
 
     print(
