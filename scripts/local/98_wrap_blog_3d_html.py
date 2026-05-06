@@ -31,8 +31,10 @@ BLOG_ASSETS_DIR = (
 )
 RAW_PROCRUSTES = STUDY_ROOT / "figures" / "local" / "fig_v3_quadrant_procrustes_3d.html"
 RAW_PER_FACE = STUDY_ROOT / "figures" / "local" / "fig_v3_per_face_pca_3d.html"
+RAW_WILD_FACES = STUDY_ROOT / "figures" / "harness" / "wild_faces_pca_3d.html"
 OUT_PROCRUSTES = BLOG_ASSETS_DIR / "fig_v3_quadrant_procrustes_3d.html"
 OUT_PER_FACE = BLOG_ASSETS_DIR / "fig_v3_per_face_pca_3d.html"
+OUT_WILD_FACES = BLOG_ASSETS_DIR / "fig_wild_faces_pca_3d.html"
 
 
 # Active models, in order. The procrustes file currently emits 5 per-model
@@ -317,6 +319,168 @@ def wrap_procrustes(raw_path: Path, out_path: Path, overlay_scene: str = "scene6
     print(f"  wrote {out_path}")
 
 
+# Quadrant colors for the wild-faces legend bar. Pulled from
+# llmoji_study.emotional_analysis.QUADRANT_COLORS so the static legend
+# matches the per-face proportional-blend colors plotly draws.
+WILD_QUADRANTS = ("HP", "LP", "HN-D", "HN-S", "LN", "NB")
+WILD_QUADRANT_COLORS = {
+    "HP":   "#998700",
+    "LP":   "#009F68",
+    "HN-D": "#DA534F",
+    "HN-S": "#9769DC",
+    "LN":   "#0091C9",
+    "NB":   "#808696",
+}
+# Surface marker shapes match the plotly markers script 67 emits:
+# circle = Claude Code journal only, diamond = any claude.ai export,
+# square = neither (HF corpus only, from another contributor).
+WILD_SURFACE_LEGEND = (
+    ("circle",  "claude code"),
+    ("diamond", "claude.ai"),
+    ("square",  "other"),
+)
+
+
+def _wild_legend_html() -> str:
+    """Static legend bar: 6 quadrant color swatches plus 3 surface-shape
+    markers. Per-face plotly markers carry an RGB blend of these
+    quadrant colors weighted by the BoL share, so the legend exposes
+    the pure-quadrant reference even though no individual point lands
+    exactly on it."""
+    items = []
+    for q in WILD_QUADRANTS:
+        color = WILD_QUADRANT_COLORS[q]
+        items.append(
+            f'    <span class="legend-item">'
+            f'<span class="legend-mark mark-circle" style="background: {color};"></span>'
+            f'{q.lower()}</span>'
+        )
+    for shape, label in WILD_SURFACE_LEGEND:
+        items.append(
+            f'    <span class="legend-item">'
+            f'<span class="legend-mark mark-{shape}"></span>'
+            f'{label}</span>'
+        )
+    return "\n".join(items)
+
+
+def wrap_wild_faces(raw_path: Path, out_path: Path) -> None:
+    """Wrap the wild-faces PCA HTML keeping only the BoL-quadrant-by-
+    surface scene (left, "scene"), dropping the KMeans cluster scene
+    (right, "scene2"). Filters out the dummy legend-entry traces script
+    67 emits with all-null coordinates for plotly's built-in legend
+    since the wrapper renders a static HTML legend bar instead."""
+    raw = raw_path.read_text(encoding="utf-8")
+    plotly_block = _extract_plotly_block(raw)
+    legend_html = _wild_legend_html()
+
+    out = f"""<html>
+{_SHARED_HEAD}<style>
+{_BASE_CSS}
+</style></head>
+<body>
+<div id="caption-bar">
+  <div class="legend-static">
+{legend_html}
+  </div>
+  <span class="subtitle">color blends per-face BoL shares · shape = deployment surface</span>
+</div>
+{plotly_block}
+<script>
+(function() {{
+  var div = null;
+  var origData = null;
+  var origLayout = null;
+
+{_THEME_JS_HELPERS}
+
+  function buildLayout(c) {{
+    var origScene = origLayout.scene || {{}};
+    var scene = JSON.parse(JSON.stringify(origScene));
+    scene.bgcolor = 'rgba(0,0,0,0)';
+    scene.domain = {{ x: [0, 1], y: [0, 1] }};
+    scene.aspectmode = 'cube';
+    scene.camera = {{ eye: {{ x: 1.5, y: 1.5, z: 1.35 }} }};
+    ['xaxis', 'yaxis', 'zaxis'].forEach(function(ax) {{
+      if (!scene[ax]) scene[ax] = {{}};
+      scene[ax].gridcolor = c.grid;
+      scene[ax].linecolor = c.lineMuted;
+      scene[ax].zerolinecolor = c.lineMuted;
+      scene[ax].color = c.text;
+      scene[ax].showbackground = false;
+      if (!scene[ax].tickfont) scene[ax].tickfont = {{}};
+      scene[ax].tickfont.color = c.muted;
+      if (typeof scene[ax].title === 'string') scene[ax].title = {{ text: scene[ax].title }};
+      if (!scene[ax].title) scene[ax].title = {{}};
+      if (!scene[ax].title.font) scene[ax].title.font = {{}};
+      scene[ax].title.font.color = c.text;
+    }});
+    return {{
+      scene: scene,
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      plot_bgcolor: 'rgba(0,0,0,0)',
+      margin: {{ l: 0, r: 0, t: 0, b: 0 }},
+      showlegend: false,
+      autosize: true,
+      font: {{ color: c.text, family: 'Recursive, ui-monospace, monospace' }},
+    }};
+  }}
+
+  function render() {{
+    if (!div || !origData || !window.Plotly) return;
+    var c = readThemeColors();
+    // Keep only scene1 traces with real data. Excludes scene2 (KMeans
+    // cluster scene we're dropping) and the dummy legend-entry traces
+    // script 67 emits with all-null coords for plotly's built-in
+    // legend, which we render as a static HTML bar instead. Filter on
+    // legendgroup since recent plotly serializes large arrays as
+    // {{bdata,dtype,shape}} objects rather than plain JS arrays — so
+    // a t.x.length check rejects every real data trace too.
+    var traces = origData
+      .filter(function (t) {{ return (t.scene || 'scene') === 'scene'; }})
+      .filter(function (t) {{
+        return t.legendgroup && t.legendgroup.indexOf('left-data-') === 0;
+      }})
+      .map(function (t) {{
+        var clone = JSON.parse(JSON.stringify(t));
+        clone.scene = 'scene';
+        if (clone.marker && clone.marker.line) {{
+          clone.marker.line.color = c.elevated;
+        }}
+        return clone;
+      }});
+    Plotly.react(div, traces, buildLayout(c), {{ responsive: true, displayModeBar: false }});
+    setTimeout(function() {{ Plotly.Plots.resize(div); }}, 50);
+  }}
+
+  function init() {{
+    div = document.querySelector('.plotly-graph-div');
+    if (!div || !div.data || !window.Plotly) {{
+      return setTimeout(init, 50);
+    }}
+    origData = JSON.parse(JSON.stringify(div.data));
+    origLayout = JSON.parse(JSON.stringify(div.layout));
+    render();
+    try {{
+      if (window.parent && window.parent !== window) {{
+        var obs = new MutationObserver(render);
+        obs.observe(window.parent.document.documentElement, {{ attributes: true, attributeFilter: ['data-theme'] }});
+      }}
+    }} catch (e) {{}}
+    window.addEventListener('resize', function() {{ if (window.Plotly && div) Plotly.Plots.resize(div); }});
+  }}
+
+  document.documentElement.dataset.theme = readTheme();
+  window.addEventListener('load', function() {{ setTimeout(init, 100); }});
+}})();
+</script>
+</body>
+</html>
+"""
+    out_path.write_text(out, encoding="utf-8")
+    print(f"  wrote {out_path}")
+
+
 def wrap_per_face(raw_path: Path, out_path: Path, subtitles: list[str]) -> None:
     """Wrap the per-face PCA HTML with a model-toggle bar.
 
@@ -472,6 +636,12 @@ def main() -> None:
         else:
             subtitles = [f"{m} per-face centroids" for m in MODELS]
         wrap_per_face(RAW_PER_FACE, OUT_PER_FACE, subtitles)
+
+    print("\n=== wild faces PCA (BoL quadrant by deployment surface) ===")
+    if not RAW_WILD_FACES.exists():
+        print(f"  missing {RAW_WILD_FACES} — generate via scripts/67_wild_residual.py", file=sys.stderr)
+    else:
+        wrap_wild_faces(RAW_WILD_FACES, OUT_WILD_FACES)
 
 
 if __name__ == "__main__":

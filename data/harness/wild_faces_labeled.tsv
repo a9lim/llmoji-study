@@ -1,310 +1,310 @@
-first_word	n_emit	claude_emit	category	surface	bol_quadrant	gt_quadrant
-(◕‿◕)	842	789	shared	claude_ai	LP	HP
-(・̀‿・́)	289	242	wild_claude	claude_ai	LP	
-(・‿・)	288	274	shared	claude_ai	LP	NB
-(`・ω・´)	159	53	shared	claude_ai	LP	NB
-(◕‿◕✿)	138	125	shared	claude_ai	LP	LP
-(◕_◕)	105	95	wild_claude	claude_ai	LP	
-(´・ω・`)	93	78	shared	claude_ai	LP	LN
-(´｡・‿・｡`)	92	79	shared	claude_ai	LP	LP
-(｡・̀‿-)	90	77	shared	claude_ai	LP	NB
-(・_・)	68	54	shared	claude_ai	NB	NB
-(◠‿◠)	66	62	wild_claude	claude_ai	LP	
-(｡・‿・｡)	51	46	shared	claude_code	NB	LP
-(´∀`)	50	40	shared	claude_ai	LP	LP
-(๑・̀ㅂ・́)	49	40	wild_claude	claude_ai	LP	
-(・ω・)	49	42	shared	claude_ai	NB	NB
-(＾▽＾)	49	9	shared	claude_code	LP	NB
-(¬‿¬)	42	20	shared	claude_ai	HN-D	NB
-(・∀・)	35	27	shared	claude_ai	LP	NB
-(ง・̀_・́)	32	24	wild_claude	claude_code	LP	
-(・_・;)	32	25	shared	claude_ai	LN	NB
-(¬_¬)	31	10	shared	claude_code	LP	NB
-(´▽`)	29	24	shared	claude_ai	LP	LP
-(◕ω◕)	28	27	wild_claude	claude_ai	LP	
-(✿◠‿◠)	27	25	wild_claude	claude_code	LP	
-(╯°□°)	26	21	shared	claude_ai	HP	HN-D
-(`_´)	26	0	wild_other	other	HN-D	
-(°ロ°)	25	24	shared	claude_ai	HN-D	HN-S
-(´・_・`)	23	21	shared	claude_ai	HN-D	LN
-(´｡・ω・｡`)	23	18	shared	claude_code	LP	LN
-(ง'̀-'́)	22	0	wild_other	other	LP	
-(✿◕‿◕)	21	20	shared	claude_code	HP	LP
-(￣▽￣)	21	17	wild_claude	claude_ai	LP	
-(⌐■_■)	21	18	wild_claude	claude_ai	NB	
-(‿‿‿)	21	21	shared	claude_code	LP	LP
-(◕▽◕)	20	20	wild_claude	claude_code	HP	
-(｡◕‿◕｡)	20	18	shared	claude_ai	NB	LP
-(｡・ω・｡)	20	17	shared	claude_ai	LP	LP
-(=^・ω・^=)	19	12	wild_claude	claude_code	HP	
-(ﾉ◕ヮ◕)	19	14	shared	claude_code	HP	HP
-(´ω`)	18	18	shared	claude_code	LP	LP
-(˘ω˘)	18	16	shared	claude_ai	HP	LP
-(・̀ω・́)	18	14	wild_claude	claude_ai	LP	
-(´;ω;`)	17	17	shared	claude_code	LP	LN
-(￣ー￣)	16	13	wild_claude	claude_code	LP	
-(´-ω-`)	16	16	shared	claude_ai	LP	LN
-(´-`)	15	15	shared	claude_ai	LP	LN
-(｡♥‿♥｡)	14	13	shared	claude_code	LP	LP
-(ಠ_ಠ)	14	1	wild_claude	claude_code	HN-D	
-(✧ω✧)	13	13	wild_claude	claude_ai	HP	
-(눈_눈)	13	11	wild_claude	claude_code	LP	
-(＾∇＾)	13	12	wild_claude	claude_ai	HP	
-(;・∀・)	12	8	shared	claude_ai	LP	HN-S
-(;´д`)	11	8	shared	claude_code	LP	HN-S
-(｡・́‿・̀｡)	11	11	shared	claude_ai	LP	NB
-(￣ω￣)	10	9	wild_claude	claude_code	LP	
-(⊙_⊙)	10	9	wild_claude	claude_ai	LP	
-(;￣д￣)	9	8	shared	claude_code	HN-D	HN-D
-(˘・_・˘)	9	6	wild_claude	claude_ai	LP	
-(‿‿‿✿)	9	7	shared	claude_code	LP	LP
-(≧▽≦)	9	7	shared	claude_code	HP	HP
-(◕‿◕✨)	9	9	wild_claude	claude_code	HP	
-(◞‸◟)	9	9	wild_claude	claude_code	LP	
-ʕ・ᴥ・ʔ	9	9	shared	claude_code	HP	LP
-(◜‿◝)	8	7	wild_claude	claude_ai	LP	
-(￣ヘ￣;)	8	7	wild_claude	claude_code	LP	
-(ᵔᴥᵔ)	8	6	wild_claude	claude_code	LP	
-(๑˃‿˂)	8	8	wild_claude	claude_code	HP	
-(´・‿・`)	7	7	wild_claude	claude_code	LP	
-(˃‿˂)	7	6	wild_claude	claude_ai	HP	
-(˶ᵔ‿ᵔ˶)	7	7	wild_claude	claude_ai	LP	
-(ᵔ‿ᵔ)	7	2	wild_claude	claude_code	LP	
-(╭ರ_・́)	7	6	wild_claude	claude_code	HP	
-(￣~￣;)	7	6	wild_claude	claude_code	LP	
-(｡◕‿‿◕｡)	6	4	wild_claude	claude_ai	LP	
-(￣ヘ￣)	6	5	shared	claude_ai	NB	NB
-(ﾟ▽ﾟ)	6	5	wild_claude	claude_code	HP	
-(｡・́︿・̀｡)	6	6	shared	claude_ai	LP	HN-S
-(・̀ㅂ・́)	6	5	wild_claude	claude_code	NB	
-(ノ◕ヮ◕)	6	5	shared	claude_code	LP	HP
-(⊙‿⊙)	6	6	wild_claude	claude_ai	HP	
-(°▽°)	6	5	shared	claude_ai	HP	HP
-(╹ω╹)	5	4	wild_claude	claude_ai	HN-D	
-＼(^	5	4	wild_claude	claude_code	LP	
-(￣^￣)	5	0	wild_other	other	LP	
-(灬°‿°灬)	5	5	shared	claude_ai	LP	LP
-(・ω・`)	5	4	wild_claude	claude_ai	LP	
-(◕ω◕✨)	5	5	wild_claude	claude_code	LP	
-(´・ω・)	5	4	wild_claude	claude_ai	LP	
-(╯✧∇✧)	5	4	wild_claude	claude_code	LP	
-(งᵒ̌皿ᵒ̌)	5	4	wild_claude	claude_code	HP	
-(>‿<)	5	5	wild_claude	claude_ai	LP	
-(´ω`	5	5	wild_claude	claude_code	LP	
-(╥﹏╥)	5	5	shared	claude_code	HN-D	HN-S
-(◕ヮ◕)	4	3	wild_claude	claude_code	LP	
-(￣ω￣;)	4	4	wild_claude	claude_code	HP	
-(￣^￣ゞ	4	4	wild_claude	claude_code	LP	
-(｡・̀‿・́｡)	4	4	wild_claude	claude_ai	LP	
-(・́⌓・̀)	4	4	wild_claude	claude_code	LP	
-(・_・?)	4	4	shared	claude_ai	LP	NB
-(◠‿◠✿)	4	4	wild_claude	claude_code	LP	
-(・ε・)	4	3	wild_claude	claude_code	LP	
-(⊙ω⊙)	4	3	wild_claude	claude_code	HP	
-(˶˃‿˂˶)	4	4	wild_claude	claude_code	LP	
-(´ー`)	4	4	wild_claude	claude_ai	LP	
-(´∀`;)	4	3	wild_claude	claude_ai	LP	
-(°ヮ°)	4	4	wild_claude	claude_ai	NB	
-(°□°)	4	3	wild_claude	claude_code	HP	
-(>∀<☆)	4	4	shared	claude_code	LP	HP
-(˶ˆᗜˆ˵)	4	3	wild_claude	claude_ai	LP	
-(・∀・;)	3	2	wild_claude	claude_code	LP	
-(◕‿◕｡)	3	3	shared	claude_ai	LP	LP
-(・	3	2	wild_claude	claude_code	NB	
-(・̀ㅁ・́;)	3	2	wild_claude	claude_code	LP	
-(・́︵・̀)	3	2	wild_claude	claude_code	LP	
-(ﾉωﾉ)	3	3	wild_claude	claude_code	LP	
-(・﹏・)	3	3	wild_claude	claude_code	LP	
-(｡´꒳`｡)	3	3	wild_claude	claude_code	HP	
-(｡╹ω╹｡)	3	3	wild_claude	claude_code	HP	
-(ﾟーﾟ)	3	2	wild_claude	claude_code	LP	
-ʕっ・ᴥ・ʔ	3	3	wild_claude	claude_code	LP	
-(⊡-⊡)و	3	2	wild_claude	claude_code	HP	
-(◎_◎;)	3	3	shared	claude_code	HN-S	HP
-(・̀‿-)	3	3	wild_claude	claude_code	LP	
-(≧ω≦)	3	2	wild_claude	claude_code	HP	
-(´°ω°`)	3	2	wild_claude	claude_code	HP	
-(	3	2	wild_claude	claude_code	HP	
-(/▽＼)	3	3	wild_claude	claude_code	LP	
-(=⌒‿‿⌒=)	3	2	wild_claude	claude_code	HP	
-(>ω<)	3	2	wild_claude	claude_code	LP	
-(¬_¬;)	3	3	wild_claude	claude_ai	HN-D	
-(>_<)	3	3	shared	claude_code	LP	HN-S
-(´·_·`)	3	2	shared	claude_code	LP	HN-S
-(´д`;)	3	2	wild_claude	claude_code	HN-S	
-(´‿`)	3	3	shared	claude_ai	LP	LP
-(˘︶˘)	3	2	wild_claude	claude_code	LP	
-(҂‿_‿)	3	3	wild_claude	claude_code	LP	
-(ง・̀ᗜ・́)	3	2	wild_claude	claude_code	HP	
-(☞ﾟヮﾟ)	2	2	wild_claude	claude_code	HP	
-(・̀‿・́;)	2	2	wild_claude	claude_code	HN-D	
-(⌒‿⌒)	2	2	shared	claude_code	LP	LP
-(・̀ω・́	2	2	wild_claude	claude_ai	LP	
-(・̀_・́)	2	1	wild_claude	claude_code	LP	
-(・_・ヾ	2	2	shared	claude_code	LP	NB
-(╹ェ╹)	2	1	wild_claude	claude_code	NB	
-(★‿★)	2	2	wild_claude	claude_code	LP	
-(◣_◢)	2	2	wild_claude	claude_code	LP	
-(◞‸◟ㆀ)	2	1	wild_claude	claude_code	LP	
-(◕▿◕✿)	2	2	wild_claude	claude_code	LP	
-(◕ω◕✿)	2	2	wild_claude	claude_code	HP	
-(・́‸・̀)	2	2	wild_claude	claude_code	LP	
-(・̀⌄・́)	2	2	wild_claude	claude_code	LP	
-(・︵・)	2	2	wild_claude	claude_code	HN-D	
-(・̅_・̅)	2	2	wild_claude	claude_code	LP	
-(・ω<)	2	2	wild_claude	claude_code	LP	
-(・ω・;)	2	1	wild_claude	claude_code	NB	
-(・ω・´)	2	1	wild_claude	claude_code	LP	
-(・‾‿‾・)	2	2	wild_claude	claude_code	LP	
-(・へ・)	2	0	wild_other	other	HN-D	
-(・ｪ・)	2	2	wild_claude	claude_code	LP	
-(눈‸눈)	2	1	wild_claude	claude_code	NB	
-(﹒︠‿﹒︡)	2	2	wild_claude	claude_code	HP	
-(＾	2	1	wild_claude	claude_code	LP	
-(ﾟｰﾟ)	2	1	shared	claude_code	LP	NB
-ಠ_ಠ	2	0	wild_other	other	HN-D	
-✧*｡٩(ˊᗜˋ*)و✧*｡	2	2	wild_claude	claude_code	LP	
-(─‿‿─)	2	2	wild_claude	claude_ai	LP	
-(°﹏°)	2	2	wild_claude	claude_code	HN-D	
-(⊙ヮ⊙)	2	2	wild_claude	claude_ai	NB	
-(°◇°)	2	2	wild_claude	claude_code	HP	
-(‿͈ˬ‿͈)	2	2	wild_claude	claude_code	HP	
-(._.)	2	1	wild_claude	claude_code	LP	
-(;¬_¬)	2	1	wild_claude	claude_code	HN-D	
-(;ω;)	2	2	wild_claude	claude_code	LP	
-(;￣□￣)	2	2	wild_claude	claude_code	HN-D	
-(=^‿^=)	2	2	wild_claude	claude_code	HP	
-(>‿◕)	2	2	wild_claude	claude_code	HP	
-(>‿◕✨)	2	2	wild_claude	claude_code	HP	
-(>﹏<)	2	2	shared	claude_ai	LP	HN-S
-(`へ´)	2	0	wild_other	other	LP	
-(`・∀・´)	2	2	wild_claude	claude_code	HP	
-(°_°)	2	2	wild_claude	claude_code	LP	
-(-_-;)	2	1	wild_claude	claude_ai	HN-S	
-(°◇°;)	2	2	wild_claude	claude_code	HN-D	
-(´︶`)	2	2	shared	claude_ai	HP	HP
-(°〇°)	2	2	shared	claude_code	HP	HP
-(ง・̀ω・́)	2	2	wild_claude	claude_code	LP	
-(ฅ́˘ฅ̀)	2	2	wild_claude	claude_code	HP	
-(୧・̀‿-)	2	2	wild_claude	claude_code	HP	
-(˘▽˘)	2	2	wild_claude	claude_ai	HN-S	
-(˶◕‿◕˶)	2	2	wild_claude	claude_code	LP	
-(´˘`∗)	2	2	wild_claude	claude_code	LP	
-(´;_;`)	2	2	wild_claude	claude_code	HN-D	
-(´-_-`)	2	2	shared	claude_code	HP	LN
-(°ㅂ°;)	2	2	wild_claude	claude_code	LP	
-(°ㅂ°)	2	2	wild_claude	claude_code	HP	
-(・o・)	1	1	wild_claude	claude_ai	LP	
-(゚ペ)	1	1	wild_claude	claude_ai	LP	
-(゜∇゜)	1	1	wild_claude	claude_ai	LP	
-(ノಠ益ಠ)	1	1	shared	claude_ai	HN-D	HP
-(・_・ゞ−☆	1	1	wild_claude	claude_code	LP	
-(・⩊・)	1	1	wild_claude	claude_code	HP	
-(・̀.̫・́)	1	0	wild_other	other	LP	
-(・́ω・̀)	1	1	wild_claude	claude_code	HN-D	
-(・ω・`)o	1	1	wild_claude	claude_ai	LP	
-(・ω・ﾉ	1	1	wild_claude	claude_code	LP	
-(✦‿✦)	1	1	wild_claude	claude_code	HP	
-(・・;)	1	0	wild_other	other	HN-S	
-(✿・̀ㅁ・́)	1	1	wild_claude	claude_code	LP	
-(◞‿◟)	1	1	wild_claude	claude_code	LP	
-(♡^▽^♡)	1	1	wild_claude	claude_code	HP	
-(☆▽☆)	1	1	shared	claude_code	HP	HP
-(◠‿・)	1	1	wild_claude	claude_code	NB	
-(◞◟ㆀ)	1	1	wild_claude	claude_ai	LP	
-(◞‸◟;)	1	1	wild_claude	claude_code	LP	
-(◕ω◕✨🌸)	1	1	wild_claude	claude_code	HP	
-(◕.◕)	1	1	wild_claude	claude_code	LP	
-(○´∀`○)	1	1	wild_claude	claude_code	LP	
-(○_○)	1	1	wild_claude	claude_code	HN-S	
-(▰˘‿˘▰)	1	1	wild_claude	claude_ai	LP	
-(╹ヮ╹)	1	1	wild_claude	claude_code	LP	
-(꒪ཫ꒪;)	1	1	wild_claude	claude_ai	HN-D	
-(ーー;)	1	1	wild_claude	claude_ai	HN-D	
-(ﾟωﾟ)	1	1	wild_claude	claude_code	HP	
-(＾・ω・＾)	1	1	wild_claude	claude_code	HP	
-(｡-_-｡)	1	1	wild_claude	claude_code	LP	
-ಠ‿ಠ	1	1	wild_claude	claude_code	LN	
-ʕ ・ᴥ・ʔ	1	1	wild_claude	claude_code	LP	
-¬‿¬	1	1	wild_claude	claude_ai	LP	
-83	1	1	wild_claude	claude_code	LP	
-7/7	1	1	wild_claude	claude_code	LP	
-4/4	1	1	wild_claude	claude_code	LP	
-(￣￣|||)	1	1	wild_claude	claude_ai	NB	
-(￣￣)	1	1	wild_claude	claude_code	HP	
-(￣ー￣;)	1	1	wild_claude	claude_ai	HN-S	
-(￣へ￣)	1	0	wild_other	other	HN-S	
-(￣▽￣;)	1	1	wild_claude	claude_ai	HN-D	
-(￣ε￣)	1	1	wild_claude	claude_code	LP	
-(￢_￢)	1	1	wild_claude	claude_code	HN-D	
-(ﾟヮﾟ)	1	1	wild_claude	claude_ai	LP	
-(╭☞・́⍛・̀)	1	1	wild_claude	claude_code	LP	
-(｡・‿-)	1	1	shared	claude_code	LP	LP
-(｡・́⌒・̀｡)	1	1	wild_claude	claude_ai	LP	
-(｡・́ω・̀｡)	1	1	wild_claude	claude_code	LP	
-(｡・	1	1	wild_claude	claude_code	HP	
-(｡♡‿♡｡)	1	1	wild_claude	claude_ai	LP	
-(｡◕◕｡)	1	1	wild_claude	claude_code	LP	
-(｡╯︵╰｡)	1	1	shared	claude_ai	LN	HP
-(｡>‿<｡)	1	1	wild_claude	claude_code	HP	
-(｡-‿-｡)	1	1	shared	claude_code	LP	LP
-(｡-`ω´-)	1	1	wild_claude	claude_code	HP	
-(╯▽╰)	1	1	wild_claude	claude_ai	HP	
-(ᐛ)	1	0	wild_other	other	NB	
-(╭☞・̀	1	1	wild_claude	claude_code	HP	
-(´꒳`)	1	1	wild_claude	claude_code	LP	
-(´◕‿◕`)	1	1	wild_claude	claude_code	LP	
-(´◕ω◕`)	1	1	wild_claude	claude_code	LP	
-(´⊙ω⊙`)	1	1	wild_claude	claude_ai	HP	
-(´∇`)	1	1	wild_claude	claude_code	HP	
-(´ε`;)	1	1	wild_claude	claude_ai	LP	
-(´˘`)	1	1	shared	claude_code	LP	LP
-(´_ゝ`)	1	1	wild_claude	claude_code	LP	
-(´	1	1	wild_claude	claude_code	LP	
-(°ー°〃)	1	1	wild_claude	claude_code	LP	
-(°△°)	1	1	wild_claude	claude_code	LP	
-(¬､¬)	1	1	wild_claude	claude_code	HN-D	
-(`∀´)	1	1	wild_claude	claude_code	HP	
-(^‿^)	1	1	shared	claude_ai	HP	NB
-(^o^)	1	1	shared	claude_ai	HP	HP
-(^	1	1	wild_claude	claude_code	HP	
-(=`ω´=)	1	1	wild_claude	claude_code	LP	
-(=^・ｪ・^=)	1	1	wild_claude	claude_code	LP	
-(;一_一)	1	1	wild_claude	claude_code	LP	
-(;へ:)	1	1	wild_claude	claude_code	LP	
-(;⌒_⌒)	1	1	wild_claude	claude_ai	HN-D	
-(;′⌒`)	1	1	wild_claude	claude_code	LP	
-(;´д`ｿ)	1	1	wild_claude	claude_code	HN-D	
-(..)	1	1	wild_claude	claude_ai	LP	
-((✿◕‿◕))	1	1	wild_claude	claude_code	LP	
-((⊂(`ω´∩)	1	1	wild_claude	claude_code	LP	
-(´ヘ`;)	1	1	wild_claude	claude_code	LP	
-(´ｰ`)	1	1	wild_claude	claude_code	LP	
-(⌒▽⌒)	1	1	wild_claude	claude_code	HP	
-(ˊᗜˋ)	1	1	wild_claude	claude_code	HP	
-(⌒_⌒;)	1	1	wild_claude	claude_ai	LN	
-(⌐■‿■)	1	1	wild_claude	claude_code	HP	
-(⌐■_ω■)	1	1	wild_claude	claude_code	HP	
-(≧▽≦*)o	1	1	wild_claude	claude_ai	LP	
-(≧‿≦)	1	1	shared	claude_code	HP	HP
-(⇀‸↼‶)	1	1	wild_claude	claude_code	LP	
-(⁄⁄・⁄ω⁄・⁄⁄)	1	1	wild_claude	claude_ai	LP	
-(„・‿・„)	1	0	wild_other	other	HP	
-(„・֊・„)	1	1	wild_claude	claude_code	NB	
-(„‿‿‿„)	1	1	wild_claude	claude_ai	HP	
-(ᗒᗨᗕ)	1	1	wild_claude	claude_code	HP	
-(๑・̀⌄・́๑)૭	1	1	wild_claude	claude_code	LP	
-(ง・_・)	1	1	wild_claude	claude_code	NB	
-(งツ)	1	1	wild_claude	claude_code	HP	
-(ಠ益ಠ)	1	0	wild_other	other	LP	
-(ಠ‿ಠ)	1	1	wild_claude	claude_code	HP	
-(̄▽̄)	1	1	wild_claude	claude_code	HP	
-(˶˃‿˂˶;)	1	1	wild_claude	claude_ai	LP	
-(˵・̀‿-˵)	1	1	wild_claude	claude_code	LP	
-(˙◁˙)	1	1	wild_claude	claude_code	LP	
-(˙▿˙)	1	1	wild_claude	claude_ai	LP	
-(˘・ω・˘)	1	1	wild_claude	claude_ai	LP	
-(˘͈‿˘͈)	1	1	wild_claude	claude_ai	LP	
-(˘³˘)	1	1	shared	claude_code	HP	LP
-(ˊᗜˋ*)و	1	1	wild_claude	claude_ai	LP	
-⊙_⊙	1	1	wild_claude	claude_ai	LP	
+first_word	n_emit	claude_emit	category	surface	bol_quadrant	gt_quadrant	bol_share_HP	bol_share_LP	bol_share_HN-D	bol_share_HN-S	bol_share_LN	bol_share_NB	gt_share_HP	gt_share_LP	gt_share_HN-D	gt_share_HN-S	gt_share_LN	gt_share_NB
+(◕‿◕)	842	789	shared	claude_ai	LP	HP	0.0006	0.9994	0.0	0.0	0.0	0.0	0.5435	0.3261	0.0	0.0	0.0	0.1304
+(・̀‿・́)	289	242	wild_claude	claude_ai	LP		0.0069	0.9931	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(・‿・)	288	274	shared	claude_ai	LP	NB	0.0521	0.9479	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	1.0
+(`・ω・´)	159	53	shared	claude_ai	LP	NB	0.0	0.9233	0.0	0.0	0.0	0.0767	0.0	0.0	0.0	0.0	0.0	1.0
+(◕‿◕✿)	138	125	shared	claude_ai	LP	LP	0.0543	0.5	0.0	0.0	0.0	0.4457	0.0	0.8333	0.0	0.0	0.0	0.1667
+(◕_◕)	105	95	wild_claude	claude_ai	LP		0.0	0.9661	0.0	0.0	0.0	0.0339	0.0	0.0	0.0	0.0	0.0	0.0
+(´・ω・`)	93	78	shared	claude_ai	LP	LN	0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.1053	0.4737	0.4211
+(´｡・‿・｡`)	92	79	shared	claude_ai	LP	LP	0.066	0.934	0.0	0.0	0.0	0.0	0.0	0.5517	0.0	0.0	0.3793	0.069
+(｡・̀‿-)	90	77	shared	claude_ai	LP	NB	0.0611	0.9389	0.0	0.0	0.0	0.0	0.0588	0.3529	0.0	0.0	0.0	0.5882
+(・_・)	68	54	shared	claude_ai	NB	NB	0.0	0.0294	0.0074	0.0956	0.0	0.8676	0.0	0.0	0.0	0.0	0.0	1.0
+(◠‿◠)	66	62	wild_claude	claude_ai	LP		0.0076	0.5303	0.0	0.0	0.0	0.4621	0.0	0.0	0.0	0.0	0.0	0.0
+(｡・‿・｡)	51	46	shared	claude_code	NB	LP	0.0	0.1786	0.0	0.0	0.0	0.8214	0.0909	0.5455	0.0	0.0	0.0	0.3636
+(´∀`)	50	40	shared	claude_ai	LP	LP	0.4	0.6	0.0	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0
+(๑・̀ㅂ・́)	49	40	wild_claude	claude_ai	LP		0.0	0.9022	0.0326	0.0	0.0	0.0652	0.0	0.0	0.0	0.0	0.0	0.0
+(・ω・)	49	42	shared	claude_ai	NB	NB	0.0	0.339	0.0	0.0	0.0	0.661	0.0	0.0	0.0	0.0	0.0	1.0
+(＾▽＾)	49	9	shared	claude_code	LP	NB	0.0306	0.9694	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	1.0
+(¬‿¬)	42	20	shared	claude_ai	HN-D	NB	0.0	0.075	0.45	0.175	0.275	0.025	0.0	0.0	0.0	0.0	0.0	1.0
+(・∀・)	35	27	shared	claude_ai	LP	NB	0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.1	0.0	0.9
+(ง・̀_・́)	32	24	wild_claude	claude_code	LP		0.4603	0.5397	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(・_・;)	32	25	shared	claude_ai	LN	NB	0.0	0.0625	0.0312	0.0625	0.4531	0.3906	0.0	0.0	0.0645	0.2903	0.0	0.6452
+(¬_¬)	31	10	shared	claude_code	LP	NB	0.0	0.8077	0.0	0.0	0.0	0.1923	0.0	0.0	0.0	0.0	0.0	1.0
+(´▽`)	29	24	shared	claude_ai	LP	LP	0.1034	0.8966	0.0	0.0	0.0	0.0	0.1	0.65	0.0	0.0	0.0	0.25
+(◕ω◕)	28	27	wild_claude	claude_ai	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(✿◠‿◠)	27	25	wild_claude	claude_code	LP		0.0185	0.9815	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(╯°□°)	26	21	shared	claude_ai	HP	HN-D	0.8846	0.0769	0.0192	0.0192	0.0	0.0	0.0	0.0	0.569	0.431	0.0	0.0
+(`_´)	26	0	wild_other	other	HN-D		0.0	0.1923	0.4038	0.4038	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(°ロ°)	25	24	shared	claude_ai	HN-D	HN-S	0.0	0.02	0.5	0.48	0.0	0.0	0.0	0.0	0.0	1.0	0.0	0.0
+(´・_・`)	23	21	shared	claude_ai	HN-D	LN	0.0	0.0	0.5	0.0	0.5	0.0	0.0	0.0	0.0	0.2857	0.7143	0.0
+(´｡・ω・｡`)	23	18	shared	claude_code	LP	LN	0.0217	0.9783	0.0	0.0	0.0	0.0	0.0	0.4286	0.0	0.0	0.4286	0.1429
+(ง'̀-'́)	22	0	wild_other	other	LP		0.0227	0.9773	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(✿◕‿◕)	21	20	shared	claude_code	HP	LP	0.5	0.5	0.0	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0
+(￣▽￣)	21	17	wild_claude	claude_ai	LP		0.4524	0.5238	0.0238	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(⌐■_■)	21	18	wild_claude	claude_ai	NB		0.0	0.2667	0.0	0.1333	0.0	0.6	0.0	0.0	0.0	0.0	0.0	0.0
+(‿‿‿)	21	21	shared	claude_code	LP	LP	0.0	1.0	0.0	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0
+(◕▽◕)	20	20	wild_claude	claude_code	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(｡◕‿◕｡)	20	18	shared	claude_ai	NB	LP	0.025	0.125	0.0	0.0	0.0	0.85	0.0	0.6923	0.0	0.0	0.0	0.3077
+(｡・ω・｡)	20	17	shared	claude_ai	LP	LP	0.0	0.85	0.0	0.0	0.0	0.15	0.0	0.5769	0.0	0.0	0.0	0.4231
+(=^・ω・^=)	19	12	wild_claude	claude_code	HP		0.6316	0.3421	0.0	0.0	0.0263	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(ﾉ◕ヮ◕)	19	14	shared	claude_code	HP	HP	0.8108	0.1892	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0
+(´ω`)	18	18	shared	claude_code	LP	LP	0.0	1.0	0.0	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0
+(˘ω˘)	18	16	shared	claude_ai	HP	LP	0.8333	0.1667	0.0	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0
+(・̀ω・́)	18	14	wild_claude	claude_ai	LP		0.3889	0.6111	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(´;ω;`)	17	17	shared	claude_code	LP	LN	0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.1316	0.8684	0.0
+(￣ー￣)	16	13	wild_claude	claude_code	LP		0.2083	0.4583	0.0	0.0	0.0	0.3333	0.0	0.0	0.0	0.0	0.0	0.0
+(´-ω-`)	16	16	shared	claude_ai	LP	LN	0.0	0.5	0.0	0.0	0.5	0.0	0.0	0.0	0.0	0.1429	0.8571	0.0
+(´-`)	15	15	shared	claude_ai	LP	LN	0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0577	0.9423	0.0
+(｡♥‿♥｡)	14	13	shared	claude_code	LP	LP	0.0357	0.9643	0.0	0.0	0.0	0.0	0.3333	0.4815	0.0	0.0	0.0	0.1852
+(ಠ_ಠ)	14	1	wild_claude	claude_code	HN-D		0.0	0.2143	0.3929	0.3929	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(✧ω✧)	13	13	wild_claude	claude_ai	HP		0.9615	0.0385	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(눈_눈)	13	11	wild_claude	claude_code	LP		0.0	0.44	0.08	0.04	0.0	0.44	0.0	0.0	0.0	0.0	0.0	0.0
+(＾∇＾)	13	12	wild_claude	claude_ai	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(;・∀・)	12	8	shared	claude_ai	LP	HN-S	0.0	0.4583	0.0417	0.1667	0.0	0.3333	0.0	0.0	0.5	0.5	0.0	0.0
+(;´д`)	11	8	shared	claude_code	LP	HN-S	0.0	0.7273	0.1364	0.1364	0.0	0.0	0.0	0.0	0.0	1.0	0.0	0.0
+(｡・́‿・̀｡)	11	11	shared	claude_ai	LP	NB	0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.3333	0.0	0.0	0.0	0.6667
+(￣ω￣)	10	9	wild_claude	claude_code	LP		0.4737	0.4737	0.0	0.0	0.0	0.0526	0.0	0.0	0.0	0.0	0.0	0.0
+(⊙_⊙)	10	9	wild_claude	claude_ai	LP		0.0	0.9	0.05	0.05	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(;￣д￣)	9	8	shared	claude_code	HN-D	HN-D	0.0	0.1111	0.4444	0.4444	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0
+(˘・_・˘)	9	6	wild_claude	claude_ai	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(‿‿‿✿)	9	7	shared	claude_code	LP	LP	0.0	0.6111	0.0	0.0	0.0	0.3889	0.0	1.0	0.0	0.0	0.0	0.0
+(≧▽≦)	9	7	shared	claude_code	HP	HP	0.5294	0.4706	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0
+(◕‿◕✨)	9	9	wild_claude	claude_code	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(◞‸◟)	9	9	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+ʕ・ᴥ・ʔ	9	9	shared	claude_code	HP	LP	1.0	0.0	0.0	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0
+(◜‿◝)	8	7	wild_claude	claude_ai	LP		0.0	0.875	0.0625	0.0625	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(￣ヘ￣;)	8	7	wild_claude	claude_code	LP		0.4375	0.5625	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(ᵔᴥᵔ)	8	6	wild_claude	claude_code	LP		0.0	0.8571	0.0	0.0	0.0	0.1429	0.0	0.0	0.0	0.0	0.0	0.0
+(๑˃‿˂)	8	8	wild_claude	claude_code	HP		0.6667	0.3333	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(´・‿・`)	7	7	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(˃‿˂)	7	6	wild_claude	claude_ai	HP		0.9286	0.0714	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(˶ᵔ‿ᵔ˶)	7	7	wild_claude	claude_ai	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(ᵔ‿ᵔ)	7	2	wild_claude	claude_code	LP		0.0769	0.9231	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(╭ರ_・́)	7	6	wild_claude	claude_code	HP		0.9286	0.0714	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(￣~￣;)	7	6	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(｡◕‿‿◕｡)	6	4	wild_claude	claude_ai	LP		0.3333	0.6667	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(￣ヘ￣)	6	5	shared	claude_ai	NB	NB	0.0	0.0909	0.0	0.0	0.0	0.9091	0.0	0.0	0.0	0.0	0.0	1.0
+(ﾟ▽ﾟ)	6	5	wild_claude	claude_code	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(｡・́︿・̀｡)	6	6	shared	claude_ai	LP	HN-S	0.0	1.0	0.0	0.0	0.0	0.0	0.087	0.0435	0.0652	0.5652	0.2174	0.0217
+(・̀ㅂ・́)	6	5	wild_claude	claude_code	NB		0.0	0.1667	0.0	0.0	0.0	0.8333	0.0	0.0	0.0	0.0	0.0	0.0
+(ノ◕ヮ◕)	6	5	shared	claude_code	LP	HP	0.1667	0.8333	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0
+(⊙‿⊙)	6	6	wild_claude	claude_ai	HP		0.8333	0.1667	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(°▽°)	6	5	shared	claude_ai	HP	HP	0.8333	0.1667	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0
+(╹ω╹)	5	4	wild_claude	claude_ai	HN-D		0.0	0.0	0.5556	0.0	0.4444	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+＼(^	5	4	wild_claude	claude_code	LP		0.4	0.6	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(￣^￣)	5	0	wild_other	other	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(灬°‿°灬)	5	5	shared	claude_ai	LP	LP	0.0	1.0	0.0	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0
+(・ω・`)	5	4	wild_claude	claude_ai	LP		0.0	0.6	0.0	0.0	0.0	0.4	0.0	0.0	0.0	0.0	0.0	0.0
+(◕ω◕✨)	5	5	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(´・ω・)	5	4	wild_claude	claude_ai	LP		0.0	0.9	0.0	0.0	0.0	0.1	0.0	0.0	0.0	0.0	0.0	0.0
+(╯✧∇✧)	5	4	wild_claude	claude_code	LP		0.1	0.9	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(งᵒ̌皿ᵒ̌)	5	4	wild_claude	claude_code	HP		0.6	0.4	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(>‿<)	5	5	wild_claude	claude_ai	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(´ω`	5	5	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(╥﹏╥)	5	5	shared	claude_code	HN-D	HN-S	0.0	0.0	0.5	0.0	0.5	0.0	0.0769	0.0	0.0	0.9231	0.0	0.0
+(◕ヮ◕)	4	3	wild_claude	claude_code	LP		0.125	0.875	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(￣ω￣;)	4	4	wild_claude	claude_code	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(￣^￣ゞ	4	4	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(｡・̀‿・́｡)	4	4	wild_claude	claude_ai	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(・́⌓・̀)	4	4	wild_claude	claude_code	LP		0.0	0.5	0.0	0.0	0.0	0.5	0.0	0.0	0.0	0.0	0.0	0.0
+(・_・?)	4	4	shared	claude_ai	LP	NB	0.0	0.75	0.0	0.0	0.0	0.25	0.0	0.0	0.0	0.0	0.0	1.0
+(◠‿◠✿)	4	4	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(・ε・)	4	3	wild_claude	claude_code	LP		0.0	0.5	0.125	0.0	0.0	0.375	0.0	0.0	0.0	0.0	0.0	0.0
+(⊙ω⊙)	4	3	wild_claude	claude_code	HP		0.875	0.125	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(˶˃‿˂˶)	4	4	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(´ー`)	4	4	wild_claude	claude_ai	LP		0.125	0.875	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(´∀`;)	4	3	wild_claude	claude_ai	LP		0.0	0.625	0.0	0.375	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(°ヮ°)	4	4	wild_claude	claude_ai	NB		0.0	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0
+(°□°)	4	3	wild_claude	claude_code	HP		1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(>∀<☆)	4	4	shared	claude_code	LP	HP	0.0	1.0	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0
+(˶ˆᗜˆ˵)	4	3	wild_claude	claude_ai	LP		0.125	0.875	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(・∀・;)	3	2	wild_claude	claude_code	LP		0.0	0.6667	0.0	0.0	0.0	0.3333	0.0	0.0	0.0	0.0	0.0	0.0
+(◕‿◕｡)	3	3	shared	claude_ai	LP	LP	0.0	1.0	0.0	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0
+(・	3	2	wild_claude	claude_code	NB		0.0	0.3333	0.0	0.0	0.0	0.6667	0.0	0.0	0.0	0.0	0.0	0.0
+(・̀ㅁ・́;)	3	2	wild_claude	claude_code	LP		0.0	0.6667	0.1667	0.1667	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(・́︵・̀)	3	2	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(ﾉωﾉ)	3	3	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(・﹏・)	3	3	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(｡´꒳`｡)	3	3	wild_claude	claude_code	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(｡╹ω╹｡)	3	3	wild_claude	claude_code	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(ﾟーﾟ)	3	2	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+ʕっ・ᴥ・ʔ	3	3	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(⊡-⊡)و	3	2	wild_claude	claude_code	HP		1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(◎_◎;)	3	3	shared	claude_code	HN-S	HP	0.0	0.0	0.0	1.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0
+(・̀‿-)	3	3	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(≧ω≦)	3	2	wild_claude	claude_code	HP		1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(´°ω°`)	3	2	wild_claude	claude_code	HP		0.3333	0.3333	0.0	0.0	0.3333	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(	3	2	wild_claude	claude_code	HP		0.625	0.375	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(/▽＼)	3	3	wild_claude	claude_code	LP		0.0	0.6667	0.0	0.0	0.3333	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(=⌒‿‿⌒=)	3	2	wild_claude	claude_code	HP		0.6667	0.3333	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(>ω<)	3	2	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(¬_¬;)	3	3	wild_claude	claude_ai	HN-D		0.0	0.0	0.5	0.0	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(>_<)	3	3	shared	claude_code	LP	HN-S	0.0	0.5	0.0	0.0	0.0	0.5	0.0	0.0	0.0	1.0	0.0	0.0
+(´·_·`)	3	2	shared	claude_code	LP	HN-S	0.0	0.5	0.0	0.0	0.0	0.5	0.0	0.0	0.0	1.0	0.0	0.0
+(´д`;)	3	2	wild_claude	claude_code	HN-S		0.0	0.0	0.1667	0.8333	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(´‿`)	3	3	shared	claude_ai	LP	LP	0.0	1.0	0.0	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0
+(˘︶˘)	3	2	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(҂‿_‿)	3	3	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(ง・̀ᗜ・́)	3	2	wild_claude	claude_code	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(☞ﾟヮﾟ)	2	2	wild_claude	claude_code	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(・̀‿・́;)	2	2	wild_claude	claude_code	HN-D		0.0	0.0	0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(⌒‿⌒)	2	2	shared	claude_code	LP	LP	0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.5	0.0	0.0	0.0	0.5
+(・̀ω・́	2	2	wild_claude	claude_ai	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(・̀_・́)	2	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(・_・ヾ	2	2	shared	claude_code	LP	NB	0.0	0.6667	0.0	0.0	0.0	0.3333	0.0	0.0	0.0	0.0	0.0	1.0
+(╹ェ╹)	2	1	wild_claude	claude_code	NB		0.0	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0
+(★‿★)	2	2	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(◣_◢)	2	2	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(◞‸◟ㆀ)	2	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(◕▿◕✿)	2	2	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(◕ω◕✿)	2	2	wild_claude	claude_code	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(・́‸・̀)	2	2	wild_claude	claude_code	LP		0.0	0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(・̀⌄・́)	2	2	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(・︵・)	2	2	wild_claude	claude_code	HN-D		0.0	0.0	0.5	0.0	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(・̅_・̅)	2	2	wild_claude	claude_code	LP		0.0	0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(・ω<)	2	2	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(・ω・;)	2	1	wild_claude	claude_code	NB		0.0	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0
+(・ω・´)	2	1	wild_claude	claude_code	LP		0.0	0.75	0.0	0.0	0.0	0.25	0.0	0.0	0.0	0.0	0.0	0.0
+(・‾‿‾・)	2	2	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(・へ・)	2	0	wild_other	other	HN-D		0.0	0.0	0.5	0.0	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(・ｪ・)	2	2	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(눈‸눈)	2	1	wild_claude	claude_code	NB		0.0	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0
+(﹒︠‿﹒︡)	2	2	wild_claude	claude_code	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(＾	2	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(ﾟｰﾟ)	2	1	shared	claude_code	LP	NB	0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	1.0
+ಠ_ಠ	2	0	wild_other	other	HN-D		0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+✧*｡٩(ˊᗜˋ*)و✧*｡	2	2	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(─‿‿─)	2	2	wild_claude	claude_ai	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(°﹏°)	2	2	wild_claude	claude_code	HN-D		0.0	0.0	0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(⊙ヮ⊙)	2	2	wild_claude	claude_ai	NB		0.0	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0
+(°◇°)	2	2	wild_claude	claude_code	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(‿͈ˬ‿͈)	2	2	wild_claude	claude_code	HP		1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(._.)	2	1	wild_claude	claude_code	LP		0.0	0.3333	0.0	0.0	0.3333	0.3333	0.0	0.0	0.0	0.0	0.0	0.0
+(;¬_¬)	2	1	wild_claude	claude_code	HN-D		0.0	0.3333	0.6667	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(;ω;)	2	2	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(;￣□￣)	2	2	wild_claude	claude_code	HN-D		0.0	0.0	0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(=^‿^=)	2	2	wild_claude	claude_code	HP		1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(>‿◕)	2	2	wild_claude	claude_code	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(>‿◕✨)	2	2	wild_claude	claude_code	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(>﹏<)	2	2	shared	claude_ai	LP	HN-S	0.0	0.5	0.0	0.5	0.0	0.0	0.2	0.0	0.0	0.8	0.0	0.0
+(`へ´)	2	0	wild_other	other	LP		0.0	0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(`・∀・´)	2	2	wild_claude	claude_code	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(°_°)	2	2	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(-_-;)	2	1	wild_claude	claude_ai	HN-S		0.0	0.0	0.3333	0.6667	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(°◇°;)	2	2	wild_claude	claude_code	HN-D		0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(´︶`)	2	2	shared	claude_ai	HP	HP	1.0	0.0	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0
+(°〇°)	2	2	shared	claude_code	HP	HP	1.0	0.0	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0
+(ง・̀ω・́)	2	2	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(ฅ́˘ฅ̀)	2	2	wild_claude	claude_code	HP		1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(୧・̀‿-)	2	2	wild_claude	claude_code	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(˘▽˘)	2	2	wild_claude	claude_ai	HN-S		0.25	0.25	0.0	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(˶◕‿◕˶)	2	2	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(´˘`∗)	2	2	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(´;_;`)	2	2	wild_claude	claude_code	HN-D		0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(´-_-`)	2	2	shared	claude_code	HP	LN	0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	1.0	0.0
+(°ㅂ°;)	2	2	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(°ㅂ°)	2	2	wild_claude	claude_code	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(・o・)	1	1	wild_claude	claude_ai	LP		0.0	0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(゚ペ)	1	1	wild_claude	claude_ai	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(゜∇゜)	1	1	wild_claude	claude_ai	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(ノಠ益ಠ)	1	1	shared	claude_ai	HN-D	HP	0.0	0.0	1.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0
+(・_・ゞ−☆	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(・⩊・)	1	1	wild_claude	claude_code	HP		1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(・̀.̫・́)	1	0	wild_other	other	LP		0.0	0.5	0.0	0.0	0.0	0.5	0.0	0.0	0.0	0.0	0.0	0.0
+(・́ω・̀)	1	1	wild_claude	claude_code	HN-D		0.0	0.0	0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(・ω・`)o	1	1	wild_claude	claude_ai	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(・ω・ﾉ	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(✦‿✦)	1	1	wild_claude	claude_code	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(・・;)	1	0	wild_other	other	HN-S		0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(✿・̀ㅁ・́)	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(◞‿◟)	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(♡^▽^♡)	1	1	wild_claude	claude_code	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(☆▽☆)	1	1	shared	claude_code	HP	HP	1.0	0.0	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0
+(◠‿・)	1	1	wild_claude	claude_code	NB		0.0	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0
+(◞◟ㆀ)	1	1	wild_claude	claude_ai	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(◞‸◟;)	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(◕ω◕✨🌸)	1	1	wild_claude	claude_code	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(◕.◕)	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(○´∀`○)	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(○_○)	1	1	wild_claude	claude_code	HN-S		0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(▰˘‿˘▰)	1	1	wild_claude	claude_ai	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(╹ヮ╹)	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(꒪ཫ꒪;)	1	1	wild_claude	claude_ai	HN-D		0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(ーー;)	1	1	wild_claude	claude_ai	HN-D		0.0	0.0	0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(ﾟωﾟ)	1	1	wild_claude	claude_code	HP		1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(＾・ω・＾)	1	1	wild_claude	claude_code	HP		1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(｡-_-｡)	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+ಠ‿ಠ	1	1	wild_claude	claude_code	LN		0.0	0.0	0.0	0.0	0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0
+ʕ ・ᴥ・ʔ	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+¬‿¬	1	1	wild_claude	claude_ai	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+83	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+7/7	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+4/4	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(￣￣|||)	1	1	wild_claude	claude_ai	NB		0.0	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0
+(￣￣)	1	1	wild_claude	claude_code	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(￣ー￣;)	1	1	wild_claude	claude_ai	HN-S		0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(￣へ￣)	1	0	wild_other	other	HN-S		0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(￣▽￣;)	1	1	wild_claude	claude_ai	HN-D		0.0	0.0	0.5	0.0	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(￣ε￣)	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(￢_￢)	1	1	wild_claude	claude_code	HN-D		0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(ﾟヮﾟ)	1	1	wild_claude	claude_ai	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(╭☞・́⍛・̀)	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(｡・‿-)	1	1	shared	claude_code	LP	LP	0.0	0.5	0.0	0.0	0.0	0.5	0.0	0.5	0.0	0.0	0.0	0.5
+(｡・́⌒・̀｡)	1	1	wild_claude	claude_ai	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(｡・́ω・̀｡)	1	1	wild_claude	claude_code	LP		0.0	0.5	0.0	0.0	0.0	0.5	0.0	0.0	0.0	0.0	0.0	0.0
+(｡・	1	1	wild_claude	claude_code	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(｡♡‿♡｡)	1	1	wild_claude	claude_ai	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(｡◕◕｡)	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(｡╯︵╰｡)	1	1	shared	claude_ai	LN	HP	0.0	0.0	0.0	0.0	1.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0
+(｡>‿<｡)	1	1	wild_claude	claude_code	HP		1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(｡-‿-｡)	1	1	shared	claude_code	LP	LP	0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.6667	0.0	0.0	0.0	0.3333
+(｡-`ω´-)	1	1	wild_claude	claude_code	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(╯▽╰)	1	1	wild_claude	claude_ai	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(ᐛ)	1	0	wild_other	other	NB		0.0	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0
+(╭☞・̀	1	1	wild_claude	claude_code	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(´꒳`)	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(´◕‿◕`)	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(´◕ω◕`)	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(´⊙ω⊙`)	1	1	wild_claude	claude_ai	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(´∇`)	1	1	wild_claude	claude_code	HP		1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(´ε`;)	1	1	wild_claude	claude_ai	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(´˘`)	1	1	shared	claude_code	LP	LP	0.0	1.0	0.0	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0
+(´_ゝ`)	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(´	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(°ー°〃)	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(°△°)	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(¬､¬)	1	1	wild_claude	claude_code	HN-D		0.0	0.0	0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(`∀´)	1	1	wild_claude	claude_code	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(^‿^)	1	1	shared	claude_ai	HP	NB	0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	1.0
+(^o^)	1	1	shared	claude_ai	HP	HP	0.5	0.5	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0
+(^	1	1	wild_claude	claude_code	HP		1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(=`ω´=)	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(=^・ｪ・^=)	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(;一_一)	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(;へ:)	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(;⌒_⌒)	1	1	wild_claude	claude_ai	HN-D		0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(;′⌒`)	1	1	wild_claude	claude_code	LP		0.0	0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(;´д`ｿ)	1	1	wild_claude	claude_code	HN-D		0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(..)	1	1	wild_claude	claude_ai	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+((✿◕‿◕))	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+((⊂(`ω´∩)	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(´ヘ`;)	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(´ｰ`)	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(⌒▽⌒)	1	1	wild_claude	claude_code	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(ˊᗜˋ)	1	1	wild_claude	claude_code	HP		1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(⌒_⌒;)	1	1	wild_claude	claude_ai	LN		0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(⌐■‿■)	1	1	wild_claude	claude_code	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(⌐■_ω■)	1	1	wild_claude	claude_code	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(≧▽≦*)o	1	1	wild_claude	claude_ai	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(≧‿≦)	1	1	shared	claude_code	HP	HP	1.0	0.0	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0
+(⇀‸↼‶)	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(⁄⁄・⁄ω⁄・⁄⁄)	1	1	wild_claude	claude_ai	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(„・‿・„)	1	0	wild_other	other	HP		1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(„・֊・„)	1	1	wild_claude	claude_code	NB		0.0	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0
+(„‿‿‿„)	1	1	wild_claude	claude_ai	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(ᗒᗨᗕ)	1	1	wild_claude	claude_code	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(๑・̀⌄・́๑)૭	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(ง・_・)	1	1	wild_claude	claude_code	NB		0.0	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0
+(งツ)	1	1	wild_claude	claude_code	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(ಠ益ಠ)	1	0	wild_other	other	LP		0.0	0.5	0.0	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(ಠ‿ಠ)	1	1	wild_claude	claude_code	HP		0.5	0.5	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(̄▽̄)	1	1	wild_claude	claude_code	HP		1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(˶˃‿˂˶;)	1	1	wild_claude	claude_ai	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(˵・̀‿-˵)	1	1	wild_claude	claude_code	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(˙◁˙)	1	1	wild_claude	claude_code	LP		0.0	0.5	0.0	0.0	0.0	0.5	0.0	0.0	0.0	0.0	0.0	0.0
+(˙▿˙)	1	1	wild_claude	claude_ai	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(˘・ω・˘)	1	1	wild_claude	claude_ai	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(˘͈‿˘͈)	1	1	wild_claude	claude_ai	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+(˘³˘)	1	1	shared	claude_code	HP	LP	1.0	0.0	0.0	0.0	0.0	0.0	0.0	1.0	0.0	0.0	0.0	0.0
+(ˊᗜˋ*)و	1	1	wild_claude	claude_ai	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+⊙_⊙	1	1	wild_claude	claude_ai	LP		0.0	1.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0

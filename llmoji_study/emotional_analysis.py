@@ -25,6 +25,7 @@ direction dominates uncentered cosine), amplified in 4096-dim.
 from __future__ import annotations
 
 from pathlib import Path
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 import numpy as np
@@ -44,26 +45,28 @@ QUADRANT_ORDER = ["HP", "LP", "HN", "LN", "NB"]
 # entirely; the categorical column gets pd.NA for them so the analysis
 # can either filter or surface them as a small grey bucket as it sees fit.
 QUADRANT_ORDER_SPLIT = ["HP", "LP", "HN-D", "HN-S", "LN", "NB"]
-# Canonical Russell-circumplex mapping. Saturated enough that 50/50
-# RGB-linear mixes between adjacent-quadrant pairs are still
-# recognizable (HN+LN → muted purple, HP+LP → olive, etc.); perceived
-# luminance balanced ~L*55–62 across all 5 so weighted mixes don't
-# drift in brightness when one quadrant dominates by saturation alone.
-# Diagonal "contradictory" mixes (HN+LP "anger meets calm",
-# HP+LN "excited meets sad") fall to brown / desaturated gray —
-# informatively unusual.
+# Canonical Russell-circumplex mapping, sourced from the a9lim.github.io
+# website palette (`shared-tokens.js::_PALETTE.extended`). All chromatic
+# entries are OKLCH L=0.62, C=0.17 uniform (gamut-capped to sRGB ceiling
+# where needed) — so 50/50 RGB-linear mixes between any two quadrants
+# are perceived-luminance-balanced and stay readable, and the chart
+# blend at any per-face share matches what the website renders for the
+# same semantic category. Adjacent mixes still read sensibly
+# (HN+LN → desaturated violet, HP+LP → muted olive); diagonal
+# "contradictory" mixes (HN+LP "anger meets calm", HP+LN "excited meets
+# sad") fall to muted brown / cool grey — informatively unusual.
 QUADRANT_COLORS = {
-    "HP": "#d49b3a",  # gold — high arousal, positive (excitement/joy)
-    "LP": "#4aa66a",  # green — low arousal, positive (calm/contentment)
-    "HN": "#d44a4a",  # red — high arousal, negative (anger/anxiety)
-    "LN": "#4a7ed4",  # blue — low arousal, negative (sadness/depression)
-    "NB": "#909090",  # gray — neutral baseline
+    "HP": "#998700",  # yellow — high arousal, positive (excitement/joy)
+    "LP": "#009F68",  # green  — low arousal, positive (calm/contentment)
+    "HN": "#DA534F",  # red    — high arousal, negative (anger/anxiety)
+    "LN": "#0091C9",  # blue   — low arousal, negative (sadness/depression)
+    "NB": "#808696",  # slate  — neutral baseline (intentionally muted, H=270)
     # Rule-3-redesign PAD-dominance split (2026-05-01). HN-D inherits HN
-    # red so aggregate-HN views stay backward-compatible; HN-S takes a
-    # saturation-matched magenta-purple that reads as "negative but
-    # submissive" without colliding with LN blue.
-    "HN-D": "#d44a4a",  # red — anger / contempt (high PAD dominance)
-    "HN-S": "#9d4ad4",  # magenta-purple — fear / anxiety (low PAD dominance)
+    # red so aggregate-HN views stay backward-compatible; HN-S takes
+    # the website's `purple` (also OKLCH L=0.62 C=0.17) which reads as
+    # "negative but submissive" without colliding with LN blue.
+    "HN-D": "#DA534F",  # red    — anger / contempt (high PAD dominance)
+    "HN-S": "#9769DC",  # purple — fear / anxiety (low PAD dominance)
 }
 
 def _palette_for(df: pd.DataFrame) -> tuple[list[str], dict[str, str]]:
@@ -164,33 +167,73 @@ def per_face_quadrant_weights(df: pd.DataFrame) -> dict[str, dict[str, float]]:
 
 
 def mix_quadrant_color(
-    weights: dict[str, float],
-    colors: dict[str, str] | None = None,
-) -> tuple[float, float, float]:
-    """Linear-RGB mix of quadrant colors weighted by ``weights``.
+    weights: Mapping[str, float] | np.ndarray | Iterable[float],
+    *,
+    colors: Mapping[str, str] | None = None,
+    fallback: str = "#808696",
+) -> str:
+    """Canonical RGB-linear blend of quadrant colors weighted by ``weights``.
 
-    Weights are expected to sum to 1.0 across the active quadrant set
-    (`per_face_quadrant_weights` produces them). The default ``colors``
-    is the classic 5-quadrant palette; pass ``QUADRANT_COLORS_SPLIT``
-    when working with HN-D/HN-S labelled data.
+    Single helper used by both matplotlib (tick colors, bar fills) and
+    plotly (Scatter3d marker.color) figures — matplotlib accepts hex
+    strings everywhere it accepts colors, so a hex return type works
+    cross-backend. Pure-quadrant input renders at the canonical
+    ``QUADRANT_COLORS`` hue; mixed input renders at the weighted RGB
+    midpoint (50/50 HP+LP → muted olive, HN+LN → desaturated violet,
+    etc.); zero-mass input falls back to ``fallback`` (default
+    ``QUADRANT_COLORS["NB"] = #808696`` slate, matching the website's
+    ``shared-tokens.js::_PALETTE.extended.slate`` and the convention
+    used by ``scripts/local/97_build_per_face_pca_3d.py``).
 
-    A face that's 100% one quadrant returns that quadrant's pure
-    color; a 50/50 split returns the RGB midpoint; an even split
-    across the full active set returns the palette centroid (close to
-    mid-gray for the balanced case).
+    ``weights`` may be:
+
+      - ``dict[quadrant -> weight]`` (e.g. from
+        :func:`per_face_quadrant_weights` or per-face emit counts).
+        Need not sum to 1 — the helper normalizes internally over the
+        positive subset.
+      - 6-element array-like aligned to :data:`QUADRANT_ORDER_SPLIT`
+        (i.e. the soft per-quadrant share that
+        :func:`llmoji_study.lexicon.bol_to_quadrant_distribution`
+        produces).
+
+    ``colors`` defaults to the full 7-key :data:`QUADRANT_COLORS`
+    palette (5-quadrant + HN-D / HN-S split). Negative weights are
+    clamped to zero before normalization. Quadrants absent from
+    ``colors`` are ignored (e.g. an aggregate ``HN`` weight when only
+    the split palette is present).
     """
     if colors is None:
         colors = QUADRANT_COLORS
-    from matplotlib.colors import to_rgb
+    from matplotlib.colors import to_hex, to_rgb
+
+    if isinstance(weights, dict):
+        items: list[tuple[str, float]] = [
+            (str(q), float(w)) for q, w in weights.items()
+        ]
+    else:
+        arr = np.asarray(list(weights), dtype=float).ravel()
+        if arr.shape[0] != len(QUADRANT_ORDER_SPLIT):
+            raise ValueError(
+                f"weights array has {arr.shape[0]} entries, expected "
+                f"{len(QUADRANT_ORDER_SPLIT)} (one per quadrant in "
+                f"{QUADRANT_ORDER_SPLIT})"
+            )
+        items = list(zip(QUADRANT_ORDER_SPLIT, arr.tolist()))
+
+    total = sum(max(0.0, w) for _, w in items)
+    if total <= 0:
+        return fallback
+
     r = g = b = 0.0
-    for q, w in weights.items():
+    for q, w in items:
         if w <= 0 or q not in colors:
             continue
         qr, qg, qb = to_rgb(colors[q])
-        r += w * qr
-        g += w * qg
-        b += w * qb
-    return (r, g, b)
+        f = w / total
+        r += f * qr
+        g += f * qg
+        b += f * qb
+    return to_hex((r, g, b))
 
 
 # ---------------------------------------------------------------------------
