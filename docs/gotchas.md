@@ -423,9 +423,10 @@ per-glyph fallback via `rcParams["font.family"] = [...]`. The canonical
 `_use_cjk_font` helper lives in `llmoji_study.emotional_analysis`;
 `analysis.py` imports it (single source of truth post-2026-05-04
 dedupe). Scripts that work outside the
-emotional-analysis pipeline (`scripts/harness/64_eriskii_replication.py`,
-`scripts/harness/63_corpus_pca.py`) keep local copies for now —
-**keep in sync**. The helper registers a project-local monochrome emoji
+emotional-analysis pipeline (`scripts/harness/63_corpus_pca.py`,
+`scripts/harness/68_three_way_analysis.py`,
+`scripts/harness/69_per_source_drift.py`) keep local copies for
+now — **keep in sync**. The helper registers a project-local monochrome emoji
 font (`data/fonts/NotoEmoji-Regular.ttf`, 1.9MB, committed) and configure
 the chain `Noto Sans CJK JP → Arial Unicode MS → DejaVu Sans → DejaVu Serif
 → Tahoma → Noto Sans Canadian Aboriginal → Heiti TC → Hiragino Sans → Apple

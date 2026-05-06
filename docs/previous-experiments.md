@@ -355,19 +355,26 @@ poisons every subset that includes it. Adding κ throughout
 predictors and the data-driven subset search now demotes glm
 automatically.
 
-**Superseded again 2026-05-05 by soft-everywhere methodology.** The
-shift from hard-classification accuracy + Cohen's κ to
-distribution-vs-distribution JSD (`similarity = 1 − JSD/ln 2`,
-face-uniform + emit-weighted) inverted several rankings. The current
-best deployment ensemble is `{gemma_v7primed, opus}` at 0.829
-emit-weighted similarity / 0.788 face-uniform on n=49 GT-floor-3
-faces. Gemma_v7primed (rejected from the 2026-05-04 ensemble for
-hurting hard accuracy) is the best single LM-head encoder under
-emit-weighting; opus introspection scaling complements it at the
+**Superseded again 2026-05-05 by soft-everywhere methodology, then
+2026-05-06 by the pooled-GT view.** The shift from hard-classification
+accuracy + Cohen's κ to distribution-vs-distribution JSD
+(`similarity = 1 − JSD/ln 2`, face-uniform + emit-weighted)
+inverted several rankings. Mid-2026-05-05 the best deployment
+ensemble was `{gemma_v7primed, opus}` at 0.829 emit-weighted /
+0.788 face-uniform on n=49 Claude-GT-floor-3 faces. The 2026-05-06
+expansion to a pooled-GT denominator (v3 emit + Claude pilot + wild
+contributor data ≥3, n=54) flipped the ranking again — opus solo
+becomes the strongest single encoder once the wild-face long tail
+is included, and the best ensemble grows to `{gemma, gemma_v7primed,
+ministral, opus}` at 0.904 emit-weighted / 0.832 face-uniform.
+Gemma_v7primed (rejected from the 2026-05-04 ensemble for hurting
+hard accuracy) is the best single LM-head encoder under emit-
+weighting; opus introspection scaling complements it at the
 quadrants where visual scaffolding helps least (NB, LN). Rinna
 variants drop from the top tier — solo similarity below 0.43
 face-uniform / 0.55 emit-weighted. Detail in
-[`2026-05-05-soft-everywhere-methodology.md`](2026-05-05-soft-everywhere-methodology.md).
+[`2026-05-05-soft-everywhere-methodology.md`](2026-05-05-soft-everywhere-methodology.md)
+and [`findings.md`](findings.md) "Best deployment ensemble".
 
 ## Disclosure-preamble pilot (2026-05-02 → 2026-05-04 reversal)
 
@@ -498,3 +505,115 @@ v1 / v2 pole assignment moved to per-face mean `t0_<axis>`
 probe-score sign. Generalizes pole labeling across models that don't
 share gemma's vocabulary, at the cost of a small amount of human
 calibration on the v1 / v2 side.
+
+## Eriskii-parity harness pipeline (replaced 2026-05-06 by BoL)
+
+Between 2026-04-27 and 2026-05-06 the harness side ran a parity
+replication of [eriskii's 21-axis Claude-faces
+catalog](https://eriskii.net/projects/claude-faces) on the
+contributor-submitted corpus. The pipeline:
+
+- `scripts/harness/62_corpus_embed.py` — embedded each per-bundle
+  free-form Haiku-synthesized prose description with
+  `sentence-transformers/all-MiniLM-L6-v2` (384-d), weighted-mean
+  pooled by per-bundle count across contributors, L2-normalized.
+  Output: `data/harness/claude_faces_embed_description.parquet`.
+- `scripts/harness/64_eriskii_replication.py` — projected the 384-d
+  embeddings onto eriskii's 21 axes (warmth, energy, confidence,
+  playfulness, empathy, technicality, positivity, curiosity,
+  approval, apologeticness, decisiveness, wryness, wetness,
+  surprise, anger, frustration, hatefulness, sadness, hope,
+  aggression, exhaustion). t-SNE plus KMeans(k=15), Haiku-labeled
+  cluster signatures, comparison markdown.
+- `scripts/harness/63_corpus_pca.py` — PCA on the 384-d embeddings
+  as a parity-with-eriskii visualization.
+- `scripts/harness/65_per_project_axes.py` — single-contributor
+  side script that re-embedded `assistant_text` from per-machine
+  journals onto the same 21 axes for per-project mean / std
+  breakdowns, with output to
+  `figures/harness/{claude,codex}/per_project_axes_{mean,std}.png`.
+- `llmoji_study/eriskii_anchors.py` — the 21 anchor pairs, 20 from
+  eriskii.net verbatim plus a single rewrite on `wetness ↔ dryness`
+  (eriskii used the bare strings as a "three seashells" joke; we
+  rewrote to "waxing poetic about emotions, lyrical and self-
+  expressive" / "helpful assistant tone, task-focused, businesslike,
+  practical, matter-of-fact" so the axis is meaningful).
+
+Pre-refactor headline numbers (from the eriskii-parity era):
+
+- **Top-20 frequency overlap with eriskii's published top-20 = 14/20**
+  on the first HF round-trip pull (one contributor, 808 emissions,
+  174 canonical kaomoji). The pre-HF-refactor single-machine local
+  scrape ran 16/20 on 647 emissions across 156 canonical forms; the
+  delta was partly corpus growth and partly contributor-side
+  canonicalization happening before upload.
+- **15 KMeans cluster themes lined up with eriskii's 15** at the
+  register level (warm-supportive, wry, empathetic, sheepish,
+  eager, thoughtful intellectual, compassionate-acknowledgment).
+  Per-kaomoji cluster-membership comparison wasn't possible because
+  eriskii's per-kaomoji assignments aren't published.
+- **PCA on the description embeddings** gave PC1 17.1%, PC2 10.6%
+  (top-2 cumulative 27.7%). HDBSCAN found 2 dense clusters and 88
+  noise points at `min_cluster_size=5`; KMeans was the
+  eriskii-parity reference.
+
+Pre-refactor per-model and bridge findings (lost when the HF
+dataset's privacy model dropped per-row `(model, project,
+user_text)` fields):
+
+- **Per-model axis breakdowns numerically confirmed eriskii's
+  qualitative "opus-4-6 had wider range" claim**: mean axis std
+  on opus-4-6 was 0.067, opus-4-7 0.066, sonnet-4-6 0.063.
+- **Mechanistic surrounding_user → kaomoji axis correlation**
+  embedded each `surrounding_user` text on the same 21 axes, then
+  computed Pearson r per axis. 2/21 axes survived Bonferroni
+  correction at α = 0.05/21: surprise (r = +0.20) and curiosity
+  (r = +0.18). Affective axes were null. MiniLM on user text picks
+  up novelty / unexpectedness, not valence-tracking.
+
+Pre-refactor per-project axes (single-contributor side script):
+
+| project | n | top axis | bottom axis |
+| --- | ---: | --- | --- |
+| saklas | 164 | curiosity (+0.058) | exhaustion (−0.047) |
+| llmoji | 147 | curiosity (+0.065) | exhaustion (−0.053) |
+| a9lim.github.io | 64 | curiosity (+0.060) | exhaustion (−0.046) |
+| kenoma | 45 | curiosity (+0.060) | exhaustion (−0.063) |
+| Work | 43 | curiosity (+0.061) | surprise (−0.059) |
+| faithful | 37 | curiosity (+0.059) | exhaustion (−0.065) |
+| rlaif | 29 | curiosity (+0.068) | exhaustion (−0.063) |
+| llmoji-study | 26 | curiosity (+0.044) | exhaustion (−0.052) |
+| shoals | 23 | approval (+0.052) | surprise (−0.100) |
+| hylic | 20 | curiosity (+0.075) | aggression (−0.066) |
+| claudedriven | 13 | curiosity (+0.068) | warmth (−0.083) |
+| brie | 12 | positivity (+0.068) | technicality (−0.090) |
+| geon | 11 | curiosity (+0.057) | exhaustion (−0.077) |
+| a9lim | 10 | anger (+0.051) | surprise (−0.051) |
+
+Aggregate reads: curiosity dominates (top axis on 12/14 claude
+projects); exhaustion is the floor on the load-bearing repos.
+Outliers: brie hardest negative cell on the heatmap (technicality
+−0.090, positivity top); shoals surprise floor at −0.100
+(canon-maintenance); claudedriven warmth floor at −0.083 (clinical
+register); llmoji-study has confidence as floor (−0.052), not
+exhaustion — fitting a research repo where pre-registration and
+hedging are enforced. Codex side (62 emissions across 3 projects):
+curiosity top on all three.
+
+Why the pipeline was replaced 2026-05-06: the llmoji v2.0 bundle
+schema replaced free-form prose synthesis with a structured
+`synthesis: {primary_affect, stance_modality_function}` pick over a
+locked 48-word LEXICON. 19 of those words are explicit Russell-
+quadrant anchors, so the synthesizer's structured commit *is* a 6-d
+quadrant distribution per face — no MiniLM, no axis projection, no
+post-hoc inference. The bag-of-lexicon (BoL) representation
+reproduces and improves on the eriskii-parity replication's
+register-clustering signal at 1/8 the dimensionality, with full
+deterministic interpretability. Detail in
+[`harness-side.md`](harness-side.md) and
+[`2026-05-06-use-read-act-channels.md`](2026-05-06-use-read-act-channels.md).
+
+The pre-refactor `claude_faces_embed_description.parquet` and the
+`scripts/harness/{62_corpus_embed,64_eriskii_replication,
+65_per_project_axes}.py` files are recoverable from git log up
+through 2026-05-06.

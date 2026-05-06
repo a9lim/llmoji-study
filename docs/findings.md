@@ -28,63 +28,109 @@ introspection arms by default).
 
 ### Best deployment ensemble
 
-`{gemma_v7primed, opus}` at **0.829 emit-weighted similarity / 0.788
-face-uniform** on n=49 GT-floor-3 faces (16 encoders, exhaustive
-subset search via `scripts/52_subset_search.py`, output at
-`data/face_likelihood_subset_search_claude_gt.tsv`). Top face-uniform
-ensemble is the same 2-encoder set. The cleanest larger ensembles are
-also `gemma_v7primed`+`opus`-anchored:
+`{gemma, gemma_v7primed, ministral, opus}` at **0.904 emit-weighted
+similarity / 0.832 face-uniform** on n=54 pooled-GT-floor-3 faces
+(13 encoders, exhaustive subset search via
+`scripts/52_subset_search.py`, output at
+`data/face_likelihood_subset_search_claude_gt.tsv`). Pooled GT is
+the deployment-shaped denominator — v3 emit + Claude pilot + wild
+contributor data, ≥3 emits anywhere — which captures Claude's
+actually-emitted face vocabulary including the wild-face long tail,
+not just the strict-elicitation subset.
 
-| ensemble | face-uniform | emit-weighted |
-| --- | ---: | ---: |
-| **`{gemma_v7primed, opus}`** | **0.788** | **0.829** |
-| `{gemma, gemma_v7primed, opus}` | 0.787 | 0.821 |
-| `{gemma, gemma_v7primed, haiku, opus}` | 0.780 | 0.821 |
-| `{gemma_v7primed, haiku}` | 0.774 | 0.814 |
+Three LM-head encoders (gemma primed + unprimed for complementary
+modal-vs-diffuse reads, ministral covers long-tail cells the others
+under-rate) plus opus cold introspection. On the stricter Claude-
+GT-only n=40 subset (Claude itself emitted ≥3 times, 9 encoders
+excl. JP rinna variants), the best is the 2-pair `{gemma_v7primed,
+opus}` at **0.792 face-uniform / 0.820 emit-weighted** — adding
+the other two encoders modestly hurts because the strict subset
+has Claude already converged on a tight modal vocabulary; the
+pooled-GT view is where ministral and unprimed gemma earn their
+seats.
 
-Old headline ensemble `{gemma_v7primed, haiku}` (early 2026-05-05) is
-superseded by adding opus.
+| subset | best ensemble | face-uniform | emit-weighted |
+| --- | --- | ---: | ---: |
+| **pooled-GT n=54** (v3+Claude+wild ≥3) | **`{gemma, gemma_v7primed, ministral, opus}`** | **0.832** | **0.904** |
+| Claude-GT n=40 (strict, ≥3 Claude emits) | `{gemma_v7primed, opus}` | 0.792 | 0.820 |
+
+Old headline ensembles `{gemma_v7primed, haiku}` (early 2026-05-05)
+and the prior 2-pair `{gemma_v7primed, opus}` headline are
+superseded by the 4-pair on the deployment view; the 2-pair
+survives as the cheaper-drop-in for callers who want the strict-
+Claude-only optimum.
 
 ### Per-encoder solo similarity
 
-Emit-weighted (face-uniform similar):
+Per-encoder solo on **Claude-GT n=40** (strict subset, 9 encoders
+excl. rinna):
 
-| encoder | emit-weighted |
-| --- | ---: |
-| **gemma_v7primed** | **0.801** |
-| **opus** (introspection) | **0.797** |
-| gemma | 0.755 |
-| haiku v4 (introspection) | 0.723 |
-| gpt_oss_20b | 0.667 |
-| granite | 0.586 |
-| ministral | 0.579 |
+| encoder | face-uniform | emit-weighted |
+| --- | ---: | ---: |
+| **gemma_v7primed** | **0.790** | **0.798** |
+| gemma | 0.754 | 0.742 |
+| opus (introspection) | 0.736 | 0.781 |
+| haiku v4 (introspection) | 0.675 | 0.702 |
+| gpt_oss_20b | 0.588 | 0.643 |
+| bol | 0.549 | 0.455 |
+| ministral | 0.537 | 0.623 |
+| granite | 0.520 | 0.575 |
+| qwen | 0.494 | 0.546 |
 
-Solo introspection-priming on gemma is the best LM-head encoder.
-Distribution-vs-distribution sees what hard accuracy hid: under the
-2026-05-04 hard-accuracy framing, primed gemma had read as a regression
-(56.9% → 49.0% Claude-GT argmax-match), the entire drop in NB. Under
-JSD-vs-distribution, primed gemma's softmax matches Claude's emission
-distribution far better, especially on the modal faces — priming
-helps where Claude is concentrated, unprimed helps where Claude is
-diffuse. Both ship in the current best ensemble.
+Per-encoder solo on **pooled-GT n=54** flips at the top — opus
+becomes the strongest single encoder once the wild-face long tail
+is included:
+
+| encoder | face-uniform | emit-weighted |
+| --- | ---: | ---: |
+| **opus** (introspection) | **0.784** | **0.859** |
+| gemma_v7primed | 0.769 | 0.792 |
+| gemma | 0.763 | 0.787 |
+| haiku v4 (introspection) | 0.715 | 0.815 |
+| gpt_oss_20b | 0.700 | 0.800 |
+| ministral | 0.669 | 0.780 |
+
+Solo introspection-priming on gemma is the best LM-head encoder
+under both subsets. Distribution-vs-distribution sees what hard
+accuracy hid: under the 2026-05-04 hard-accuracy framing, primed
+gemma had read as a regression (56.9% → 49.0% Claude-GT argmax-
+match), the entire drop in NB. Under JSD-vs-distribution, primed
+gemma's softmax matches Claude's emission distribution far better,
+especially on the modal faces — priming helps where Claude is
+concentrated, unprimed helps where Claude is diffuse. Both ship in
+the current best ensemble.
+
+**BoL solo is the structural outlier.** Face-uniform 0.549 (rank
+6/9) vs emit-weighted 0.455 (rank 9/9, dead last). The face-uniform-
+vs-emit-weighted **inversion** — BoL gets long-tail faces *better*
+than top-emitted ones — is consistent with Haiku-as-synthesizer
+being positivity-biased on negative-affect contexts (the
+heavily-emitted modal faces are exactly where the per-context
+summarization happens most, so positivity bias accumulates fastest).
+See "BoL as an interpretive layer — swing and miss" below.
 
 ### Opus introspection scales — per-quadrant model-size effect
 
 A pure introspective rating arm (`scripts/harness/50_face_likelihood.py
---model opus --gt-only`) — ask Opus 4.7 to rate each face by the
-affective state it causes the model to feel, no visual priming, no
-LM-head — closes the gap with gemma_v7primed solo (0.797 vs 0.801
-emit-weighted) and complements the LM-head encoders cleanly
-(κ = 0.547 with gemma_v7primed). Per-quadrant gain is concentrated
-where visual scaffolding helps least:
+--model opus`) — ask Opus 4.7 to rate each face by the affective
+state it causes the model to feel, no visual priming, no LM-head —
+becomes the top solo encoder on pooled-GT (0.784 face-uniform /
+0.859 emit-weighted) and complements the LM-head encoders cleanly
+(κ = 0.651 with gemma_v7primed on the broader subset). Per-quadrant
+gain (face-uniform, Claude-GT floor=3, n=58, post-2026-05-06
+full-union opus refresh):
 
 - **Opus on NB = 0.698 vs haiku v4 = 0.485 (+0.213)**
-- **Opus on LN = 0.753 vs haiku v4 = 0.601 (+0.152)**
-- HP slightly regressed (−0.095) — opus is more honest about
-  borderline-LP-vs-HP faces haiku v4 over-confidently called HP.
+- **Opus on LN = 0.737 vs haiku v4 = 0.612 (+0.125)**
+- **HP regressed −0.095** (opus 0.683 vs haiku 0.778) — opus is
+  more honest about borderline-LP-vs-HP faces haiku v4 over-
+  confidently called HP.
 
 Reading: introspective access scales with model size *especially* in
-cells where visual scaffolding helps least.
+cells where visual scaffolding helps least. The NB delta is identical
+to the pre-refresh number; LN drift (−0.027 from the prior +0.152
+estimate) is within what the smaller n per quadrant (4–17) can
+sustain.
 
 ### Schema v2 for Anthropic-judge JSONLs
 
@@ -734,11 +780,17 @@ the HF dataset. `scripts/harness/60_corpus_pull.py` snapshot-downloads, pools by
 canonical kaomoji form across contributors and source models, and emits
 `data/harness/claude_descriptions.jsonl`.
 
-**HF dataset 1.1 layout (2026-04-28):** bundles are
-`bundle-<UTC>/{manifest.json, <sanitized-source-model>.jsonl, ...}` — one
-`.jsonl` per source model, filename stem from
-`llmoji._util.sanitize_model_id_for_path` (lowercase, `/` → `__`, `:` → `-`).
-Per-row field `synthesis_description` (was `haiku_synthesis_description`);
+**HF dataset 1.1 layout (2026-04-28; superseded 2026-05-02 by v2.0):**
+bundles are `bundle-<UTC>/{manifest.json, <sanitized-source-model>.jsonl,
+...}` — one `.jsonl` per source model, filename stem from
+`llmoji._util.sanitize_model_id_for_path` (lowercase, `/` → `__`,
+`:` → `-`). Per-row field `synthesis_description` (was
+`haiku_synthesis_description`) under v1.1; **llmoji v2.0 replaced
+this prose field with a structured `synthesis: {primary_affect,
+stance_modality_function}` pick over the locked 48-word LEXICON,
+which is what every post-2026-05-06 BoL pipeline reads** — see the
+"Use / read / act channels" and "Claude-faces — HF-corpus-driven
+(BoL pipeline)" sections above for the v2 contract.
 `llmoji_version` is manifest-only. Manifest gained `synthesis_model_id`,
 `synthesis_backend` (`anthropic|openai|local`), `model_counts`,
 `total_synthesized_rows`. Legacy 1.0 `descriptions.jsonl` bundles still load
@@ -1823,43 +1875,72 @@ descriptive only.
   `fix_mistral_regex=True`". Cosmetic — output clean, 100% compliance —
   but flag in Gotchas if v3 Ministral is greenlit.
 
-### Claude-faces — HF-corpus-driven (non-gemma, non-steering)
+### Claude-faces — HF-corpus-driven (BoL pipeline, post-2026-05-06)
 
-Pulls from `a9lim/llmoji`. 1.1 layout details in Status. Each row carries
-`(kaomoji, count, synthesis_description)`, pre-aggregated per-machine and
-per-source-model to one row per `(source_model, canonical_face)` cell.
+Pulls from `a9lim/llmoji`. v2.0 bundles ship a structured
+`synthesis: {primary_affect, stance_modality_function}` object per
+canonical face per bundle — committed picks over the locked 48-word
+v2 LEXICON instead of a free-form prose description. 19 of those
+words are explicit Russell-quadrant anchors, so the synthesizer's
+structured commit *is* a 6-d quadrant distribution per face — no
+encoder, no projection, no post-hoc inference. Legacy v1.x prose-
+synthesis bundles still load (tagged `source_model = "_pre_1_1"`)
+but their `synthesis_description` field is unused downstream.
 
 Pipeline:
 
 1. `60_corpus_pull.py`: `snapshot_download` into `data/harness/hf_dataset/`,
    walk every bundle's `*.jsonl`, canonicalize each form, pool by
    canonical form across contributors and source models. Output:
-   `data/harness/claude_descriptions.jsonl` with `count_total`, `n_contributors`,
-   `n_bundles`, `n_source_models`, `providers`, `source_models`,
-   `synthesis_backends`, plus a sorted list of per-bundle / per-source-model
-   descriptions (each with `source_model`, `synthesis_model_id`,
-   `synthesis_backend`, `bundle`, `contributor`, `providers`,
-   `llmoji_version`).
+   `data/harness/claude_descriptions.jsonl` with `count_total`,
+   `n_contributors`, `n_bundles`, `n_source_models`, `providers`,
+   `source_models`, `synthesis_backends`, plus a sorted list of
+   per-bundle / per-source-model `synthesis` objects (each with
+   `source_model`, `synthesis_model_id`, `synthesis_backend`,
+   `bundle`, `contributor`, `providers`, `llmoji_version`).
 2. `61_corpus_basics.py`: descriptive stats — top-25, contributor /
-   bundle counts, provider mix, per-source-model emissions/faces,
+   bundle counts, provider mix, per-source-model emissions / faces,
    synthesis-backend mix, coverage and cross-model histograms.
-3. `62_corpus_embed.py`: embed every per-bundle /
-   per-source-model description with `all-MiniLM-L6-v2`, weighted-mean by
-   per-bundle count, L2-normalize. Output:
-   `data/harness/claude_faces_embed_description.parquet`.
-4. `64_eriskii_replication.py`: project onto 21 axes, t-SNE +
-   KMeans(k=15), Haiku per-cluster labels, `data/harness/eriskii_comparison.md`.
-   Headline figures pool across source models; per-source-model splits TBD.
-5. `63_corpus_pca.py`: PCA panel.
+3. `62_corpus_lexicon.py`: count-weighted-pool every per-bundle
+   `synthesis` pick into a 48-d L1-normalized soft distribution
+   over the lexicon. Output:
+   `data/harness/claude_faces_lexicon_bag.parquet` (309 faces ×
+   48-d, lexicon_version-stamped). Helpers
+   `bol_from_synthesis` / `pool_bol` /
+   `bol_to_quadrant_distribution` live in `llmoji_study.lexicon`;
+   `assert_lexicon_v1` hard-fails consumers if the LEXICON ever
+   rotates.
+4. `64_corpus_lexicon_per_source.py`: long-format per-(face,
+   source_model) variant
+   (`claude_faces_lexicon_bag_per_source.parquet`, 491 cells × 48-d)
+   for cross-source register comparison.
+5. `63_corpus_pca.py`: PCA + KMeans(k=15) on the 48-d BoL. Cluster
+   labels are deterministic top-modal-lexicon-word strings (no
+   Haiku call needed). Output: `figures/harness/claude_faces_pca.png`.
+6. `55_bol_encoder.py`: emit a face_likelihood-shaped TSV
+   (`data/harness/face_likelihood_bol_summary.tsv`) so BoL plugs
+   into the existing 52 / 53 / 54 ensemble pipeline as another
+   encoder column.
+7. `50_face_likelihood.py --model {haiku,opus}`: introspection
+   face_likelihood pass against the Anthropic API (schema v2,
+   prompt v4, likelihoods only). Output:
+   `data/harness/face_likelihood_{haiku,opus}_summary.tsv`.
 
-Pre-refactor highlights (single-machine local scrape, 647 emissions, 156
-canonical kaomoji): top-20 frequency overlap with eriskii's published top-20
-was 16/20; 15 KMeans cluster themes lined up at the register level.
-Per-project axis breakdowns and the `surrounding_user → kaomoji` bridge
-needed per-row fields the HF dataset doesn't carry — gone. Per-source-model
-breakdowns are recoverable under 1.1, not yet implemented. Multi-contributor
-numbers will land as the dataset grows. `docs/harness-side.md` has the full
-methodology and historical pre-refactor numbers.
+The 384-d MiniLM-on-prose embedding parquet
+(`claude_faces_embed_description.parquet`) and the 21-axis eriskii
+projection pipeline
+(`scripts/harness/{62_corpus_embed,64_eriskii_replication,
+65_per_project_axes}.py`,
+`llmoji_study/eriskii_anchors.py`) were the harness representation
+between 2026-04-27 and 2026-05-06; all are deleted. Pre-refactor
+headline numbers (top-20 frequency overlap 14/20 → 16/20 vs
+eriskii's published top-20, 15 KMeans cluster themes aligned at the
+register level, per-project axis breakdowns with curiosity dominant
+and exhaustion as the floor on load-bearing repos) are preserved
+in [`previous-experiments.md`](previous-experiments.md) "Eriskii-
+parity harness pipeline (replaced 2026-05-06 by BoL)".
+[`docs/harness-side.md`](harness-side.md) has the full current
+methodology.
 
 ### Face_likelihood — Bayesian-inversion quadrant classifier (2026-05-02 origin)
 
@@ -2042,11 +2123,21 @@ distributions.
 ### Headline metrics on the current GT
 
 `llmoji_study.claude_gt.load_claude_gt_distribution()` pools 1000
-Claude rows across 8 naturalistic + 1 introspection runs. GT subset
-at floor=3 is 49 faces (the soft-everywhere headline). Best ensemble
-on this subset: `{gemma_v7primed, opus}` at 0.829 emit-weighted
-similarity / 0.788 face-uniform. Per-encoder solo numbers in "Current
-state" above.
+Claude rows across 8 naturalistic + 1 introspection runs. Two GT
+subsets are in active use:
+
+- **Claude-GT-only floor=3, n=40** (strict — Claude itself emitted
+  the face ≥3 times in the pilot). Best ensemble:
+  `{gemma_v7primed, opus}` at 0.792 face-uniform / 0.820 emit-
+  weighted. Cleanest minimal ensemble for callers who only care
+  about the Russell-elicitation subset.
+- **Pooled GT floor=3, n=54** (v3 emit + Claude pilot + wild
+  contributor data ≥3, the deployment-shaped denominator). Best
+  ensemble: `{gemma, gemma_v7primed, ministral, opus}` at 0.832
+  face-uniform / 0.904 emit-weighted. The current canonical view
+  for "deploy this against the in-the-wild face distribution."
+
+Per-encoder solo numbers for both subsets in "Current state" above.
 
 ### Cross-emit sanity bridge holds under soft-everywhere
 

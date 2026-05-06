@@ -180,9 +180,9 @@ not nothing.
   corpus than in the elicitation set. Cluster-table outputs at
   `data/harness/wild_residual_clusters{,_gt_only}.tsv`.
 - **Sequential Claude scaling complete.** 880 naturalistic
-  (`data/claude-runs/run-{0..7}.jsonl`) + 120 introspection
-  (`data/claude-runs-introspection/run-0.jsonl`) = 1000 Opus-4.7 rows
-  under naturalistic / v7-introspection conditions. Per-quadrant
+  (`data/harness/claude-runs/run-{0..7}.jsonl`) + 120 introspection
+  (`data/harness/claude-runs-introspection/run-0.jsonl`) = 1000
+  Opus-4.7 rows under naturalistic / v7-introspection conditions. Per-quadrant
   saturation gate exited HN-D after r2 and LN after r6; HP/LP/HN-S/NB
   went to cap (r7). Welfare ledger ~460 negative-affect gens vs ~540
   worst case. Detail: `docs/2026-05-04-claude-groundtruth-pilot.md`.
@@ -279,7 +279,7 @@ not nothing.
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -e ../llmoji   # editable; or pip install 'llmoji>=2.0,<3'
-pip install -e .            # saklas, sentence-transformers, pyarrow, plotly, anthropic
+pip install -e .            # saklas, anthropic, pyarrow, plotly, scikit-learn, matplotlib
 
 # Smoke test the hidden-state pipeline (~5 min). Asserts MAX_NEW_TOKENS=16.
 python scripts/local/90_hidden_state_smoke.py
@@ -349,7 +349,8 @@ python scripts/local/99_regen_blog_figures.py
 # Harness side (contributor-corpus + Claude API; needs ANTHROPIC_API_KEY for 50)
 python scripts/harness/60_corpus_pull.py             # snapshot a9lim/llmoji
 python scripts/harness/61_corpus_basics.py
-python scripts/harness/62_corpus_lexicon.py          # build BoL parquet (no GPU/API)
+python scripts/harness/62_corpus_lexicon.py          # build pooled BoL parquet (no GPU/API)
+python scripts/harness/64_corpus_lexicon_per_source.py  # long-format per-(face, source_model) BoL
 python scripts/harness/63_corpus_pca.py              # 48-d BoL PCA + KMeans cluster panels
 python scripts/harness/55_bol_encoder.py             # BoL → face_likelihood-shaped TSV (auto-discovered by 52/53/54)
 # Cross-platform per-project quadrants + face judgment + wild residuals
@@ -359,8 +360,12 @@ python scripts/66_per_project_quadrants.py --mode bol      # pure BoL inference 
 python scripts/66_per_project_quadrants.py --mode gt-only  # strict
 python scripts/harness/50_face_likelihood.py                  # haiku face-judgment encoder (default; auto-writes face_likelihood TSV)
 python scripts/harness/50_face_likelihood.py --model opus --gt-only   # opus on the GT subset
+python scripts/harness/68_three_way_analysis.py       # use/read/act per-face — needs GT + opus + haiku + BoL TSVs
+python scripts/harness/69_per_source_drift.py         # per-source BoL drift + diagnostic case files
 python scripts/67_wild_residual.py --fixed-k 6        # wild-emit residual clusters + 3D PCA on BoL
 python scripts/67_wild_residual.py --gt-only --fixed-k 6  # gt-only counterpart
+python scripts/67_wild_residual.py --color-by gt        # 3D PCA colored by GT quadrant (non-GT = black)
+python scripts/67_wild_residual.py --color-by predicted # colored by ensemble-predicted softmax blend
 
 # Claude groundtruth pilot (Opus 4.7, T=1.0; saturation-gated sequential).
 # Run-0 was the original block-staged pilot; runs 1+ are single-block
@@ -433,11 +438,16 @@ llmoji-study/
     local/                     # local-LM scripts (00, 10/11, 20-29, 30-33,
                                # 50/51, 90-92, 97-99)
     harness/                   # contributor-corpus + Claude-API scripts
-                               # (00, 10, 50, 55, 60-63). Post-2026-05-06
+                               # (00, 10, 50, 55, 60-64, 68, 69). Post-2026-05-06
                                # the eriskii axis projection pipeline
-                               # (64_eriskii_replication, 65_per_project_axes)
-                               # is gone — replaced by direct bag-of-lexicon
-                               # consumption from llmoji v2 synthesis rows.
+                               # (62_corpus_embed, 64_eriskii_replication,
+                               # 65_per_project_axes) is gone — replaced by
+                               # direct bag-of-lexicon (BoL) consumption from
+                               # llmoji v2 synthesis rows. 64_corpus_lexicon_per_source
+                               # is the long-format per-(face, source_model) BoL
+                               # builder; 68_three_way_analysis is the
+                               # use/read/act per-face joiner; 69_per_source_drift
+                               # is the per-source case-file generator.
   preambles/                   # introspection-prompt iterations v2..v8;
                                # v7 is canonical (config.INTROSPECTION_PREAMBLE)
   docs/                        # findings / internals / gotchas /
@@ -446,8 +456,8 @@ llmoji-study/
   data/                        # tracked: *.jsonl, *.tsv, *.parquet, *.html
     # Cross-platform (lives at data/ root):
     v3_face_union.{parquet,tsv}                  # canonical face inventory
-    face_likelihood_{subset_search,topk_pooling,ensemble_predict}_claude_gt.{tsv,md}
-                                                 # post-hoc evals against Claude GT
+    face_likelihood_{subset_search,ensemble_predict}_claude_gt.{tsv,md}
+    face_likelihood_topk_pooling_claude_gt.tsv   # post-hoc evals against Claude GT
     fonts/                                       # NotoEmoji-Regular.ttf
     local/                     # local-LM-produced data
       {gemma, qwen, ministral, gpt_oss_20b, granite,
@@ -463,23 +473,28 @@ llmoji-study/
                                # multi-layer h_mean tensors (gitignored)
       v3_cross_model_face_overlap.tsv
       face_gain_variance{,_bootstrap}.tsv
-      face_likelihood_{subset_search,topk_pooling,ensemble_predict}{,.md}.tsv
-      face_likelihood_cross_emit_sanity.{tsv,md}
+      face_likelihood_{subset_search,topk_pooling,ensemble_predict,cross_emit_sanity}.{tsv,md}
       rule3_dominance_check.tsv
       v3_probe_correlations.json
       temp_smoke_verdict.md
     harness/                   # claude/contributor-corpus-side data
       claude-runs/             # naturalistic run-{0..7}.jsonl (Opus 4.7)
-      claude-runs-introspection/  # v7-primed run-0.jsonl
+                               # + per-run *_summary.tsv companions
+      claude-runs-introspection/  # v7-primed run-0.jsonl + summary
       hf_dataset/              # snapshot of a9lim/llmoji (gitignored)
       claude_descriptions.jsonl
       claude_disclosure_pilot{,_summary}.{jsonl,tsv}
-      claude_faces_lexicon_bag.parquet  # 48-d BoL per canonical face,
-                                        # lexicon_version-stamped
+      claude_faces_lexicon_bag.parquet            # pooled 48-d BoL,
+                                                  # lexicon_version-stamped
+      claude_faces_lexicon_bag_per_source.parquet # long-format per-(face, source_model)
       haiku_face_quadrant_judgment{,_summary}.{jsonl,md}
       opus_face_quadrant_judgment{,_summary}.{jsonl,md}
       face_likelihood_{haiku,opus,bol}_summary.tsv
-      wild_residual_clusters{,_gt_only}.tsv
+      three_way_per_face.tsv                      # script-68 inner-join (n=40 shared faces)
+      three_way_summary.md                        # script-68 narrative writeup
+      per_source_drift.tsv                        # script-69 per-(face, source_model) cell
+      per_source_drift_summary.md                 # script-69 case files
+      wild_residual_clusters{,_gt_only}.tsv       # script-67 cluster tables
       # Deployment-telemetry outputs (claude_per_project_* and
       # wild_faces_labeled* with surface columns) are gitignored —
       # regenerate locally via scripts 66 + 67.

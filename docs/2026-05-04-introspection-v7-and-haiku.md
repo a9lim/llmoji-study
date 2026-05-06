@@ -207,13 +207,16 @@ hurts."
 The 2026-05-05 soft-everywhere methodology pivot (JSD against
 Claude's emission distribution, not argmax against Claude's modal
 label) **inverts the verdict**: gemma_v7primed becomes the **best
-single LM-head encoder** on emit-weighted similarity (0.801 emit-
-weighted, 0.776 face-uniform), beating unprimed gemma (0.755 emit-
-weighted, 0.756 face-uniform) substantially. The reframe: priming
-helps where Claude's distribution is concentrated (head modal
-faces), unprimed helps where it's diffuse. Distribution-vs-distribution
-sees what hard accuracy hid. The current best deployment ensemble is
-`{gemma_v7primed, opus}` at 0.829 emit-weighted similarity.
+single LM-head encoder** under both subsets (Claude-GT n=40
+strict: 0.798 emit-weighted / 0.790 face-uniform vs unprimed
+gemma's 0.742 / 0.754; pooled-GT n=54: 0.792 / 0.769 vs unprimed
+gemma's 0.787 / 0.763). The reframe: priming helps where Claude's
+distribution is concentrated (head modal faces), unprimed helps
+where it's diffuse. Distribution-vs-distribution sees what hard
+accuracy hid. The current best deployment ensemble is
+`{gemma, gemma_v7primed, ministral, opus}` at 0.904 emit-weighted /
+0.832 face-uniform on pooled-GT n=54 (with the strict-subset 2-pair
+`{gemma_v7primed, opus}` surviving at 0.792 / 0.820 on Claude-GT n=40).
 
 Pairwise κ(unprimed-gemma ↔ v7-primed-gemma) = 0.757 — high, so they
 don't add complementary signal at high subset sizes; the soft-mean

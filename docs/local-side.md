@@ -236,52 +236,95 @@ Helpers in `llmoji_study/jsd.py` plus
 
 ### Solo-encoder similarity vs Claude-GT (current)
 
-Per-encoder solo similarity on the 49 GT-floor-3 faces (face-uniform
-/ emit-weighted), from `data/face_likelihood_subset_search_claude_gt.tsv`:
+Two subsets are in active use:
+
+- **Claude-GT-only n=40** (strict — Claude itself emitted ≥3 times,
+  9 encoders excl. JP rinna variants). Tight Russell-elicitation
+  vocabulary; gemma_v7primed leads.
+- **Pooled-GT n=54** (v3 emit + Claude pilot + wild contributor
+  data ≥3, the deployment-shaped denominator). Includes the wild-
+  face long tail; opus solo flips to the top because the LM-head
+  encoders weren't trained on long-tail wild faces but Opus's
+  introspection generalizes.
+
+Per-encoder solo on Claude-GT n=40:
 
 | encoder | face-uniform | emit-weighted |
 | --- | ---: | ---: |
-| **gemma_v7primed** | 0.777 | **0.801** |
-| **opus** (introspection) | 0.776 | 0.797 |
-| gemma | 0.756 | 0.755 |
-| haiku (introspection) | — | 0.723 |
-| gpt_oss_20b | — | 0.667 |
-| granite | — | 0.586 |
-| ministral | — | 0.579 |
+| **gemma_v7primed** | **0.790** | **0.798** |
+| gemma | 0.754 | 0.742 |
+| opus (introspection) | 0.736 | 0.781 |
+| haiku v4 (introspection) | 0.675 | 0.702 |
+| gpt_oss_20b | 0.588 | 0.643 |
+| bol | 0.549 | 0.455 |
+| ministral | 0.537 | 0.623 |
+| granite | 0.520 | 0.575 |
+| qwen | 0.494 | 0.546 |
 
-The story under emit-weighting: **introspection priming on gemma
-becomes the best single LM-head encoder**, beating unprimed gemma
-substantially. Under hard-accuracy (the 2026-05-04 framing) primed
-gemma had read as a regression because primed gemma's NB modal
-(`( ˙꒳˙ )`) diverged from Claude's gentle-warm `(｡◕‿◕｡)` on argmax;
-under JSD-against-distribution, primed gemma's softmax matches
-Claude's emission *distribution* far better, especially on modal
-faces. Distribution-vs-distribution sees what hard accuracy hid.
+Per-encoder solo on pooled-GT n=54 (top of ranking flips):
+
+| encoder | face-uniform | emit-weighted |
+| --- | ---: | ---: |
+| **opus** (introspection) | **0.784** | **0.859** |
+| gemma_v7primed | 0.769 | 0.792 |
+| gemma | 0.763 | 0.787 |
+| haiku v4 (introspection) | 0.715 | 0.815 |
+| gpt_oss_20b | 0.700 | 0.800 |
+| ministral | 0.669 | 0.780 |
+
+The story under emit-weighting on the strict subset:
+**introspection priming on gemma is the best single LM-head encoder**,
+beating unprimed gemma substantially. Under hard-accuracy (the
+2026-05-04 framing) primed gemma had read as a regression because
+primed gemma's NB modal (`( ˙꒳˙ )`) diverged from Claude's gentle-
+warm `(｡◕‿◕｡)` on argmax; under JSD-against-distribution, primed
+gemma's softmax matches Claude's emission *distribution* far
+better, especially on modal faces. Distribution-vs-distribution
+sees what hard accuracy hid.
+
+**BoL solo is the structural outlier.** Face-uniform 0.549 (rank
+6/9 on Claude-GT n=40) but emit-weighted 0.455 (rank 9/9, dead
+last). The face-uniform-vs-emit-weighted **inversion** is consistent
+with Haiku-as-synthesizer being positivity-biased on negative-affect
+contexts — the heavily-emitted modal faces are exactly where the
+per-context summarization happens most, so positivity bias
+accumulates fastest. BoL doesn't make the best ensemble; the
+encoder still ships because the inversion itself is a useful
+signal. Detail in
+[`2026-05-06-use-read-act-channels.md`](2026-05-06-use-read-act-channels.md).
 
 **Opus introspection scaling.** A pure introspective rating arm —
 ask Opus 4.7 to rate each face by the affective state it causes the
-model to feel, no visual priming, no LM-head — closes the gap with
-gemma_v7primed solo (0.797 vs 0.801 emit-weighted). Per-quadrant
-gain is concentrated where visual scaffolding helps least: opus on
-NB = 0.698 vs haiku v4 = 0.485 (+0.213); opus on LN = 0.753 vs
-haiku = 0.601 (+0.152). HP regressed slightly (−0.095) — opus is
-more honest about borderline-LP-vs-HP faces haiku v4 over-confidently
+model to feel, no visual priming, no LM-head — becomes the top
+solo encoder on pooled-GT (0.784 face-uniform / 0.859 emit-
+weighted). Per-quadrant gain is concentrated where visual
+scaffolding helps least: opus on NB = 0.698 vs haiku v4 = 0.485
+(+0.213); opus on LN = 0.737 vs haiku = 0.612 (+0.125). HP
+regressed −0.095 (opus 0.683 vs haiku 0.778) — opus is more
+honest about borderline-LP-vs-HP faces haiku v4 over-confidently
 called HP. Reading: introspective access scales with model size
 *especially* in cells where visual scaffolding helps least.
 
 ### Best ensemble (current)
 
-| ensemble | face-uniform | emit-weighted |
-| --- | ---: | ---: |
-| **`{gemma_v7primed, opus}`** | **0.788** | **0.829** |
-| `{gemma, gemma_v7primed, opus}` | 0.787 | 0.821 |
-| `{gemma, gemma_v7primed, haiku, opus}` | 0.780 | 0.821 |
-| `{gemma_v7primed, haiku}` | 0.774 | 0.814 |
+| subset | best ensemble | face-uniform | emit-weighted |
+| --- | --- | ---: | ---: |
+| **pooled-GT n=54** | **`{gemma, gemma_v7primed, ministral, opus}`** | **0.832** | **0.904** |
+| Claude-GT n=40 (strict) | `{gemma_v7primed, opus}` | 0.792 | 0.820 |
 
-`{gemma_v7primed, opus}` is the best ensemble across both ranking
-metrics. Pairwise κ(gemma_v7primed, opus) = 0.547 — moderate, with
-complementary error patterns: opus owns NB / LN, gemma_v7primed
-owns the high-arousal cells, the soft-mean ensemble averages well.
+The 4-pair is the deployment-shaped headline — three LM-head
+encoders (gemma primed + unprimed for complementary modal-vs-
+diffuse reads, ministral covers long-tail cells the others under-
+rate) plus opus cold introspection. The strict-subset 2-pair
+survives as a cheaper drop-in for callers who only care about
+Russell-elicited Claude vocabulary; ministral and unprimed gemma
+earn their seats specifically by helping on the wild-face long
+tail.
+
+Pairwise κ(gemma_v7primed, opus) = 0.651 on the broader subset —
+moderate, with complementary error patterns: opus owns NB / LN /
+the long tail, gemma_v7primed owns the high-arousal cells, the
+soft-mean ensemble averages well.
 
 Subset search source: `scripts/52_subset_search.py` against
 `data/face_likelihood_subset_search_claude_gt.tsv`. Top-k pooling
@@ -409,13 +452,11 @@ genuine, not undersampling. Detail:
 Applying the per-face quadrant resolver to
 `~/.claude/kaomoji-journal.jsonl` plus contributor-corpus exports
 gives **3119 emissions across 274 unique faces** under
-`--mode gt-priority`. Direct Claude-GT resolution (the face appeared
-in the 1000-row groundtruth pilot) covers **67.2%** of emissions;
-the soft ensemble fills another 29.4%; the residual 3.4% is unknown
-(faces not in the canonical face union). Strict `--mode gt-only`
-leaves 32.8% (1024 emissions / 207 unique faces) unknown — those
-are the in-the-wild contributor faces that Claude never emitted
-under the Russell-elicitation pilot.
+`--mode gt-priority`. Direct Claude-GT resolution (the face
+appeared in the 1000-row groundtruth pilot) covers ~67% of
+emissions; BoL fallback fills the remaining ~33%; strict
+`--mode gt-only` leaves ~33% unknown (the in-the-wild contributor
+faces Claude never emitted under the Russell-elicitation pilot).
 
 Per-project, most projects sit close to the global distribution. A
 few diverge sharply:
@@ -423,32 +464,40 @@ few diverge sharply:
 - `brie` / `yap` / `webui` are LP-modal (44 to 64% LP, plausibly
   things mostly working and Claude expressing contentment more than
   analysis).
-- `verify` is HN-D-modal (29% anger / contempt at n=7 — a code-review
-  and bug-finding tool, the project's purpose lines up with the
-  register).
-- `shoals` has anomalously high HP (18% vs the global rate, plausibly
-  tied to the simulator's narrative-event content).
+- `verify` is HN-D-modal (29% anger / contempt at n=7 — a code-
+  review and bug-finding tool, the project's purpose lines up with
+  the register).
+- `shoals` has anomalously high HP (18% vs the global rate,
+  plausibly tied to the simulator's narrative-event content).
 
 These are intrinsic-affect readings of the kaomoji Claude chose to
 emit, not assertions about Claude's "actual" emotional state. The
-ensemble's 0.829 emit-weighted similarity to Claude-GT gives the
-per-project picture meaningful resolution where direct GT doesn't
-cover.
+deployment-shaped 4-pair ensemble's 0.904 emit-weighted similarity
+to pooled-GT (0.820 for the strict 2-pair against Claude-GT n=40)
+gives the per-project picture meaningful resolution where direct
+GT doesn't cover. **BoL fallback is provisional** on negative-
+affect faces — the synthesizer-positivity-bias hedge means LP-coded
+projects might be slightly inflated where the long-tail faces are
+LN/HN-coded in lived state but BoL whitewashes; deployment-
+interpretation should prefer GT or Opus introspection over BoL when
+they disagree.
 
 Pipeline: `scripts/66_per_project_quadrants.py` with three
 resolution modes — `--mode gt-priority` (default, Claude-GT first
-then ensemble fallback for in-the-wild faces), `--mode ensemble`
-(ensemble for every face — the deployable-extension scenario), and
+then BoL fallback for in-the-wild faces), `--mode bol` (BoL for
+every face — the structural-deployment-shape scenario), and
 `--mode gt-only` (strict, no speculative grading). Reads the
-canonical ensemble predictions from
-`scripts/54_ensemble_predict.py` and the Claude-GT distribution from
+canonical Claude-GT distribution from
 `llmoji_study.claude_gt.load_claude_gt_distribution()` (which pools
-across all naturalistic runs + the introspection arm). Pulls
-emissions from `~/.claude/kaomoji-journal.jsonl` plus
-comma-separated claude.ai exports (defaults to two known exports
-under `~/Downloads/`, unioned by conversation UUID). Outputs to
-`data/harness/claude_per_project_{gt_priority,ensemble,gt_only}{,.md}.tsv`
-+ `figures/harness/claude_per_project_*.png`.
+across all naturalistic runs + the introspection arm) and the BoL
+parquet from `scripts/harness/62_corpus_lexicon.py`. Pulls
+emissions from `~/.claude/kaomoji-journal.jsonl` plus comma-
+separated claude.ai exports (defaults to two known exports under
+`~/Downloads/`, unioned by conversation UUID). Outputs to
+`data/harness/claude_per_project_{gt_priority,bol,gt_only}{,.md}.tsv`
++ `figures/harness/claude_per_project_*.png`. The rendered outputs
+are deployment-telemetry by construction — gitignored, regenerate
+locally per contributor.
 
 ## Hidden-state pipeline
 

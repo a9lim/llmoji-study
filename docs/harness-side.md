@@ -1,33 +1,46 @@
 # Harness side: contributor-submitted Claude and Codex kaomoji
 
-The harness side replicates [eriskii's Claude-faces
-catalog](https://eriskii.net/projects/claude-faces) on a
-contributor-submitted corpus. The corpus lives on HuggingFace as
+The harness side runs analyses on a contributor-submitted corpus of
+kaomoji emissions. The corpus lives on HuggingFace as
 [`a9lim/llmoji`](https://huggingface.co/datasets/a9lim/llmoji); the
 companion package [`llmoji`](https://github.com/a9lim/llmoji)
-collects the data on the contributor side via Stop hooks and
-Haiku synthesis, and uploads pre-aggregated bundles to that
-dataset. This repo just pulls the corpus and runs the analysis.
+collects the data on the contributor side via Stop hooks, runs a
+structured Haiku synthesis pass that commits each face's affect /
+stance / modality picks to a locked 48-word LEXICON, and uploads
+pre-aggregated bundles to that dataset. This repo just pulls the
+corpus and runs the analysis.
 
 ## Prior art: eriskii
 
 eriskii ran the original prompting experiment: configure Claude to
 start each message with a kaomoji, log the resulting vocabulary,
-and analyze it. They built a 21-axis semantic projection scheme
-(warmth, energy, confidence, playfulness, empathy, technicality,
-positivity, curiosity, approval, apologeticness, decisiveness,
-wryness, wetness, surprise, anger, frustration, hatefulness,
-sadness, hope, aggression, exhaustion) and a two-stage Haiku
-pipeline for going from raw kaomoji-bearing turns to per-face
-descriptions. The published page has a 519-face catalog with 15
-KMeans cluster labels and per-axis rankings.
+and analyze it. Their writeup at
+[eriskii.net/projects/claude-faces](https://eriskii.net/projects/claude-faces)
+built a 21-axis MiniLM-on-prose semantic projection (warmth, energy,
+confidence, playfulness, …) and a two-stage Haiku pipeline that
+went raw kaomoji-bearing turns → per-instance description → per-face
+synthesis description, then ran KMeans(k=15) on the embeddings for
+register clustering. The published page has a 519-face catalog with
+per-axis rankings.
 
-The harness-side pipeline here uses eriskii's anchor scheme (with
-one rewrite called out below) and their two-stage Haiku method,
-then runs the analysis on the contributor-submitted corpus
-instead of a single-author log.
+This repo's harness side **previously** ran a parity replication on
+that scheme — `scripts/harness/62_corpus_embed.py` MiniLM'd the
+synthesized prose, `scripts/harness/64_eriskii_replication.py`
+projected onto the 21 axes, `scripts/harness/65_per_project_axes.py`
+embedded `assistant_text` from per-machine journals onto the same
+axes for per-project register breakdowns. **All three are gone as of
+2026-05-06.** They were replaced by the bag-of-lexicon (BoL) pipeline
+described below; the eriskii framing survives as motivation but its
+21-axis projection is no longer the harness representation.
 
-## Pipeline
+The pre-refactor numbers from the eriskii-parity era (16/20 → 14/20
+top-20 frequency overlap; 15-cluster theme alignment; per-project
+axis means with curiosity dominating and exhaustion as the floor on
+load-bearing repos; saklas / kenoma cross-provider divergence) are
+preserved in [`previous-experiments.md`](previous-experiments.md)
+"Eriskii-parity harness pipeline (replaced 2026-05-06 by BoL)".
+
+## Pipeline (post-2026-05-06)
 
 The whole pipeline is split between the contributor side (the
 `llmoji` package, runs locally on each contributor's machine) and
@@ -45,12 +58,17 @@ Contributor side, in the `llmoji` package:
 2. `llmoji analyze` walks the journals, canonicalizes each
    kaomoji form via `llmoji.taxonomy.canonicalize_kaomoji`, samples
    up to 4 instances per face for Stage A (per-instance Haiku
-   description with `[FACE]` masking), then runs Stage B
-   (per-face synthesis of the 4 descriptions into one canonical
-   one-sentence meaning).
+   read-through with `[FACE]` masking), then runs Stage B — a
+   **structured synthesis pass** that asks Haiku to commit, per
+   face per bundle, a pick from the locked 48-word v2 LEXICON: 1–3
+   `primary_affect` words (the Russell-circumplex-tagged subset)
+   plus 3–5 `stance_modality_function` words (the extension axes).
+   Pre-2026-05-02 (llmoji v1.x) this stage produced a free-form
+   prose "synthesis description" instead. v2 bundles ship the
+   structured `synthesis` object alongside the row's count metadata.
 3. `llmoji upload --target hf` ships a bundle of
-   `(manifest.json, descriptions.jsonl)` to a contributor-named,
-   timestamped subfolder under
+   `(manifest.json, <sanitized-source-model>.jsonl)` to a
+   contributor-named, timestamped subfolder under
    `contributors/<32-hex>/bundle-<UTC>/`. The 32-hex is a salted
    hash of a per-machine random token, not an HF account ID.
 
@@ -59,28 +77,99 @@ Research side, in this repo:
 4. `scripts/harness/60_corpus_pull.py` snapshot-downloads
    `a9lim/llmoji`, walks every bundle, canonicalizes each kaomoji
    form again (in case contributors have different package
-   versions), and pools by canonical form across contributors.
-   Output: `data/harness/claude_descriptions.jsonl`, one row per canonical
-   form with the union of per-bundle synthesized descriptions
-   plus per-contributor counts and provider mix.
+   versions), and pools by canonical form across contributors and
+   source models. Output: `data/harness/claude_descriptions.jsonl`,
+   one row per canonical face with per-bundle `synthesis` objects,
+   per-bundle counts, source-model and provider mix. Legacy v1.x
+   bundles still load (`source_model = "_pre_1_1"`) but their
+   free-form `synthesis_description` field is unused downstream.
 5. `scripts/harness/61_corpus_basics.py` prints descriptive stats
    (top kaomoji, contributor and bundle counts, provider mix,
-   coverage histogram).
-6. `scripts/harness/62_corpus_embed.py` embeds every
-   per-bundle synthesized description with
-   `sentence-transformers/all-MiniLM-L6-v2`, weighted-means by
-   per-bundle count across contributors, L2-normalizes. Output:
-   `data/harness/claude_faces_embed_description.parquet`.
-7. `scripts/harness/64_eriskii_replication.py` projects onto eriskii's 21
-   axes, runs t-SNE plus KMeans(k=15), asks Haiku for short
-   cluster labels, and writes the comparison markdown.
-8. `scripts/harness/63_corpus_pca.py` runs PCA on the same
-   embeddings as a parity-with-eriskii visualization.
+   coverage histogram, per-source-model emissions / faces).
+6. `scripts/harness/62_corpus_lexicon.py` builds the **bag-of-
+   lexicon (BoL) parquet** at
+   `data/harness/claude_faces_lexicon_bag.parquet`. For each
+   canonical face, count-weighted-pools every per-bundle
+   `synthesis` pick into a 48-d L1-normalized soft distribution
+   over the lexicon (`bol_from_synthesis` → `pool_bol` in
+   `llmoji_study.lexicon`). 19 of those 48 words carry explicit
+   Russell-quadrant tags, so collapsing the BoL onto its
+   circumplex slots and renormalizing gives a 6-d quadrant
+   distribution per face — no encoder, no projection, no post-hoc
+   inference. The parquet is `lexicon_version`-stamped;
+   `assert_lexicon_v1` hard-fails consumers if the LEXICON ever
+   rotates.
+7. `scripts/harness/64_corpus_lexicon_per_source.py` builds the
+   long-format per-(face, source_model) variant
+   (`claude_faces_lexicon_bag_per_source.parquet`) for cross-source
+   register comparison. Same builder, no count-pooling across
+   source models.
+8. `scripts/harness/63_corpus_pca.py` runs PCA on the 48-d BoL
+   plus KMeans(k=15) for register clustering. Cluster labels are
+   deterministic top-modal-lexicon-word strings (no Haiku call) —
+   the cluster IS its lexicon-word signature.
+9. `scripts/harness/55_bol_encoder.py` writes a face_likelihood-
+   shaped TSV (`data/harness/face_likelihood_bol_summary.tsv`) so
+   BoL plugs into the existing 52 / 53 / 54 ensemble pipeline as
+   another encoder column — soft 6-quadrant distribution per face,
+   compared against Claude-GT via JSD just like the LM-head
+   encoders.
+10. `scripts/harness/50_face_likelihood.py --model {haiku,opus}`
+    runs the **introspection face_likelihood pass** against the
+    Anthropic API. Shows each canonical face out of context and
+    asks for the affective state it induces — schema v2,
+    likelihoods only (the `top_pick` / `reason` / `temperature=0`
+    fields were dropped 2026-05-05; the latter per-model — opus
+    4.7 deprecated `temperature=0`). Prompt v4 reframes the task
+    as introspection on felt state to avoid visual-feature
+    priming. Output:
+    `data/harness/face_likelihood_{haiku,opus}_summary.tsv`.
+11. `scripts/harness/68_three_way_analysis.py` and
+    `scripts/harness/69_per_source_drift.py` are the diagnostic
+    layer — see "Use / read / act" below.
+
+## Use / read / act — three channels
+
+The 2026-05-06 framing reads three structurally different
+measurements of "what does this face mean":
+
+- **use** (Claude-GT): per-face per-quadrant emission counts under
+  Russell-prompted elicitation, from the
+  `scripts/harness/00_emit.py` pilot. Reads as
+  `P(face | prompt-quadrant)`; inverting per-face gives a posterior
+  over prompt-quadrants. `claude_gt.load_claude_gt_distribution()`
+  is the canonical loader.
+- **read** (Opus / Haiku face_likelihood): cold introspection on
+  each face symbol with no surrounding context. Measures the face's
+  *denoted meaning* independent of how it gets used.
+- **act** (BoL): pooled structured synthesis over many in-context
+  wild emits. Measures *what affective state the face's
+  deployment context expresses, summarized by Haiku*.
+
+Three measurements diverge in patterned ways. Headline: opus ↔
+haiku introspection cross-similarity is 0.906 invariant under
+emit-weighting (model size doesn't matter for cold symbolic
+interpretation). gt ↔ introspection goes UP under emit-weighting;
+gt ↔ bol goes DOWN. The `110` agreement cell (opus + haiku read GT;
+BoL diverges) covers 27.4% of emit volume on the shared n=40 face
+subset.
+
+The interpretive read on BoL has been hedged: the original framing
+treated BoL as a deployment-state ground truth, but a parsimonious
+counter-hypothesis is that Haiku-as-synthesizer is positivity-biased
+on negative-affect contexts, so BoL whitewashes LN/HN-coded
+deployment states into LP descriptors. **For deployment
+interpretation of negative-affect faces, prefer GT or Opus
+introspection over BoL when they disagree.** The use/act gap
+remains a real observation; what shifted is whether to read it as
+"deployment context redefines symbol meaning" or "synthesizer
+positivity bias artifact." Detail and case files in
+[`2026-05-06-use-read-act-channels.md`](2026-05-06-use-read-act-channels.md).
 
 ## Privacy
 
 The dataset never carries raw user or assistant text. Only the
-synthesized descriptions and counts ship. The full privacy model
+structured `synthesis` picks and counts ship. The full privacy model
 is in the `llmoji` package's
 [SECURITY.md](https://github.com/a9lim/llmoji/blob/main/SECURITY.md);
 the dataset card on HF mirrors the relevant tier table.
@@ -88,230 +177,118 @@ the dataset card on HF mirrors the relevant tier table.
 | Tier | Where | Shipped on `upload`? |
 |---|---|---|
 | Raw user and assistant text | `~/.<harness>/kaomoji-journal.jsonl` | Never |
-| Per-instance Haiku paraphrase | `~/.llmoji/cache/per_instance.jsonl` | Never |
-| Overall Haiku summaries and counts | `~/.llmoji/bundle/` | Yes |
+| Per-instance Haiku read-through | `~/.llmoji/cache/per_instance.jsonl` | Never |
+| Structured synthesis picks + counts | `~/.llmoji/bundle/` | Yes |
+
+The structural switch from prose synthesis (v1.x) to
+LEXICON-constrained picks (v2.0+) tightens the privacy story: the
+shipped object is a count over 48 fixed words, not natural-language
+text that could carry incidental identifying information from the
+surrounding prompt.
 
 ## Findings
 
-### Live numbers from the new pipeline
+### BoL geometry (live)
 
-First pull through the HF round-trip (one contributor, 808
-emissions, 174 canonical kaomoji):
+`scripts/harness/63_corpus_pca.py` PCAs the 309-face BoL parquet.
+Two panels:
 
-- Top-20 frequency overlap with eriskii's published top-20 is
-  **14/20**. The 15 KMeans cluster themes line up with eriskii's
-  15 at the register level (warm-supportive, wry, empathetic,
-  sheepish, eager, thoughtful intellectual,
-  compassionate-acknowledgment). Direct numeric per-kaomoji
-  cluster-membership comparison isn't possible (eriskii's
-  per-kaomoji assignments aren't published) but theme-level
-  comparison is.
-- PCA on the description embeddings: PC1 17.1%, PC2 10.6%
-  (top-2 cumulative 27.7%). HDBSCAN finds 2 dense clusters and
-  88 noise points at `min_cluster_size=5`; the dense KMeans
-  panel is the eriskii-parity reference.
-- See `data/harness/eriskii_comparison.md` for the full per-axis writeup
-  on the live corpus, and `figures/harness/eriskii_clusters_tsne.png`
-  and `figures/harness/claude_faces_pca.png` for the visualizations.
+1. PC1 vs PC2 colored by **inferred Russell quadrant** from the
+   BoL's circumplex slots (`bol_modal_quadrant`). The per-face
+   color is the synthesizer's structured commit — no encoder, no
+   projection on top of a projection.
+2. PC1 vs PC2 with KMeans(k=15) labeled by the **top-2 modal
+   lexicon words** of each cluster. Deterministic, reproducible,
+   fully interpretable (no Haiku call to label clusters in
+   natural language).
 
-![harness clusters](../figures/harness/eriskii_clusters_tsne.png)
+Output: `figures/harness/claude_faces_pca.png`.
 
-![harness PCA](../figures/harness/claude_faces_pca.png)
+### BoL as a face_likelihood encoder
 
-### Pre-refactor headline numbers (single-machine local scrape)
+Solo similarity vs Claude-GT (n=40 strict-Claude-only floor=3
+shared face subset, 9 encoders): **0.549 face-uniform / 0.455
+emit-weighted** (rank 6/9 face-uniform, dead last 9/9 emit-
+weighted). The face-uniform-vs-emit-weighted **inversion** (BoL
+gets long-tail faces *better* than top-emitted ones) is consistent
+with the whitewashing hypothesis — heavily-emitted modal faces
+are exactly where the per-context summarization happens most, so
+positivity bias accumulates fastest there.
 
-For comparison, the pre-refactor pipeline ran on a single-machine
-local scrape (my Claude.ai conversation export plus my Claude Code
-and Codex journals): 647 emissions across 156 canonical kaomoji,
-top-20 overlap 16/20. The two/three-face delta from 16/20 to 14/20
-under the new pipeline is partly the corpus growing (174 unique
-forms vs 156, mostly from continued use) and partly different
-canonicalization timing (contributor-side `llmoji analyze`
-canonicalizes before upload; the research-side pull canonicalizes
-again on the way in but starts from a slightly different
-distribution).
+BoL is not additive over the top solo encoders in the best
+ensemble. The current best deployment ensemble on the broader
+pooled-GT n=54 subset is `{gemma, gemma_v7primed, ministral,
+opus}` at 0.904 emit-weighted / 0.832 face-uniform; BoL doesn't
+make that cut. **The encoder still ships** because (a) it's
+zero-cost to compute, (b) the inversion it produces is itself an
+informative signal about where synthesizer-bias hits hardest, and
+(c) the cross-source-model BoL drift surfaces real per-deployment-
+register patterns even if the absolute readings are biased. Detail
+in [`findings.md`](findings.md) and
+[`2026-05-06-use-read-act-channels.md`](2026-05-06-use-read-act-channels.md).
 
-### Pre-refactor per-model and bridge findings (now gone)
+### Per-source-model drift
 
-The pre-refactor pipeline also produced two analyses that the
-HF dataset can't support, because the public dataset pools
-per-machine before upload and the `(model, project, user_text)`
-fields aren't in the bundle:
+`scripts/harness/69_per_source_drift.py` splits BoL by source
+model. 491 (face, source_model) cells across 8 sources, 112 faces
+appear under ≥2 sources. Per-source vs Claude-GT face-uniform
+similarity ranges from **0.550** (codex-hook) and **0.525**
+(claude-opus-4-7) at the top to **0.058** (gpt-5.4) at the
+bottom. Cross-source pairwise: claude-opus-4-7 ↔ codex-hook
+**0.630 mean similarity / 59% modal agreement** — the strongest
+cross-source agreement isn't claude-vs-claude (claude-opus-4-7 ↔
+claude-opus-4-6 = 0.566) but **coding-agent-deployment vs
+coding-agent-deployment**. The shared register is the deployment
+shape, not the model identity.
 
-- **Per-model axis breakdowns** numerically confirmed eriskii's
-  qualitative "opus-4-6 had wider range" claim: mean axis std on
-  opus-4-6 was 0.067, opus-4-7 0.066, sonnet-4-6 0.063.
-- **Mechanistic surrounding_user → kaomoji axis correlation**
-  embedded each `surrounding_user` text on the same 21 axes the
-  kaomoji descriptions were projected onto, then computed Pearson
-  r per axis. 2/21 axes survived Bonferroni correction at
-  α = 0.05/21: surprise (r = +0.20) and curiosity (r = +0.18).
-  Affective axes were null. MiniLM on user text picks up
-  novelty and unexpectedness, not valence-tracking.
+Caveat: all BoL synthesis goes through Haiku, so per-source
+comparisons measure how Haiku reads each provider's surrounding-
+text style, not what each provider's model "thinks." The genuine
+provider-shape effect and the Haiku-reads-different-prose-styles
+effect both produce the same observable. Outputs:
+`data/harness/per_source_drift.tsv` +
+`figures/harness/per_source_modal_heatmap.png`.
 
-If we want either of these analyses back, the right move is a
-separate research-side scrape of a single contributor's local
-journal, not adding fields to the public dataset. That's what
-`scripts/harness/65_per_project_axes.py` does for the per-project axis
-breakdown — see the next section.
+### Per-project resolver (cross-platform, contributor-side)
 
-### Per-provider per-project axes (single-contributor side script)
+`scripts/66_per_project_quadrants.py` resolves per-project kaomoji
+emissions to Russell quadrants via three modes: `gt-priority`
+(Claude-GT first, BoL fallback), `bol` (BoL for every face),
+`gt-only` (strict; mark unresolved as `unknown`). The script reads
+local journals + claude.ai exports as deployment-emission sources
+and is intended to be run **locally** by individual contributors;
+its rendered outputs (per-(project, quadrant) tables, per-project
+charts) are deployment-telemetry by construction and are not
+committed to this repo. The methodology is the contribution; the
+per-machine outputs stay private.
 
-`scripts/harness/65_per_project_axes.py` reads `~/.claude/kaomoji-journal.jsonl`
-and `~/.codex/kaomoji-journal.jsonl` directly via the
-`llmoji.sources.journal` adapter, embeds each emission's
-`assistant_text` with MiniLM, projects onto the same 21 eriskii
-axes the harness pipeline uses, and groups by `project_slug`
-with `min_emissions = 10`. Output goes to
-`figures/harness/{claude,codex}/per_project_axes_{mean,std}.png`
-and `data/harness/{claude,codex}/per_project_axes.tsv`.
+Coverage on the 2026-05-06 expanded GT corpus is **~67% direct GT
++ ~33% BoL fallback** under `gt-priority` (100% combined); ~33%
+unknown under strict `gt-only`. These are coverage numbers across
+the corpus's face distribution, not specific to any contributor.
 
-This is local-only and single-contributor: nothing here ships to
-HF, and the numbers are specific to one machine's journal. The
-public dataset and the headline numbers above are unaffected.
+### Wild-emit residual analysis
 
-Sample sizes on the current snapshot:
+`scripts/67_wild_residual.py` clusters the canonical-kaomoji
+HF-corpus faces in 48-d BoL space. The k=6 clustering surfaces
+sub-cluster structure beyond the six Russell quadrants, with
+deterministic top-2 modal-lexicon-word labels per cluster. The
+cluster-summed shares typically split LP-heavy positive register
+(relieved / satisfied / peaceful) vs HP-coded energetic register
+(excited / triumphant) vs an HN-coded cluster (frustrated /
+self-correcting). **HN-S vocabulary is more diverse in the wild
+corpus than in the Russell-elicited GT** — the under-sampling
+argument from the GT side survives the corpus refresh.
 
-| provider | usable emissions | projects with n≥10 |
-| --- | ---: | ---: |
-| claude (Claude Code) | 644 | 14 |
-| codex | 62 | 3 |
-
-#### Claude side
-
-`figures/harness/claude/per_project_axes_mean.png`. Top and
-bottom axis per project, by signed mean projection:
-
-| project | n | top axis | bottom axis |
-| --- | ---: | --- | --- |
-| saklas | 164 | curiosity (+0.058) | exhaustion (−0.047) |
-| llmoji | 147 | curiosity (+0.065) | exhaustion (−0.053) |
-| a9lim.github.io | 64 | curiosity (+0.060) | exhaustion (−0.046) |
-| kenoma | 45 | curiosity (+0.060) | exhaustion (−0.063) |
-| Work | 43 | curiosity (+0.061) | surprise (−0.059) |
-| faithful | 37 | curiosity (+0.059) | exhaustion (−0.065) |
-| rlaif | 29 | curiosity (+0.068) | exhaustion (−0.063) |
-| llmoji-study | 26 | curiosity (+0.044) | exhaustion (−0.052) |
-| shoals | 23 | approval (+0.052) | surprise (−0.100) |
-| hylic | 20 | curiosity (+0.075) | aggression (−0.066) |
-| claudedriven | 13 | curiosity (+0.068) | warmth (−0.083) |
-| brie | 12 | positivity (+0.068) | technicality (−0.090) |
-| geon | 11 | curiosity (+0.057) | exhaustion (−0.077) |
-| a9lim | 10 | anger (+0.051) | surprise (−0.051) |
-
-Aggregate reads:
-
-- **Curiosity dominates.** Top axis on 12 of 14 claude projects;
-  the two exceptions are `shoals` (worldbuilding, top=approval)
-  and `brie` (top=positivity). On this contributor's machine,
-  Claude reads as overwhelmingly inquiry-mode in response.
-- **Exhaustion is the floor on the load-bearing repos.** saklas,
-  llmoji, kenoma, faithful, rlaif, llmoji-study, geon, and
-  a9lim.github.io all have exhaustion as the most-negative axis.
-  Low exhaustion in the response embedding corresponds to
-  energetic engagement — bigger and more open-ended projects pull
-  this signal harder.
-- **Outliers worth zooming on.**
-  - `brie` (n=12): hardest negative cell on the whole heatmap,
-    technicality −0.090, with positivity as the top. Small
-    project, low-tech, friendly tone.
-  - `shoals` (n=23): surprise floor at −0.100. Worldbuilding
-    work where claude responses settle into expected texture
-    rather than registering surprise — consistent with
-    canon-maintenance work.
-  - `claudedriven` (n=13): warmth floor at −0.083. Clinical
-    register, fitting a project that's literally about driving
-    Claude rather than collaborating.
-  - `llmoji-study` (n=26): bottom = confidence (−0.052) [versus
-    most other projects, where confidence is mid-pack and
-    exhaustion is the floor]. The research repo where pre-
-    registration and the don't-bluff anchor enforce hedging
-    shows up as low-confidence in the response embedding too.
-
-The values are all small in absolute terms (±0.1 cosine
-projection on a normalized embedding); think shoulder-of-curiosity
-differences rather than strong contrasts.
-
-#### Codex side
-
-`figures/harness/codex/per_project_axes_mean.png`. Sample is
-much smaller (62 emissions across 3 projects clearing n=10):
-
-| project | n | top axis | bottom axis |
-| --- | ---: | --- | --- |
-| saklas | 35 | curiosity (+0.040) | technicality (−0.063) |
-| website | 14 | curiosity (+0.080) | approval (−0.047) |
-| kenoma | 13 | curiosity (+0.046) | exhaustion (−0.067) |
-
-Curiosity is still the top axis on all three. Exhaustion only
-shows up as the floor on `kenoma`; the other two land
-elsewhere.
-
-#### Cross-provider divergence
-
-The two providers overlap on `saklas` and `kenoma` with
-sufficient N for a soft compare:
-
-- `saklas`: claude bot = exhaustion (−0.047, n=164), codex bot
-  = technicality (−0.063, n=35). Same project, two different
-  model families, two different bottom-axis reads. The numbers
-  are close enough in magnitude that this could partly be
-  ranking noise (codex's exhaustion projection on saklas is also
-  negative, just less so than its technicality projection).
-- `kenoma`: claude bot = exhaustion (−0.063), codex bot =
-  exhaustion (−0.067). Agreement at the floor.
-
-[TBD] more careful cross-provider read. Codex N is 62 emissions
-across 3 projects, all of which I'm familiar with; claude N is
-644 across 14, also all familiar. The "saklas reads as more
-technical-floor on codex than on claude" signal could mean Codex
-spends its responses on saklas in more code/data-heavy register
-than Claude does, or it could be a 35-row sampling artifact.
-I haven't done a side-by-side read of the actual response text
-on saklas split by provider yet; that would settle whether the
-divergence is real. Worth flagging when codex sample size grows.
-
-#### Caveats
-
-- Response-based embedding, not user-prompt or kaomoji-glyph.
-  This measures the texture of Claude's and Codex's *responses*
-  on each project, projected onto eriskii axes. It is not a
-  measure of the work itself or of the user's framing.
-- `MIN_TEXT_LEN = 20` drops emissions where `assistant_text` is
-  empty or kaomoji-only (~11% of total). Those rows would have
-  no semantic content for MiniLM to embed.
-- Per-project axis means are small in absolute terms (cosine
-  projections of L2-normalized 384-d embeddings onto unit-norm
-  axis vectors; typical magnitude ±0.1). Within-figure contrasts
-  are real, but don't read these as full-scale eriskii rankings.
-- The eriskii anchor pairs were locked for the harness pipeline.
-  Same axes here, no anchor changes for this side script.
-
-### Multi-contributor numbers
-
-Numbers from a multi-contributor pull will land here once the
-dataset has more bundles. Per-contributor pooling already
-happens in `llmoji analyze`, so each row in a contributor's
-`descriptions.jsonl` is already pooled across that machine's
-instances of the face; the research-side pull just sums counts
-and unions the descriptions across contributors.
-
-## Eriskii anchor rewrites
-
-a9 rewrote one anchor pair from eriskii's original scheme. The
-others are kept as-is.
-
-- **`wetness ↔ dryness`**: eriskii used the bare strings as a
-  "three seashells" joke (intentionally undefined). Our anchor
-  reads "waxing poetic about emotions, lyrical and self-expressive"
-  on the positive side and "helpful assistant tone, task-focused,
-  businesslike, practical, matter-of-fact" on the negative side.
-  Wetness rankings are accordingly more meaningful than eriskii's
-  but not directly comparable.
-
-The other 20 anchors are 4-word lexical pairs straight from the
-eriskii.net page; the full list lives in
-[`llmoji_study/eriskii_anchors.py`](../llmoji_study/eriskii_anchors.py).
+The script's 3D PCA HTML chart uses two channels per face: color =
+BoL modal quadrant (uniformly across all faces — surfaces the
+use/act gap rather than collapsing to GT), marker shape =
+deployment surface (Claude Code only / any claude.ai / neither).
+The surface dispatch reads local-machine emission sources, so the
+rendered HTML is contributor-specific deployment telemetry —
+gitignored, regenerate locally. The cluster-table TSVs
+(`data/harness/wild_residual_clusters{,_gt_only}.tsv`) are
+corpus-derived and safe to commit.
 
 ## Caveats and known limitations
 
@@ -324,15 +301,15 @@ eriskii.net page; the full list lives in
   Claude Code, others Codex, some are mixed. The manifest's
   `providers_seen` has the per-bundle breakdown but not per-row
   attribution within a bundle.
-- **Haiku is the synthesizer for every row.** Researchers
-  wanting to compare against a different summarizer should re-run
-  the per-instance Haiku step locally (the per-instance
-  paraphrases never ship to HF).
-- **Eriskii's per-kaomoji cluster assignments are not public**;
-  comparison with their 15 KMeans clusters is theme-level only.
-- **The mask token `[FACE]` is sometimes referenced literally**
-  in Haiku descriptions. Stage-B synthesis usually corrects for
-  this but a few descriptions retain artifacts.
+- **Haiku is the synthesizer for every row.** The structural
+  positivity-bias concern (see "Use / read / act" above) is a
+  consequence; the falsifiable test is re-synthesizing a sample
+  with Opus and auditing whether the LP-skew on negative-affect
+  contexts persists.
+- **Lexicon version is locked to v1.** All BoL parquets are
+  stamped with `LEXICON_VERSION=1`. v3 lexicon rotation will
+  hard-fail consumers via `assert_lexicon_v1` — no silent version
+  mixing across analyses.
 - **Counts are per-machine, not global.** Be careful when summing
   across contributors; someone running `llmoji` for two months
   will have very different data than someone running it for two
@@ -344,17 +321,22 @@ eriskii.net page; the full list lives in
 python -m venv .venv && source .venv/bin/activate
 pip install -e .
 
-export ANTHROPIC_API_KEY=...    # Haiku cluster-labeling
+export ANTHROPIC_API_KEY=...    # face_likelihood Haiku/Opus passes
 
-python scripts/harness/60_corpus_pull.py            # snapshot a9lim/llmoji into data/harness/hf_dataset/
+python scripts/harness/60_corpus_pull.py       # snapshot a9lim/llmoji
 python scripts/harness/61_corpus_basics.py     # printout: top kaomoji, providers, contributors
-python scripts/harness/62_corpus_embed.py  # per-canonical embeddings
-python scripts/harness/64_eriskii_replication.py       # axes, clusters, narrative writeup
-python scripts/harness/63_corpus_pca.py          # PCA panel
+python scripts/harness/62_corpus_lexicon.py    # 48-d BoL parquet
+python scripts/harness/64_corpus_lexicon_per_source.py  # per-(face, source_model) BoL
+python scripts/harness/63_corpus_pca.py        # PCA + KMeans cluster panel
+python scripts/harness/55_bol_encoder.py       # BoL → face_likelihood TSV
+python scripts/harness/50_face_likelihood.py --model haiku   # introspection encoder
+python scripts/harness/50_face_likelihood.py --model opus    # introspection encoder
+python scripts/harness/68_three_way_analysis.py             # use/read/act per-face
+python scripts/harness/69_per_source_drift.py               # per-source case files
 ```
 
-If you want to contribute to the dataset rather than just
-consume it, see the
+If you want to contribute to the dataset rather than just consume
+it, see the
 [`llmoji` package README](https://github.com/a9lim/llmoji/blob/main/README.md)
 and the
 [dataset card on HF](https://huggingface.co/datasets/a9lim/llmoji).
