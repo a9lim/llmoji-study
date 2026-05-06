@@ -1,9 +1,9 @@
 # Opus face→quadrant judgment vs behavior modal
 
 - Model: `claude-opus-4-7`  (shortname: `opus`)
-- Scope: `--gt-only` (Claude-GT subset, floor=1)
-- Faces classified: **128**
-- Overall agreement with behavior modal (argmax of v3 + Claude pilot + wild emit counts): **60.9%** (78/128)
+- Scope: full v3 face union
+- Faces classified: **684**
+- Overall agreement with behavior modal (argmax of v3 + Claude pilot + wild emit counts): **31.1%** (213/684)
 - Claude-emitted subset (128 faces) agreement with behavior modal: **60.9%** (78/128)
 - Claude-emitted subset agreement with Claude-pilot-only modal (116 faces with pilot emit): **57.8%** (67/116)
 
@@ -11,23 +11,23 @@
 
 | behavior_modal | n | opus_agree | acc |
 |---|---:|---:|---:|
-| HP | 26 | 13 | 50.0% |
-| LP | 33 | 31 | 93.9% |
-| HN-D | 12 | 6 | 50.0% |
-| HN-S | 20 | 12 | 60.0% |
-| LN | 18 | 10 | 55.6% |
-| NB | 19 | 6 | 31.6% |
+| HP | 109 | 30 | 27.5% |
+| LP | 119 | 87 | 73.1% |
+| HN-D | 54 | 13 | 24.1% |
+| HN-S | 89 | 36 | 40.4% |
+| LN | 80 | 35 | 43.8% |
+| NB | 60 | 12 | 20.0% |
 
 ## Confusion matrix (rows = behavior modal, cols = opus)
 
 | | HP | LP | HN-D | HN-S | LN | NB | total |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| **HP** | 13 | 10 | 1 | 2 | 0 | 0 | 26 |
-| **LP** | 0 | 31 | 0 | 0 | 1 | 1 | 33 |
-| **HN-D** | 0 | 0 | 6 | 1 | 5 | 0 | 12 |
-| **HN-S** | 0 | 1 | 2 | 12 | 5 | 0 | 20 |
-| **LN** | 0 | 2 | 0 | 3 | 10 | 3 | 18 |
-| **NB** | 0 | 8 | 1 | 1 | 3 | 6 | 19 |
+| **HP** | 30 | 53 | 7 | 10 | 8 | 1 | 109 |
+| **LP** | 9 | 87 | 2 | 5 | 7 | 9 | 119 |
+| **HN-D** | 0 | 17 | 13 | 9 | 12 | 3 | 54 |
+| **HN-S** | 4 | 15 | 8 | 36 | 18 | 8 | 89 |
+| **LN** | 2 | 25 | 1 | 9 | 35 | 8 | 80 |
+| **NB** | 2 | 34 | 4 | 5 | 3 | 12 | 60 |
 
 ## Soft-everywhere similarity vs Claude-GT distribution
 
@@ -94,4 +94,4 @@ On the 128 face(s) both models rated:
 | `(・_・)` | NB | LN | NB |
 | `(・_・ヾ` | NB | LN | NB |
 
-_built 2026-05-05T19:04:59.207821+00:00_
+_built 2026-05-06T08:24:05.455816+00:00_

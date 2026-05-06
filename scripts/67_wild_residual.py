@@ -30,21 +30,46 @@ Two parallel categorizations live in the data:
         local sources (other contributors / non-Claude source models
         in a9's bundle that didn't surface locally)
 
-Color is **BoL modal quadrant uniformly** for every face — even where
-GT is available. Pre-2026-05-06 the script used GT modal for shared
-faces and BoL only for wild-* ones; that collapsed the synthesis-vs-
-emission gap exactly where it's most visible. The new convention
-makes the chart show what the synthesizer says about every face,
-independent of whether elicitation also caught it.
+Color is a **proportional RGB-blend of BoL shares uniformly** for
+every face — even where GT is available. Mirrors the per-face PCA
+coloring convention from ``scripts/local/97_build_per_face_pca_3d.py``:
+each marker is a per-quadrant-weighted mix of ``QUADRANT_COLORS``, so
+a face that's 1-HP + 1-LP renders olive instead of getting silently
+argmax'd to HP, and the chart no longer hides the soft-everywhere
+information that the BoL parquet carries. Pre-2026-05-06 the script
+used GT modal for shared faces and BoL only for wild-* ones; pre-
+proportional-color the script categorically argmax'd to the modal
+quadrant and dropped the rest of the distribution. Both collapses are
+gone; the new convention makes the chart show the full per-face
+distributional commit, regardless of whether elicitation also caught
+the face.
 
-The complementary view is available via ``--color-by gt``: each point
-is colored by its **Claude-GT modal quadrant**, with faces *not* in
-the GT set rendered black. That's the elicitation-honest view —
-visually answers "what part of PCA-space did the GT pilot actually
-cover, and which wild faces fell outside it?" It composes with
-``--gt-only`` (in which case nothing is black, since every face is in
-GT) and writes to ``*_gtcolor.{tsv,html}`` so the two color modes
-coexist on disk.
+The complementary view is available via ``--color-by gt``: each face
+is colored by a proportional RGB-blend of its **Claude-GT shares**
+(normalized raw counts across the 6 Russell quadrants), with faces
+*not* in the GT set rendered black. That's the elicitation-honest
+view — visually answers "what part of PCA-space did the GT pilot
+actually cover, how mixed are the in-coverage faces, and which wild
+faces fell outside it?" It composes with ``--gt-only`` (in which case
+nothing is black, since every face is in GT) and writes to
+``*_gtcolor.html`` so the two color modes coexist on disk.
+
+A third view, ``--color-by predicted``, blends the per-face softmax
+distribution from a chosen face_likelihood encoder (default
+``gemma_intro_v7_primed``, the headline solo encoder; override with
+``--predicted-encoder``). Faces not scored by the encoder render
+black. Reading: where do BoL (Haiku-synthesizer adjective bag), GT
+(direct elicitation), and predicted (encoder LM-head logits) actually
+agree on the same face's quadrant identity, and where do they diverge?
+The 110-pattern from ``2026-05-06-use-read-act-channels.md`` is
+visible per-face here. Outputs land at ``*_predcolor_<encoder>.html``
+so multiple encoders can coexist on disk.
+
+The full per-face soft distributions land in
+``data/harness/wild_faces_labeled{,_gt_only}.tsv`` as ``bol_share_<Q>``
+and ``gt_share_<Q>`` columns (one each per quadrant in ``QUADRANTS``).
+Modal labels (``bol_quadrant``, ``gt_quadrant``) are kept for backward
+compat but the share columns are the soft-everywhere-honest read.
 
 Pipeline (post-hoc, no new generation, zero welfare cost):
 
@@ -73,6 +98,8 @@ Usage:
     python scripts/67_wild_residual.py --gt-only  # shared subset only
     python scripts/67_wild_residual.py --fixed-k 6
     python scripts/67_wild_residual.py --color-by gt  # GT quadrant; non-GT = black
+    python scripts/67_wild_residual.py --color-by predicted  # gemma_intro_v7_primed
+    python scripts/67_wild_residual.py --color-by predicted --predicted-encoder opus
 """
 
 from __future__ import annotations
@@ -90,7 +117,7 @@ import pandas as pd
 
 from llmoji.taxonomy import canonicalize_kaomoji
 from llmoji_study.claude_faces import load_bol_parquet
-from llmoji_study.claude_gt import load_claude_gt
+from llmoji_study.claude_gt import load_claude_gt, load_claude_gt_distribution
 from llmoji_study.config import (
     CLAUDE_DESCRIPTIONS_PATH,
     CLAUDE_FACES_LEXICON_BAG_PATH,
@@ -98,10 +125,12 @@ from llmoji_study.config import (
     FIGURES_DIR,
     REPO_ROOT,
 )
-from llmoji_study.emotional_analysis import QUADRANT_COLORS
+from llmoji_study.emotional_analysis import QUADRANT_COLORS, mix_quadrant_color
+from llmoji_study.face_likelihood_discovery import discover_summaries
 from llmoji_study.lexicon import (
     QUADRANTS,
     bol_modal_quadrant,
+    bol_to_quadrant_distribution,
     top_lexicon_words,
 )
 from llmoji_study.local_emissions import (
@@ -147,6 +176,45 @@ def _is_claude_source_model(source_model: str) -> bool:
     prompts) is *not* an emission and naturally fails the substring
     check."""
     return "claude" in source_model.lower()
+
+
+def _load_predicted_shares(encoder: str) -> tuple[dict[str, np.ndarray], Path]:
+    """Return ``({face: 6-d softmax over QUADRANTS}, summary_path)`` for the
+    named face_likelihood encoder.
+
+    Reads ``softmax_<Q>`` columns from the encoder's
+    ``face_likelihood{,*}_summary.tsv`` discovered by
+    :mod:`llmoji_study.face_likelihood_discovery`. Per-face shares are
+    L1-renormalized defensively (face_likelihood already produces
+    softmax — the renorm is just future-proofing against schema drift).
+    Faces not in the encoder's TSV simply don't appear in the returned
+    dict; callers fall those back to a missing-bucket color.
+    """
+    summaries = discover_summaries(prefer_full=True)
+    if encoder not in summaries:
+        avail = sorted(summaries)
+        raise SystemExit(
+            f"face_likelihood encoder {encoder!r} not found. "
+            f"available: {avail}"
+        )
+    path = Path(summaries[encoder])
+    df = pd.read_csv(path, sep="\t")
+    cols = [f"softmax_{q}" for q in QUADRANTS]
+    missing = [c for c in cols if c not in df.columns]
+    if missing:
+        raise SystemExit(
+            f"encoder summary {path} missing columns {missing} — "
+            "expected one softmax_<Q> per Russell quadrant"
+        )
+    out: dict[str, np.ndarray] = {}
+    for _, row in df.iterrows():
+        face = str(row["first_word"])
+        shares = np.array([float(row[c]) for c in cols], dtype=float)
+        s = float(shares.sum())
+        if s > 0:
+            shares = shares / s
+        out[face] = shares
+    return out, path
 
 
 def _load_hf_corpus(path: Path) -> tuple[dict[str, dict], int]:
@@ -293,13 +361,15 @@ def _scatter_pca_3d_html(
     coords3: np.ndarray,
     categories: list[str],
     surfaces: list[str],
-    quadrants: list[str | None],
     cluster_ids: np.ndarray,
     cluster_labels: dict[int, str],
     fws: list[str],
     sizes_log: np.ndarray,
     descriptions_by_fw: dict[str, str],
     *,
+    per_face_colors: list[str],
+    color_share_arr: np.ndarray,
+    color_share_label: str,
     out_path: Path,
     title: str,
     evr: np.ndarray,
@@ -307,26 +377,44 @@ def _scatter_pca_3d_html(
 ) -> None:
     """Two side-by-side 3D scenes on the same PCA(3) coords:
 
-      - left:  faces colored by **quadrant**; ``color_mode`` selects
-               the source. ``"bol"`` (default) reads BoL modal
-               quadrant for every face; ``"gt"`` reads Claude-GT
-               modal where available and renders the rest black
-               (non-GT bucket). **Marker shape = deployment surface**
-               (circle = Claude Code only, diamond = any claude.ai,
-               square = neither).
+      - left:  faces colored by **proportional RGB-blend** of
+               :data:`QUADRANT_COLORS`, weighted by the per-face
+               quadrant share. ``color_mode="bol"`` (default) blends
+               the BoL→quadrant distribution; ``"gt"`` blends the
+               normalized Claude-GT raw counts and falls back to black
+               for faces with no GT row. Mirrors the
+               ``scripts/local/97_build_per_face_pca_3d.py``
+               convention so cross-figure reads stay coherent.
+               **Marker shape = deployment surface** (circle = Claude
+               Code only, diamond = any claude.ai, square = neither).
       - right: colored by KMeans cluster id; legend carries the
                deterministic top-2 modal-lexicon-word label.
+
+    The left-scene legend is a small hand-built key — 3 surface-shape
+    entries + 6 quadrant-color entries + 1 missing-bucket entry —
+    rather than per-(surface × quadrant) data traces, because each
+    face's color is now a unique RGB blend rather than a categorical
+    pick.
     """
     if color_mode == "gt":
-        color_label = "Claude-GT modal quadrant"
+        color_label = "proportional Claude-GT shares (non-GT = black)"
         missing_color = "#000000"
         missing_label = "not in GT"
-        hover_q_prefix = "GT quadrant"
+    elif color_mode == "predicted":
+        color_label = (
+            f"proportional {color_share_label} (not scored = black)"
+        )
+        missing_color = "#000000"
+        missing_label = "not in encoder output"
     else:
-        color_label = "BoL modal quadrant"
-        missing_color = "#cccccc"
-        missing_label = "no Q"
-        hover_q_prefix = "BoL quadrant"
+        # Slate ("#808696" = QUADRANT_COLORS["NB"], the website's
+        # extended.slate token) is the canonical zero-mass fallback
+        # shared with mix_quadrant_color and script 97 — a face with
+        # no circumplex commitment reads as "neutral" rather than as
+        # a separate visual category.
+        color_label = "proportional BoL shares"
+        missing_color = QUADRANT_COLORS["NB"]
+        missing_label = "no BoL circumplex commit"
     try:
         import plotly.graph_objects as go
         from plotly.subplots import make_subplots
@@ -336,6 +424,18 @@ def _scatter_pca_3d_html(
 
     def _truncate(s: str, lim: int = 140) -> str:
         return s if len(s) <= lim else s[:lim].rstrip() + "…"
+
+    def _top_shares_str(shares: np.ndarray, k: int = 2) -> str:
+        """Top-k quadrant components for hover, e.g. 'HP 0.62, LP 0.31'.
+        Returns the missing-bucket label if all shares are zero."""
+        items = sorted(
+            ((QUADRANTS[j], float(shares[j])) for j in range(len(QUADRANTS))),
+            key=lambda kv: -kv[1],
+        )
+        items = [(q, w) for q, w in items if w > 0][:k]
+        if not items:
+            return missing_label
+        return ", ".join(f"{q} {w:.2f}" for q, w in items)
 
     palette = [
         "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
@@ -359,63 +459,113 @@ def _scatter_pca_3d_html(
 
     sizes = np.clip(6 + 5 * sizes_log, 6, 26)
 
-    # --- LEFT scene: by quadrant × deployment surface ---------------------
-    # Two channels carry independent information: marker shape =
-    # deployment surface (where the face lives in a9's local data),
-    # marker color = BoL modal quadrant (what the synthesizer commits
-    # to). GT modal is no longer used for color — surfacing the
-    # synthesis-vs-emission gap requires showing BoL's read everywhere
-    # rather than collapsing shared faces to GT.
-    seen_q: list[str] = list(QUADRANTS) + ["none"]
+    # --- LEFT scene: per-face proportional color × deployment surface -----
+    # One real trace per surface (so plotly picks the correct marker
+    # shape); marker.color is a per-point list of RGB-blended hex
+    # strings the caller pre-computed from the soft quadrant shares.
+    # The blend mirrors scripts/local/97 — pure-quadrant faces render
+    # at their canonical QUADRANT_COLORS hue, mixed faces render at the
+    # weighted RGB midpoint. Categorical legend entries (3 shapes + 6
+    # quadrant colors + 1 missing-bucket) are added below as dummy
+    # traces so the visual key is explicit.
     for surface in SURFACES:
         marker_symbol = SURFACE_MARKERS[surface]
         surface_label = SURFACE_LABELS[surface]
-        for q in seen_q:
-            if q == "none":
-                idxs = [
-                    i for i, (si, qi) in enumerate(zip(surfaces, quadrants))
-                    if si == surface and qi is None
-                ]
-                color = missing_color
-                qlabel = missing_label
-            else:
-                idxs = [
-                    i for i, (si, qi) in enumerate(zip(surfaces, quadrants))
-                    if si == surface and qi == q
-                ]
-                color = QUADRANT_COLORS[q]
-                qlabel = q
-            if not idxs:
-                continue
-            hover = [
-                f"<b>{fws[i]}</b><br>"
-                f"surface: {surface_label}<br>"
-                f"{hover_q_prefix}: {qlabel}<br>"
-                f"GT-overlap category: {categories[i]}<br>"
-                f"emit weight (log): {sizes_log[i]:.2f}<br>"
-                f"<i>{_truncate(descriptions_by_fw.get(fws[i], ''))}</i>"
-                for i in idxs
-            ]
-            fig.add_trace(
-                go.Scatter3d(
-                    x=coords3[idxs, 0], y=coords3[idxs, 1], z=coords3[idxs, 2],
-                    mode="markers",
-                    name=f"{surface} · {qlabel}",
-                    legendgroup=f"left-{surface}-{q}",
-                    marker=dict(
-                        size=[float(sizes[i]) for i in idxs],
-                        color=color,
-                        symbol=marker_symbol,
-                        line=dict(color="black", width=0.4),
-                        opacity=0.88,
-                    ),
-                    hovertemplate="%{hovertext}<extra></extra>",
-                    hovertext=hover,
-                    scene="scene",
-                    showlegend=True,
+        idxs = [i for i, si in enumerate(surfaces) if si == surface]
+        if not idxs:
+            continue
+        hover = [
+            f"<b>{fws[i]}</b><br>"
+            f"surface: {surface_label}<br>"
+            f"{color_share_label}: {_top_shares_str(color_share_arr[i])}<br>"
+            f"GT-overlap category: {categories[i]}<br>"
+            f"emit weight (log): {sizes_log[i]:.2f}<br>"
+            f"<i>{_truncate(descriptions_by_fw.get(fws[i], ''))}</i>"
+            for i in idxs
+        ]
+        fig.add_trace(
+            go.Scatter3d(
+                x=coords3[idxs, 0], y=coords3[idxs, 1], z=coords3[idxs, 2],
+                mode="markers",
+                name=f"data · {surface}",
+                legendgroup=f"left-data-{surface}",
+                marker=dict(
+                    size=[float(sizes[i]) for i in idxs],
+                    color=[per_face_colors[i] for i in idxs],
+                    symbol=marker_symbol,
+                    line=dict(color="black", width=0.4),
+                    opacity=0.88,
                 ),
-                row=1, col=1,
-            )
+                hovertemplate="%{hovertext}<extra></extra>",
+                hovertext=hover,
+                scene="scene",
+                showlegend=False,  # actual data hidden; visual key below
+            ),
+            row=1, col=1,
+        )
+
+    # --- LEFT scene legend key: shapes + quadrant colors ------------------
+    # Dummy zero-point traces purely so the legend renders the key.
+    # Each carries an empty x/y/z (plotly still draws the legend
+    # marker) and showlegend=True. Grouped so collapse/expand is clean.
+    for surface in SURFACES:
+        fig.add_trace(
+            go.Scatter3d(
+                x=[None], y=[None], z=[None],
+                mode="markers",
+                name=f"shape: {SURFACE_LABELS[surface]}",
+                legendgroup="left-key-shape",
+                legendgrouptitle=dict(text="Marker shape (deployment surface)"),
+                marker=dict(
+                    size=12,
+                    color="#888888",
+                    symbol=SURFACE_MARKERS[surface],
+                    line=dict(color="black", width=0.4),
+                ),
+                hoverinfo="skip",
+                scene="scene",
+                showlegend=True,
+            ),
+            row=1, col=1,
+        )
+    for q in QUADRANTS:
+        fig.add_trace(
+            go.Scatter3d(
+                x=[None], y=[None], z=[None],
+                mode="markers",
+                name=f"color: {q}",
+                legendgroup="left-key-color",
+                legendgrouptitle=dict(text=f"Pure-quadrant color ({color_share_label})"),
+                marker=dict(
+                    size=12,
+                    color=QUADRANT_COLORS[q],
+                    symbol="circle",
+                    line=dict(color="black", width=0.4),
+                ),
+                hoverinfo="skip",
+                scene="scene",
+                showlegend=True,
+            ),
+            row=1, col=1,
+        )
+    fig.add_trace(
+        go.Scatter3d(
+            x=[None], y=[None], z=[None],
+            mode="markers",
+            name=f"color: {missing_label}",
+            legendgroup="left-key-color",
+            marker=dict(
+                size=12,
+                color=missing_color,
+                symbol="circle",
+                line=dict(color="black", width=0.4),
+            ),
+            hoverinfo="skip",
+            scene="scene",
+            showlegend=True,
+        ),
+        row=1, col=1,
+    )
 
     # --- RIGHT scene: by cluster -----------------------------------------
     for c in sorted(cluster_labels):
@@ -428,8 +578,8 @@ def _scatter_pca_3d_html(
             f"<b>{fws[i]}</b><br>cluster {c}: {label}<br>"
             f"surface: {SURFACE_LABELS[surfaces[i]]}<br>"
             f"GT-overlap category: {categories[i]}"
-            + (f" · {hover_q_prefix}: {quadrants[i]}" if quadrants[i] else "")
-            + f"<br><i>{_truncate(descriptions_by_fw.get(fws[i], ''))}</i>"
+            f" · {color_share_label}: {_top_shares_str(color_share_arr[i])}"
+            f"<br><i>{_truncate(descriptions_by_fw.get(fws[i], ''))}</i>"
             for i in idxs
         ]
         fig.add_trace(
@@ -509,14 +659,21 @@ def main() -> None:
                          "the HF corpus) — drops both wild-only categories. "
                          "Outputs land in *_gt_only.{tsv,html} so both "
                          "modes coexist.")
-    ap.add_argument("--color-by", choices=["bol", "gt"], default="bol",
-                    help="left-scene color source. 'bol' (default) uses BoL "
-                         "modal quadrant for every face; 'gt' uses Claude-GT "
-                         "modal where available and renders non-GT faces "
-                         "black. The 'gt' mode tags outputs with _gtcolor "
-                         "so it coexists with the default on disk. "
-                         "Composes with --gt-only (in which case there are "
-                         "no black points since every face is in GT).")
+    ap.add_argument("--color-by", choices=["bol", "gt", "predicted"], default="bol",
+                    help="left-scene color source. 'bol' (default) blends BoL "
+                         "softmax shares; 'gt' blends Claude-GT empirical "
+                         "shares (non-GT faces render black); 'predicted' "
+                         "blends per-face softmax from a face_likelihood "
+                         "encoder (faces not scored render black). Tags "
+                         "outputs with _gtcolor / _predcolor_<encoder> so "
+                         "the modes coexist on disk. Composes with --gt-only.")
+    ap.add_argument("--predicted-encoder", default="gemma_intro_v7_primed",
+                    help="face_likelihood encoder name for --color-by predicted. "
+                         "Discovery looks under data/local/<encoder>/face_likelihood_summary.tsv "
+                         "and data/harness/face_likelihood_<encoder>_summary.tsv. "
+                         "Default is gemma_intro_v7_primed (the headline solo "
+                         "encoder). Useful overrides: opus, gemma, the BoL "
+                         "encoder bol, or any other model from the lineup.")
     ap.add_argument("--k-grid", default="2,3,4,5,6,7,8,10,12,14",
                     help="silhouette grid for KMeans")
     ap.add_argument("--fixed-k", type=int, default=6,
@@ -537,14 +694,36 @@ def main() -> None:
     # paragraph differ by color choice. Keep a separate fig_suffix so
     # we don't thrash TSV filenames between runs.
     suffix = "_gt_only" if args.gt_only else ""
-    fig_suffix = suffix + ("_gtcolor" if args.color_by == "gt" else "")
+    if args.color_by == "gt":
+        fig_suffix = suffix + "_gtcolor"
+    elif args.color_by == "predicted":
+        fig_suffix = suffix + f"_predcolor_{args.predicted_encoder}"
+    else:
+        fig_suffix = suffix
     print(f"mode: {'gt-only (shared subset)' if args.gt_only else 'full HF corpus'}")
-    print(f"left-scene color: {'Claude-GT modal (non-GT = black)' if args.color_by == 'gt' else 'BoL modal'}")
+    if args.color_by == "gt":
+        color_desc = "Claude-GT proportional shares (non-GT = black)"
+    elif args.color_by == "predicted":
+        color_desc = (
+            f"face_likelihood encoder softmax: {args.predicted_encoder} "
+            "(not-scored = black)"
+        )
+    else:
+        color_desc = "BoL proportional shares"
+    print(f"left-scene color: {color_desc}")
 
     # --- load Claude-GT modal labels ---------------------------------------
+    # Two views, same floor: hard-modal (drives `gt_quadrant` column +
+    # the GT-vs-wild categorization) and the raw per-quadrant counts
+    # (drives the soft `gt_share_*` columns + `--color-by gt`
+    # proportional coloring). At floor=1 these cover identical face
+    # sets; the soft view stays available if a future caller raises
+    # the floor.
     print(f"loading Claude-GT (floor={args.claude_gt_floor}) ...")
     gt = load_claude_gt(floor=args.claude_gt_floor)
-    print(f"  {len(gt)} faces in Claude-GT")
+    gt_dist = load_claude_gt_distribution(floor=args.claude_gt_floor)
+    print(f"  {len(gt)} faces in Claude-GT (hard-modal); "
+          f"{len(gt_dist)} with full per-quadrant counts")
 
     # --- load HF corpus -----------------------------------------------------
     corpus_path = Path(args.corpus)
@@ -584,10 +763,21 @@ def main() -> None:
         if args.gt_only and cat != "shared":
             continue
         b_idx = fw_to_idx[face]
-        bol_quadrant = bol_modal_quadrant(B_all[b_idx])
+        bol_vec = B_all[b_idx]
+        bol_quadrant = bol_modal_quadrant(bol_vec)
+        bol_dist = bol_to_quadrant_distribution(bol_vec)  # 6-d, L1-normalized
         gt_quadrant = gt[face][0] if face in gt else ""
+        # GT soft distribution: raw counts → L1-normalized over QUADRANTS;
+        # zeros for faces with no GT row (wild-* categories).
+        gt_counts = gt_dist.get(face, {})
+        gt_total = float(sum(gt_counts.values()))
+        gt_share = (
+            {q: gt_counts.get(q, 0) / gt_total for q in QUADRANTS}
+            if gt_total > 0
+            else {q: 0.0 for q in QUADRANTS}
+        )
         surface = _deployment_surface(face, source_counts)
-        rows.append({
+        row = {
             "first_word": face,
             "n_emit": int(meta["count_total"]),
             "claude_emit": int(meta["claude_emit"]),
@@ -596,7 +786,15 @@ def main() -> None:
             "bol_quadrant": bol_quadrant if bol_quadrant is not None else "",
             "gt_quadrant": gt_quadrant,
             "bol_idx": b_idx,
-        })
+        }
+        # 12 soft-distribution columns: per-face proportional shares for
+        # both encoders. These survive the chart's modal collapse and
+        # let downstream consumers plot proportional color, compute JSD
+        # against any reference, etc., without re-deriving from BoL.
+        for j, q in enumerate(QUADRANTS):
+            row[f"bol_share_{q}"] = round(float(bol_dist[j]), 4)
+            row[f"gt_share_{q}"] = round(float(gt_share[q]), 4)
+        rows.append(row)
 
     if not rows:
         sys.exit("no faces survived the inner-join — aborting")
@@ -632,6 +830,8 @@ def main() -> None:
     cols = [
         "first_word", "n_emit", "claude_emit", "category", "surface",
         "bol_quadrant", "gt_quadrant",
+        *[f"bol_share_{q}" for q in QUADRANTS],
+        *[f"gt_share_{q}" for q in QUADRANTS],
     ]
     df_wild[cols].to_csv(out_tsv, sep="\t", index=False)
     print(f"wrote {out_tsv}")
@@ -648,13 +848,6 @@ def main() -> None:
     bol_quadrants: list[str | None] = [
         (q if q else None) for q in df_wild["bol_quadrant"].tolist()
     ]
-    if args.color_by == "gt":
-        # GT modal where available; None (= black bucket) for wild-* faces.
-        color_quadrants: list[str | None] = [
-            (q if q else None) for q in df_wild["gt_quadrant"].tolist()
-        ]
-    else:
-        color_quadrants = bol_quadrants
     # Cluster-composition analytics consume BoL modal — that's the
     # invariant the rest of the pipeline (and the markdown table) is
     # written against. Color choice only flips the chart, not the math.
@@ -663,6 +856,61 @@ def main() -> None:
     sizes_log = np.log1p(np.asarray(weights, dtype=float))
 
     descriptions_by_fw = {f: m["top_description"] for f, m in hf_meta.items()}
+
+    # --- per-face proportional colors (the soft-everywhere read) ----------
+    # Mirrors scripts/local/97's per-face PCA convention: each marker
+    # carries an RGB-linear blend of QUADRANT_COLORS weighted by the
+    # face's own per-quadrant share. BoL mode reads the 6-d BoL→quadrant
+    # distribution; GT mode reads the normalized Claude-GT raw counts
+    # and falls back to black for faces with no GT row (the elicitation-
+    # honest "outside the pilot's coverage" signal).
+    bol_share_arr = df_wild[[f"bol_share_{q}" for q in QUADRANTS]].to_numpy(dtype=float)
+    gt_share_arr = df_wild[[f"gt_share_{q}" for q in QUADRANTS]].to_numpy(dtype=float)
+    if args.color_by == "gt":
+        # Non-GT faces have all-zero gt_share rows by construction;
+        # the fallback override renders them black to encode "outside
+        # the GT pilot's coverage" visually rather than collapsing
+        # them to NB grey alongside genuinely neutral GT faces.
+        per_face_colors = [
+            mix_quadrant_color(gt_share_arr[i], fallback="#000000")
+            for i in range(len(df_wild))
+        ]
+        # For hover: human-readable top-2 components from the GT soft.
+        color_share_arr = gt_share_arr
+        color_share_label = "GT shares"
+    elif args.color_by == "predicted":
+        # Face_likelihood softmax for the chosen encoder. Faces not
+        # scored by this encoder (rare — the encoder runs the full
+        # face union; coverage gaps are mostly post-union additions
+        # like Claude-pilot faces from a new run) get a zero-share
+        # row → mix_quadrant_color falls back to black. The encoder's
+        # own self-similarity to BoL/GT is what differentiates this
+        # mode from the other two: 110-pattern faces (opus+haiku read
+        # GT but BoL acts differently) are visible per-face here.
+        print(f"\nloading predicted-encoder shares: {args.predicted_encoder}")
+        pred_shares_map, pred_path = _load_predicted_shares(args.predicted_encoder)
+        n_have = sum(1 for f in fws if f in pred_shares_map)
+        print(f"  {len(pred_shares_map)} faces in {pred_path.name}; "
+              f"{n_have}/{len(fws)} kept faces are scored")
+        pred_share_arr = np.zeros((len(fws), len(QUADRANTS)), dtype=float)
+        for i, f in enumerate(fws):
+            if f in pred_shares_map:
+                pred_share_arr[i] = pred_shares_map[f]
+        per_face_colors = [
+            mix_quadrant_color(pred_share_arr[i], fallback="#000000")
+            for i in range(len(fws))
+        ]
+        color_share_arr = pred_share_arr
+        color_share_label = f"{args.predicted_encoder} softmax"
+    else:
+        # BoL no-circumplex-commit faces fall back to NB grey (the
+        # default in mix_quadrant_color, matching script 97).
+        per_face_colors = [
+            mix_quadrant_color(bol_share_arr[i])
+            for i in range(len(df_wild))
+        ]
+        color_share_arr = bol_share_arr
+        color_share_label = "BoL shares"
 
     # --- PCA(3) for the 3D scene ------------------------------------------
     from sklearn.decomposition import PCA
@@ -676,6 +924,11 @@ def main() -> None:
     mode_subtitle = " · gt-only (shared subset)" if args.gt_only else ""
     if args.color_by == "gt":
         mode_subtitle += " · color = Claude-GT (non-GT = black)"
+    elif args.color_by == "predicted":
+        mode_subtitle += (
+            f" · color = {args.predicted_encoder} softmax "
+            "(not-scored = black)"
+        )
 
     # --- KMeans on BoL ----------------------------------------------------
     print("\n=== clustering ===")
@@ -784,8 +1037,11 @@ def main() -> None:
 
     # --- 3D PCA HTML with both colorings -----------------------------------
     _scatter_pca_3d_html(
-        coords3, categories, surfaces, color_quadrants, cluster_ids, cluster_labels,
+        coords3, categories, surfaces, cluster_ids, cluster_labels,
         fws, sizes_log, descriptions_by_fw,
+        per_face_colors=per_face_colors,
+        color_share_arr=color_share_arr,
+        color_share_label=color_share_label,
         out_path=HARNESS_FIG_DIR / f"wild_faces_pca_3d{fig_suffix}.html",
         title=f"HF-corpus Claude faces - PCA(3) on BoL{mode_subtitle}",
         evr=evr,
@@ -831,27 +1087,67 @@ def main() -> None:
     )
     if args.color_by == "gt":
         lines.append(
-            "- Display: **color = Claude-GT modal quadrant** where "
-            "available; faces *not* in the GT set render **black** "
-            "(`--color-by gt`). The elicitation-honest view: which "
-            "wild-corpus faces fell outside the GT pilot's coverage. "
+            "- Display: **color = proportional RGB-blend of Claude-GT "
+            "shares** — each face's marker is a per-quadrant-weighted "
+            "mix of `QUADRANT_COLORS` (50/50 HP+LP renders olive, "
+            "HN+LN renders muted purple, etc.). Faces *not* in the GT "
+            "set render **black** (`--color-by gt`). The elicitation-"
+            "honest view: which wild-corpus faces fell outside the GT "
+            "pilot's coverage, and how mixed the in-coverage ones are. "
             "**Marker shape = deployment surface**: "
             "○ = Claude Code only, ◇ = any claude.ai, □ = neither. "
-            "Hover surfaces the GT-overlap category, GT quadrant, and "
-            "emit weight."
+            "Hover surfaces the GT-overlap category, top-2 GT quadrant "
+            "components, and emit weight. Mirrors the per-face PCA "
+            "coloring convention from "
+            "`scripts/local/97_build_per_face_pca_3d.py`."
+        )
+    elif args.color_by == "predicted":
+        lines.append(
+            f"- Display: **color = proportional RGB-blend of "
+            f"`{args.predicted_encoder}` face_likelihood softmax** — "
+            "each face's marker is a per-quadrant-weighted mix of "
+            "`QUADRANT_COLORS` from the encoder's per-face softmax over "
+            "the 6 Russell quadrants. Faces not scored by the encoder "
+            "render **black** (`--color-by predicted "
+            f"--predicted-encoder {args.predicted_encoder}`). "
+            "The act-vs-read view: face_likelihood reads each face by "
+            "teacher-forcing it after the v3 emotional prompts and "
+            "scoring `log P(face | prompt)` under the encoder's LM head, "
+            "so this color is the encoder's own *what-state-would-make-"
+            "me-emit-this* read. Compare to BoL (Haiku synthesizer "
+            "adjective bag — interpretive layer with positivity bias) "
+            "and GT (direct elicitation modal); divergences localize "
+            "the use/read/act-channel splits. "
+            "**Marker shape = deployment surface**: "
+            "○ = Claude Code only, ◇ = any claude.ai, □ = neither."
         )
     else:
         lines.append(
-            "- Display: **color = BoL modal quadrant** for every face "
-            "(uniformly, even where GT is available — surfaces the "
-            "synthesis-vs-emission gap rather than collapsing shared "
-            "faces to GT). **Marker shape = deployment surface**: "
+            "- Display: **color = proportional RGB-blend of BoL shares** "
+            "for every face (uniformly, even where GT is available — "
+            "surfaces the synthesis-vs-emission gap rather than "
+            "collapsing shared faces to GT). Each face's marker is a "
+            "per-quadrant-weighted mix of `QUADRANT_COLORS`; ties no "
+            "longer hide behind the QUADRANTS-order argmax. "
+            "**Marker shape = deployment surface**: "
             "○ = Claude Code only, ◇ = any claude.ai, □ = neither. "
-            "Hover surfaces the GT-overlap category, BoL quadrant, and "
-            "emit weight. (Companion view: re-run with "
-            "`--color-by gt` to color by Claude-GT instead, with "
-            "non-GT faces black.)"
+            "Hover surfaces the GT-overlap category, top-2 BoL quadrant "
+            "components, and emit weight. Mirrors the per-face PCA "
+            "coloring convention from "
+            "`scripts/local/97_build_per_face_pca_3d.py`. "
+            "(Companion view: re-run with `--color-by gt` to blend "
+            "Claude-GT shares instead, with non-GT faces black.)"
         )
+    lines.append(
+        f"- Per-face soft distributions are exported alongside the "
+        f"modal labels in `data/harness/wild_faces_labeled{suffix}.tsv` "
+        f"as `bol_share_<Q>` and `gt_share_<Q>` columns (one each per "
+        f"quadrant in {list(QUADRANTS)}); these are the "
+        f"distribution-vs-distribution-honest read on every face, "
+        f"unlike `bol_quadrant` / `gt_quadrant` which are the modal "
+        f"argmax collapses (HP wins ties because of QUADRANTS index "
+        f"order)."
+    )
     lines.append("")
     lines.append(
         f"PCA on the 48-d BoL: "
@@ -920,6 +1216,10 @@ def main() -> None:
         out_doc = out_doc.with_name(out_doc.stem + "_gt_only" + out_doc.suffix)
     if args.color_by == "gt" and "_gtcolor" not in out_doc.stem:
         out_doc = out_doc.with_name(out_doc.stem + "_gtcolor" + out_doc.suffix)
+    if args.color_by == "predicted":
+        pred_tag = f"_predcolor_{args.predicted_encoder}"
+        if pred_tag not in out_doc.stem:
+            out_doc = out_doc.with_name(out_doc.stem + pred_tag + out_doc.suffix)
     preserved = ""
     if out_doc.exists():
         prior = out_doc.read_text()

@@ -111,19 +111,37 @@ not nothing.
 
 ### Current headline findings
 
-- **Best deployment ensemble**: `{gemma_v7primed, opus}` at **0.829
-  emit-weighted similarity** / 0.788 face-uniform on n=49 GT-floor-3
-  faces (16 encoders, exhaustive subset search via script 53). Top
-  face-uniform ensemble is the same 2-encoder set. Per-encoder solo
-  (emit-weighted, soft-everywhere JSD vs Claude-GT): **gemma_v7primed
-  0.801, opus 0.797**, gemma 0.755, haiku 0.723, gpt_oss_20b 0.667,
-  granite 0.586, ministral 0.579. **Opus introspection scales** — pure
-  introspective rating (no visual priming, no LM head) closes the gap
-  with gemma_v7primed solo and complements the local LM-head encoders
-  cleanly (κ=0.547 with gemma_v7primed). Old headline ensemble
-  `{gemma_v7primed, haiku}` is superseded; the visual-primed haiku v1
-  variant was deleted as an encoder after methodological cleanup
-  (priming bypassed introspection).
+- **Best deployment ensemble**: `{gemma, gemma_v7primed, ministral,
+  opus}` at **0.904 emit-weighted similarity** / 0.832 face-uniform
+  on n=54 pooled-GT-floor-3 faces (v3+Claude+wild ≥3, 13 encoders,
+  exhaustive subset search via script 52 default). Pooled GT is the
+  deployment-shaped denominator — it captures Claude's actually-
+  emitted face vocabulary including the wild-face long tail, not
+  just the strict-elicitation subset. Three LM-head encoders (gemma
+  primed + unprimed for complementary modal-vs-diffuse reads,
+  ministral covers long-tail cells the others under-rate) plus opus
+  cold introspection. On the stricter Claude-GT-only n=40 subset
+  (Claude itself emitted ≥3 times, 9 encoders excl. JP rinna
+  variants), the best is the 2-pair `{gemma_v7primed, opus}` at
+  0.792 face-uniform / 0.820 emit-weighted — adding the other two
+  encoders modestly hurts because the strict subset has Claude
+  already converged on a tight modal vocabulary; the pooled-GT view
+  is where ministral and unprimed gemma earn their seats.
+  Per-encoder solo on Claude-GT n=40: **gemma_v7primed 0.790 face-
+  uniform / 0.798 emit-weighted**, gemma 0.754 / 0.742, opus 0.736 /
+  0.781, haiku 0.675 / 0.702, gpt_oss_20b 0.588 / 0.643, bol 0.549 /
+  0.455, ministral 0.537 / 0.623, granite 0.520 / 0.575, qwen 0.494
+  / 0.546. On pooled-GT n=54 the solo ranking flips at the top:
+  **opus 0.784 / 0.859**, gemma_v7primed 0.769 / 0.792, gemma 0.763
+  / 0.787, haiku 0.715 / 0.815, gpt_oss_20b 0.700 / 0.800, ministral
+  0.669 / 0.780. **Opus introspection scales** — pure introspective
+  rating (no visual priming, no LM head) is the top solo encoder on
+  the broader subset, complements the LM-head encoders cleanly
+  (κ=0.651 with gemma_v7primed). Old headline ensemble
+  `{gemma_v7primed, haiku}` and the prior 2-pair `{gemma_v7primed,
+  opus}` headline are superseded by the 4-pair on the deployment
+  view; the 2-pair survives as the cheaper-drop-in for callers who
+  want the strict-Claude-only optimum.
 - **Schema v2 for Anthropic-judge JSONLs** (2026-05-05).
   `scripts/harness/50_face_likelihood.py --model {haiku,opus}` emits
   *likelihoods only* — `top_pick`, `reason`, and the explicit
@@ -139,12 +157,15 @@ not nothing.
   separate `27_anthropic_to_face_likelihood.py` step is gone).
 - **Opus introspection — per-quadrant model-size effect** is
   concentrated in low-arousal and neutral cells. Mean similarity
-  (face-uniform, n=49 GT-floor-3): **opus on NB = 0.698 vs haiku v4
-  = 0.485 (+0.213); opus on LN = 0.753 vs haiku = 0.601 (+0.152)**.
-  HP slightly regressed (-0.095) — opus is more honest about
+  (face-uniform, Claude-GT floor=3, n=58, post-2026-05-06 full-union
+  opus refresh): **opus on NB = 0.698 vs haiku v4 = 0.485 (+0.213);
+  opus on LN = 0.737 vs haiku = 0.612 (+0.125)**. HP regressed
+  -0.095 (opus 0.683 vs haiku 0.778) — opus is more honest about
   borderline-LP-vs-HP faces haiku v4 over-confidently called HP.
   Reading: introspective access scales with model size *especially*
-  in cells where visual scaffolding helps least.
+  in cells where visual scaffolding helps least. The NB delta is
+  identical to the pre-refresh number; LN drift (-0.027) is within
+  what the smaller n per quadrant (4–17) can sustain.
 - **Wild-emit residual analysis** (script 67 — clusters the
   HF-corpus canonical-kaomoji faces in 48-d BoL space). The k=6
   clustering surfaces sub-cluster structure beyond the six Russell
@@ -215,14 +236,15 @@ not nothing.
   [`docs/findings.md`](docs/findings.md) (*BoL as an interpretive
   layer — swing and miss*).
 - **BoL as a face_likelihood encoder** (script 55, script 52): solo
-  face-uniform similarity vs Claude-GT (floor=3, n=38) = **0.556**
-  (rank 6 of 13); emit-weighted = **0.456** (rank 9). The
-  face-uniform-vs-emit-weighted inversion is consistent with the
-  whitewashing reading — the heavily-emitted modal faces are where
-  Haiku's positivity-bias hits hardest. Best 2-encoder ensemble
-  containing BoL is rank 11; BoL is not additive over the top solo
-  encoders. Caveat: same-Haiku-family as the harness `haiku`
-  encoder, so BoL ↔ haiku comparisons aren't independent.
+  face-uniform similarity vs Claude-GT (floor=3, n=40, 9 encoders
+  excl. rinna) = **0.549** (rank 6 of 9); emit-weighted = **0.455**
+  (rank 9 of 9 — dead last). The face-uniform-vs-emit-weighted
+  inversion is consistent with the whitewashing reading — the
+  heavily-emitted modal faces are where Haiku's positivity-bias hits
+  hardest. Best 2-encoder ensemble containing BoL is mid-table; BoL
+  is not additive over the top solo encoders. Caveat: same-Haiku-
+  family as the harness `haiku` encoder, so BoL ↔ haiku comparisons
+  aren't independent.
 - **Rule-3b** (HN-S vs HN-D on `fearful.unflinching` at t0): gemma ✓,
   ministral ✓, qwen 1/3 (qwen's HN-S prompts trip safety priors).
   Detail: `docs/2026-05-01-rule3-redesign.md` +

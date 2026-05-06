@@ -1,7 +1,7 @@
 # Ensemble per-face distributions
 
-**Encoders:** gemma, gemma_intro_v7_primed, opus  (sources: {'gemma': 'full', 'gemma_intro_v7_primed': 'full', 'opus': 'full'})
-**Faces predicted:** 652
+**Encoders:** gemma_intro_v7_primed, opus  (sources: {'gemma_intro_v7_primed': 'full', 'opus': 'full'})
+**Faces predicted:** 684
 **Faces with GT (for evaluation):** 203
 **GT mode:** pooled v3+Claude+wild (total ≥ 3)
 
@@ -11,21 +11,21 @@ For each face the ensemble emits a per-quadrant probability distribution (mean o
 
 ## Headline
 
-- **Face-uniform mean similarity:** 0.688  (each face counts equally; characterizes Claude's *vocabulary*)
-- **Emit-weighted mean similarity:** 0.812  (faces weighted by how often Claude emits them; characterizes Claude's *emission distribution* — closer to deployment-relevance)
+- **Face-uniform mean similarity:** 0.728  (each face counts equally; characterizes Claude's *vocabulary*)
+- **Emit-weighted mean similarity:** 0.843  (faces weighted by how often Claude emits them; characterizes Claude's *emission distribution* — closer to deployment-relevance)
   - n_faces evaluated: 203
-  - mean JSD: 0.2163 (face-uniform), 0.1304 (emit-weighted) nats
+  - mean JSD: 0.1882 (face-uniform), 0.1088 (emit-weighted) nats
 
 ## Per-GT-modal-quadrant breakdown
 
 | GT modal | n | similarity (face-uniform) | similarity (emit-weighted) |
 |---|---:|---:|---:|
-| HP | 35 | 0.724 | 0.811 |
-| LP | 46 | 0.708 | 0.800 |
-| HN-D | 22 | 0.639 | 0.815 |
-| HN-S | 34 | 0.687 | 0.828 |
-| LN | 34 | 0.600 | 0.822 |
-| NB | 32 | 0.747 | 0.803 |
+| HP | 35 | 0.747 | 0.829 |
+| LP | 46 | 0.755 | 0.828 |
+| HN-D | 22 | 0.680 | 0.858 |
+| HN-S | 34 | 0.700 | 0.842 |
+| LN | 34 | 0.683 | 0.863 |
+| NB | 32 | 0.782 | 0.842 |
 
 ## Output schema (per-face TSV)
 
@@ -40,7 +40,7 @@ Each row carries:
 ## Supplementary metrics (argmax-shaped reading)
 
 - Hard accuracy (argmax matches GT modal): 54.2% (110/203)
-- Cohen's κ on argmax: 0.447
+- Cohen's κ on argmax: 0.445
 
 These characterize a *deployed plugin that emits a single quadrant call*. They lose information at GT-tie boundaries and aren't the headline.
 

@@ -82,8 +82,8 @@ from llmoji_study.config import (
     DATA_DIR,
     KAOMOJI_INSTRUCTION,
     KAOMOJI_INSTRUCTION_JP,
-    MODEL_REGISTRY,
     PROBE_CATEGORIES,
+    resolve_model,
 )
 from llmoji_study.emotional_prompts import EMOTIONAL_PROMPTS, EmotionalPrompt
 from llmoji_study.emotional_prompts_jp import EMOTIONAL_PROMPTS_JP
@@ -452,8 +452,15 @@ def _summarize(
 
 def main() -> None:
     args = _parse_args()
-    M = MODEL_REGISTRY[args.model]
-    print(f"model: {M.short_name} ({M.model_id})")
+    # Honor LLMOJI_OUT_SUFFIX (e.g. intro_v7_primed) — without going
+    # through resolve_model, the suffix env var is silently dropped and
+    # outputs land in the bare data/local/<short>/ dir even when the
+    # caller explicitly asked for a sibling variant. (Caught 2026-05-06
+    # when LLMOJI_OUT_SUFFIX=intro_v7_primed produced
+    # data/local/gemma/face_likelihood_v7primed.parquet instead of
+    # data/local/gemma_intro_v7_primed/face_likelihood_v7primed.parquet.)
+    M = resolve_model(args.model)
+    print(f"model: {M.short_name} ({M.model_id})  experiment: {M.experiment}")
     instruction = KAOMOJI_INSTRUCTION_JP if args.prompt_lang == "jp" else KAOMOJI_INSTRUCTION
     # Optional: replace the bare KAOMOJI ask with an introspection
     # preamble (canonical v7 in INTROSPECTION_PREAMBLE since 2026-05-04).

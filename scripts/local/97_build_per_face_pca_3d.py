@@ -31,9 +31,8 @@ from sklearn.decomposition import PCA
 
 from llmoji_study.config import FIGURES_DIR
 from llmoji_study.emotional_analysis import (
-    QUADRANT_COLORS,
-    QUADRANT_ORDER_SPLIT,
     load_emotional_features_stack,
+    mix_quadrant_color,
 )
 
 
@@ -45,29 +44,6 @@ MODELS = ("gemma", "qwen", "ministral", "gpt_oss_20b", "granite")
 MIN_FACE_COUNT = 1
 OUT_HTML = FIGURES_DIR / "local" / "fig_v3_per_face_pca_3d.html"
 OUT_META = OUT_HTML.with_suffix(".meta.json")
-
-
-def _hex_to_rgb(h: str) -> tuple[int, int, int]:
-    h = h.lstrip("#")
-    return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
-
-
-def _rgb_blend(quadrant_counts: dict[str, int]) -> str:
-    """RGB-linear blend of QUADRANT_COLORS weighted by per-quadrant
-    emission counts. Returns ``#RRGGBB`` for plotly marker color."""
-    total = sum(quadrant_counts.values())
-    if total <= 0:
-        return "#909090"
-    r = g = b = 0.0
-    for q, n in quadrant_counts.items():
-        if n <= 0 or q not in QUADRANT_COLORS:
-            continue
-        cr, cg, cb = _hex_to_rgb(QUADRANT_COLORS[q])
-        w = n / total
-        r += cr * w
-        g += cg * w
-        b += cb * w
-    return f"#{int(round(r)):02x}{int(round(g)):02x}{int(round(b)):02x}"
 
 
 def _per_face_centroids(
@@ -110,7 +86,7 @@ def _build_scene(
     breakdowns: list[dict[str, int]], totals: list[int],
 ) -> None:
     scene = "scene" if scene_idx == 1 else f"scene{scene_idx}"
-    colors = [_rgb_blend(b) for b in breakdowns]
+    colors = [mix_quadrant_color(b) for b in breakdowns]
     sizes = [max(6, min(28, 6 + 4 * np.log2(max(1, t)))) for t in totals]
     hovertexts = []
     for face, b, t in zip(faces, breakdowns, totals):
