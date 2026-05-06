@@ -12,7 +12,7 @@ ensemble headlines, the disclosure-pilot reversal) lives in
 references a "historical" or "pre-2026-05-XX" finding, that's where
 the full earlier framing is preserved.
 
-## Current state (2026-05-05)
+## Current state (2026-05-06)
 
 The headline metric is **distribution similarity vs Claude-GT** —
 soft-everywhere methodology, not hard-classification accuracy. Per
@@ -131,45 +131,161 @@ NB went 16 unique → 5 unique faces under priming (`(・_・)` family at
 45% modal). LN modal `(´-`)` doubled in concentration (30% → 60%) —
 same modal, sharpened distribution.
 
-### Per-project Claude affect under expanded GT
+### Per-project resolution methodology (script 66)
 
-`scripts/66_per_project_quadrants.py` regenerated 2026-05-05 on the
-expanded GT corpus. **3119 emissions across 274 unique faces**:
+`scripts/66_per_project_quadrants.py` resolves per-project kaomoji
+emissions to Russell quadrants via three modes — `gt-priority`
+(Claude-GT first, BoL fallback), `bol` (BoL for every face), and
+`gt-only` (strict, mark unresolved as unknown). The script reads
+local journals + claude.ai exports as deployment-emission sources
+and is intended to be run *locally* by individual contributors;
+its rendered outputs (per-(project, quadrant) tables, per-project
+charts) are deployment-telemetry by construction and are not
+committed to this repo. The methodology is the contribution; the
+per-machine outputs stay private.
 
-| mode | resolved by Claude-GT | resolved by ensemble | unknown |
-|---|---:|---:|---:|
-| gt-priority (default) | 1587/2405 (66.0%) | 765/2405 (31.8%) | 53/2405 (2.2%) |
-| ensemble | 0/2405 | 2338/2405 (97.2%) | 67/2405 (2.8%) |
-| gt-only (strict) | 1587/2405 (66.0%) | 0/2405 | 818/2405 (34.0%) |
+GT resolution coverage on the 2026-05-06 expanded GT corpus is
+~67% direct + ~33% BoL fallback under `gt-priority` (100% combined
+coverage); ~33% unknown under strict `gt-only`. These are coverage
+numbers across the corpus's face distribution, not specific to any
+contributor.
 
-(Per-emission counts in the 2405-row table above; the per-face counts
-under `--gt-priority` resolve **67.2% direct Claude-GT / 29.4%
-ensemble fallback / 3.4% unknown** on the wider 274-unique-face
-distribution.) The 66% direct GT resolution is up substantially from
-the pre-2026-05-05 floor=1 / floor=2 GT (~22 / 51 faces); for the
-per-project deployment use case, two-thirds of contributor-corpus
-emissions now have direct Claude-on-affective-prompts evidence backing
-the quadrant assignment. Figures at
-`figures/harness/claude_per_project_{gt_priority,ensemble,gt_only}.png`.
+### Use / read / act channels (2026-05-06) — methodology + structural findings
 
-### Wild-emit residual analysis (2026-05-05)
+Detail: [`2026-05-06-use-read-act-channels.md`](2026-05-06-use-read-act-channels.md).
 
-Detail: [`2026-05-05-residual-state-axes.md`](2026-05-05-residual-state-axes.md)
-+ companion gt-only doc.
+**TL;DR:** The harness/embedding/eriskii side was overhauled
+2026-05-06: MiniLM-on-prose embeddings + the eriskii 21-axis
+projection are gone; the per-face representation is now a 48-d
+**bag-of-lexicon (BoL)** vector pulled directly from the structured
+`synthesis: {primary_affect, stance_modality_function}` rows in the
+llmoji v2 corpus. 19 of the 48 lexicon words are explicit Russell-
+quadrant anchors, so the synthesizer's structured commit *is* a 6-d
+quadrant distribution per face — no encoder, no projection.
 
-On the refreshed corpus (1 contributor / 8 source models / 306
-canonical kaomoji from `wild_faces_labeled.tsv`, n=215 wild-emit
-faces), the unsupervised k=6 clustering surfaces a substantial
-**HN-S-modal cluster (n=44, modal share 0.56, "composed competence
-with measured empathy")** that was under-resolved at the prior
-corpus size. Face-shape: empathic-concern, not fear/alarm —
-`(´・ω・`)`, `(´;ω;`)`, `(´-ω-`)`. Cluster-summed shares (face-count):
-HP 14% / LP 24% / HN-D 3% / HN-S 15% / LN 12% / NB 32%.
-Empathic-concern is the primary under-sampled state in the GT pilot —
-only 5% of GT-only faces are HN-S vs 15% in the wild set — and the
-cleanest target for the next elicitation arm. The selection-confound
-argument ("Russell-elicited GT misses what deployment surfaces")
-survives the corpus refresh unchanged.
+A three-way per-face analysis (`scripts/harness/68_three_way_analysis.py`)
+on the n=40 shared-face subset (702 GT emits) shows three structural
+findings:
+
+1. **Opus ↔ Haiku introspection cross-similarity = 0.906 invariant
+   under emit-weighting**. The two introspection channels make the
+   same per-face calls. Model size barely matters for cold symbolic
+   interpretation of a kaomoji.
+2. **gt ↔ introspection goes UP under emit-weighting (0.736 →
+   0.781 for opus, 0.675 → 0.702 for haiku); gt ↔ bol goes DOWN
+   (0.549 → 0.455).** Introspection nails the heavily-emitted faces,
+   loses on the long tail. BoL nails the long tail, loses on the
+   heavily-emitted ones. They measure different things.
+3. **`110` agreement pattern = 27.4% of emit volume.** Both
+   introspection channels correctly cold-read the GT meaning, but
+   BoL lands somewhere different. This is the synthesis-vs-emission
+   gap empirically: cold-introspection of the symbol matches the
+   elicited use; pooled-synthesis-from-emits drifts.
+
+The case files in the design doc walk through five faces where the
+channels diverge sharply (`(╯°□°)`, `(´;ω;`)`, `(╥﹏╥)`, `(>∀<☆)`,
+`(´-`)`). Per-channel quadrant distributions are reported per face;
+the original framing read BoL as a deployment-state ground truth
+that captured cases where lived state diverges from denoted meaning.
+That framing did not survive the next pass.
+
+The per-source-model extension (`scripts/harness/69_per_source_drift.py`)
+splits the BoL channel by source model. Cross-source pairwise BoL
+similarity on the corpus's shared faces shows the same general
+pattern: BoL aggregations differ by deployment register. The data
+is on the public HF dataset (`a9lim/llmoji`), summarized in
+`data/harness/per_source_drift_summary.md`.
+
+### BoL as an interpretive layer — swing and miss
+
+**TL;DR for the BoL pipeline:** The structural infrastructure built
+out 2026-05-06 (lexicon module, BoL parquet builders, three-way
+analysis script, per-source drift script, BoL face_likelihood
+encoder) is sound and worth keeping. **The interpretive claim that
+motivated it — that BoL captures "what state the face fires under
+in deployment" — is compromised** by a synthesizer-positivity-bias
+that shows up cleanly when BoL is compared to GT on negative-affect
+faces. Specifically:
+
+- BoL is built by Haiku synthesizing many in-context emits of a
+  face into a structured adjective-bag pick over the locked v2
+  LEXICON.
+- Haiku is helpful-tuned. When summarizing "how did Claude respond
+  to this hard user content," Haiku's available descriptors
+  (`satisfied / helpful / relieved`, etc) skew positive — the
+  synthesizer prefers LP-coded vocabulary over LN/HN-coded
+  vocabulary even when the underlying lived affect is negative.
+- The result is a **biased-positive** measurement of deployment-
+  state, not a neutral one. The use/act gap (BoL vs GT divergence
+  on negative-affect faces) is at least partly a synthesizer-bias
+  artifact rather than a genuine deployment-state truth.
+
+**Implication for the llmoji adjective-bag synthesis approach as an
+interpretive tool:** structurally compromised for affect
+interpretation on negative-valence faces. The adjective-bag
+representation is still useful for some purposes (corpus-clustering,
+zero-cost per-face vectors, structural comparison across source
+models), but **it is not a trustworthy substitute for direct
+elicitation (GT) or cold introspection (Opus / Haiku
+face_likelihood) when the question is "what state is the model
+in"**. The original framing oversold BoL's interpretive value; the
+honest framing demotes it to a corpus-summary tool with known
+positivity bias.
+
+**What survives:**
+
+- The four-channel comparison framework (GT use, Opus read, Haiku
+  read, BoL act) and the JSD-based pairwise similarity machinery.
+- The empirical observation that the four channels diverge in
+  patterned ways (the `110` cell exists; opus↔haiku invariance
+  exists). Interpretation of *why* they diverge is the part that
+  shifted.
+- The lexicon module, BoL parquet pipeline, and per-source drift
+  infrastructure as cheap reusable tooling.
+- Cross-source-model BoL similarity is informative as a
+  *register-similarity proxy* even if its absolute readings are
+  biased; coding-agent-register sources cluster together
+  regardless.
+
+**What does not survive:**
+
+- "BoL is the reference for deployment interpretation."
+- "When Claude emits `(╯°□°)`, the lived state is HP not HN-D"
+  (asserted as fact rather than as one of several plausible reads).
+- The use/act gap framed as "deployment context redefines symbol
+  meaning" — the gap might just be the synthesizer's positivity
+  bias.
+
+**Falsifiable next step** for anyone wanting to push the bias
+question: re-synthesize a sample of negative-affect face contexts
+with Opus instead of Haiku, audit whether Opus picks more LN/HN
+descriptors on the same inputs. If so, whitewashing confirmed and
+the BoL pipeline can be regenerated with Opus as the synthesizer.
+If not, the bias is structural to the prompt or the LEXICON design,
+not the model.
+
+Detail: [`2026-05-06-use-read-act-channels.md`](2026-05-06-use-read-act-channels.md).
+
+### Wild-emit residual analysis (2026-05-05; chart rework 2026-05-06)
+
+`scripts/67_wild_residual.py` clusters the canonical-kaomoji
+HF-corpus faces in 48-d BoL space and surfaces sub-cluster
+structure beyond the six Russell quadrants. The k=6 clustering
+typically resolves into recognizable affect / register groupings
+via deterministic top-2 modal-lexicon-word labels per cluster.
+Cluster-table outputs (`wild_residual_clusters{,_gt_only}.tsv`)
+report per-cluster face counts, GT-overlap shares, and modal
+lexicon-word signatures.
+
+The script's 3D PCA HTML chart uses two channels of information
+per face: **color = BoL modal quadrant** (uniformly across all
+faces — surfaces the use/act gap rather than collapsing to GT),
+**marker shape = deployment surface** (Claude Code only / any
+claude.ai / neither). The surface dispatch reads local-machine
+emission sources, so the rendered HTML is contributor-specific
+deployment telemetry; it's gitignored — regenerate locally via
+`python scripts/67_wild_residual.py`. The cluster-table TSVs
+themselves are corpus-derived and safe to commit.
 
 ### Layer-stack representation (since 2026-05-04)
 
@@ -1948,12 +2064,13 @@ the face naturally.
 - **GT denominator is selection-confounded**. The 49-face GT-floor-3
   subset is from Claude's emissions on Russell-elicited prompts; it
   systematically misses what Claude emits on deployment-distribution
-  prompts (mostly NB observational, with empathic-concern HN-S
-  under-represented). The wild-emit residual analysis quantifies
-  this: empathic-concern (HN-S sub-cluster, n=44 in the wild set,
-  modal share 0.56) is the cleanest target for the next elicitation
-  arm. See `docs/2026-05-05-residual-state-axes.md`.
-- **Best-subset search is in-sample**. Cleaner cross-validation
+  prompts (mostly NB observational, with HN-S vocabulary under-
+  represented). The wild-emit residual analysis (script 67)
+  quantifies this — HN-S sub-clusters show meaningfully more
+  vocabulary diversity in the wild corpus than in the elicitation
+  set, suggesting more elicitation arms targeting HN-S contexts
+  would close the gap.
+- **Best-subset search is in-sample.** Cleaner cross-validation
   would split faces or use a held-out GT. The reported similarity
   numbers should be interpreted as upper bounds rather than
   generalization estimates.

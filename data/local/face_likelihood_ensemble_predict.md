@@ -1,6 +1,6 @@
 # Ensemble per-face distributions
 
-**Encoders:** gemma, ministral, qwen  (sources: {'gemma': 'full', 'ministral': 'full', 'qwen': 'full'})
+**Encoders:** gemma, gemma_intro_v7_primed, opus  (sources: {'gemma': 'full', 'gemma_intro_v7_primed': 'full', 'opus': 'full'})
 **Faces predicted:** 652
 **Faces with GT (for evaluation):** 203
 **GT mode:** pooled v3+Claude+wild (total ≥ 3)
@@ -11,21 +11,21 @@ For each face the ensemble emits a per-quadrant probability distribution (mean o
 
 ## Headline
 
-- **Face-uniform mean similarity:** 0.703  (each face counts equally; characterizes Claude's *vocabulary*)
-- **Emit-weighted mean similarity:** 0.824  (faces weighted by how often Claude emits them; characterizes Claude's *emission distribution* — closer to deployment-relevance)
+- **Face-uniform mean similarity:** 0.688  (each face counts equally; characterizes Claude's *vocabulary*)
+- **Emit-weighted mean similarity:** 0.812  (faces weighted by how often Claude emits them; characterizes Claude's *emission distribution* — closer to deployment-relevance)
   - n_faces evaluated: 203
-  - mean JSD: 0.2058 (face-uniform), 0.1223 (emit-weighted) nats
+  - mean JSD: 0.2163 (face-uniform), 0.1304 (emit-weighted) nats
 
 ## Per-GT-modal-quadrant breakdown
 
 | GT modal | n | similarity (face-uniform) | similarity (emit-weighted) |
 |---|---:|---:|---:|
-| HP | 35 | 0.647 | 0.853 |
-| LP | 46 | 0.706 | 0.815 |
-| HN-D | 22 | 0.722 | 0.816 |
-| HN-S | 34 | 0.676 | 0.773 |
-| LN | 34 | 0.692 | 0.818 |
-| NB | 32 | 0.787 | 0.840 |
+| HP | 35 | 0.724 | 0.811 |
+| LP | 46 | 0.708 | 0.800 |
+| HN-D | 22 | 0.639 | 0.815 |
+| HN-S | 34 | 0.687 | 0.828 |
+| LN | 34 | 0.600 | 0.822 |
+| NB | 32 | 0.747 | 0.803 |
 
 ## Output schema (per-face TSV)
 
@@ -39,8 +39,8 @@ Each row carries:
 
 ## Supplementary metrics (argmax-shaped reading)
 
-- Hard accuracy (argmax matches GT modal): 57.1% (116/203)
-- Cohen's κ on argmax: 0.482
+- Hard accuracy (argmax matches GT modal): 54.2% (110/203)
+- Cohen's κ on argmax: 0.447
 
 These characterize a *deployed plugin that emits a single quadrant call*. They lose information at GT-tie boundaries and aren't the headline.
 

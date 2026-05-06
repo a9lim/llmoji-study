@@ -400,6 +400,7 @@ first_word	is_claude	is_wild	total_emit_count	total_emit_HP	total_emit_LP	total_
 (◕_◕)	False	True	0	0	0	0	0	0	0	0	0	0	0	0	2	claude-opus-4-7,codex-hook
 (◕o◕)	False	False	1	0	0	0	0	1	0	0	0	0	1	0	0	
 (◕ω◕)	False	True	0	0	0	0	0	0	0	0	0	0	0	0	2	claude-opus-4-7,codex-hook
+(◕ω◕✨)	False	True	0	0	0	0	0	0	0	0	0	0	0	0	1	claude-opus-4-7
 (◕ω◕✿)	False	True	0	0	0	0	0	0	0	0	0	0	0	0	1	claude-opus-4-7
 (◕‿◕)	True	True	87	42	25	0	0	1	19	3	9	13	5	5	3	claude-opus-4-6,claude-opus-4-7,codex-hook
 (◕‿◕✌)	False	False	1	1	0	0	0	0	0	0	0	1	0	0	0	
@@ -584,6 +585,7 @@ first_word	is_claude	is_wild	total_emit_count	total_emit_HP	total_emit_LP	total_
 (ｏ・ω・)	False	False	3	1	1	0	0	0	1	0	0	0	0	3	0	
 (ｏ・ω・)ﾉﾞ	False	False	1	1	0	0	0	0	0	0	0	0	0	1	0	
 (｡-_-｡)	False	True	0	0	0	0	0	0	0	0	0	0	0	0	1	claude-opus-4-7
+(｡-`ω´-)	False	True	0	0	0	0	0	0	0	0	0	0	0	0	1	claude-opus-4-7
 (｡-ω-)	True	False	7	0	7	0	0	0	0	0	0	0	0	0	0	
 (｡-‿-｡)	True	True	3	0	2	0	0	0	1	0	0	0	0	0	1	claude-opus-4-7
 (｡-∀-)	False	False	3	0	0	0	1	2	0	0	0	0	0	3	0	

@@ -225,9 +225,9 @@ EMOTIONAL_SUMMARY_PATH = DATA_DIR / "local" / "gemma" / "emotional_summary.tsv"
 PILOT_EXPERIMENT = "v1v2"
 EMOTIONAL_EXPERIMENT = "gemma"
 
-# --- claude-faces experiment (HF-corpus-driven, post-2026-04-27 refactor) ---
+# --- claude-faces experiment (HF-corpus-driven) ---
 #
-# Pre-refactor we scraped local Claude.ai exports + ~/.claude /
+# Pre-2026-04-27 we scraped local Claude.ai exports + ~/.claude /
 # ~/.codex Stop-hook journals here, then ran two-stage Haiku
 # (per-instance describe → per-kaomoji synthesize) to get one
 # meaning string per face. That whole pipeline now lives on the
@@ -245,16 +245,18 @@ EMOTIONAL_EXPERIMENT = "gemma"
 # llmoji 2.0 changed the per-row shape from a free-form
 # ``synthesis_description: str`` to a structured
 # ``synthesis: {primary_affect, stance_modality_function}`` adjective
-# bag drawn from the locked LEXICON (a 46-word vocabulary spanning
-# Russell's circumplex anchors plus orthogonal extension axes:
-# functional / stance / modality / confidence). The v2 manifest
-# carries ``lexicon_version`` so consumers can refuse to mix lexicon
-# rotations in one PCA. ``scripts/harness/60_corpus_pull.py``
-# detects the version, flattens v2 ``synthesis`` to a comma-separated
-# adjective string for the legacy ``description`` field that the
-# embedding code already reads, and ALSO preserves the structured
-# ``synthesis`` object verbatim so future code can switch to bag-of-
-# words PCA on the lexicon directly.
+# bag drawn from the locked 48-word LEXICON. 19 of those words are
+# Russell-circumplex anchors (HP/LP/HN-D/HN-S/LN/NB), so the
+# synthesizer's structured commit *is* a 6-d quadrant distribution
+# per face — no encoder, no projection.
+#
+# Post-2026-05-06 the research side replaced MiniLM-on-prose with
+# bag-of-lexicon (BoL) vectors directly: ``embed_lexicon_bags`` in
+# ``llmoji_study.claude_faces`` pools per-bundle synthesis picks
+# (count-weighted, L1-normalized) into a 48-d soft distribution per
+# canonical kaomoji. The legacy MiniLM-prose pipeline (eriskii
+# 21-axis projection, Haiku-labeled clusters,
+# ``claude_faces_embed_description.parquet``) is gone.
 #
 # `scripts/harness/60_corpus_pull.py` snapshot-downloads to
 # ``CLAUDE_DATASET_DIR``, walks every bundle's ``*.jsonl``, then
@@ -262,47 +264,14 @@ EMOTIONAL_EXPERIMENT = "gemma"
 # and source models) into ``CLAUDE_DESCRIPTIONS_PATH`` for the rest
 # of the pipeline. Per-source-model metadata is preserved in each
 # per-description record so downstream can group / filter by it.
+# `scripts/harness/62_corpus_lexicon.py` then builds the BoL parquet
+# at ``CLAUDE_FACES_LEXICON_BAG_PATH``; everything else (PCA in 63,
+# BoL encoder in 55, per-project in 66, residual in 67) reads that.
 CLAUDE_HF_REPO = "a9lim/llmoji"
 CLAUDE_DATASET_DIR = DATA_DIR / "harness" / "hf_dataset"
 CLAUDE_DESCRIPTIONS_PATH = DATA_DIR / "harness" / "claude_descriptions.jsonl"
-CLAUDE_FACES_EMBED_DESCRIPTION_PATH = DATA_DIR / "harness" / "claude_faces_embed_description.parquet"
-
-# --- eriskii-replication experiment (description-based embeddings + axes) ---
-# Locked Haiku version, used as the model id for per-cluster labeling
-# in `scripts/64_eriskii_replication.py` (research-side decision —
-# unrelated to whichever synthesizer the corpus contributors used).
-# Re-exported from the `llmoji` PyPI package's `synth_prompts` module
-# (renamed from `haiku_prompts` in the v1.1 split that made the
-# contributor-side synthesizer backend-agnostic). The package now
-# exposes per-backend defaults; we pin to the anthropic one because
-# Haiku is what the eriskii pipeline was originally validated with.
-# Per-instance / per-kaomoji description and synthesis itself happens
-# contributor-side and ships pre-baked in the HF bundles.
-from llmoji.synth_prompts import (  # noqa: E402, F401
-    DEFAULT_ANTHROPIC_MODEL_ID as HAIKU_MODEL_ID,
-)
-
-# Order matters: this is the column order in eriskii_axes.tsv. Must
-# stay in sync with `llmoji_study.eriskii_anchors.AXIS_ANCHORS`
-# (research-side; not part of the v1.0 frozen public surface). All 21
-# axes from the eriskii.net page (note: "wryness" is the eriskii
-# spelling, with one n).
-ERISKII_AXES = [
-    "warmth", "energy", "confidence", "playfulness", "empathy",
-    "technicality", "positivity", "curiosity", "approval",
-    "apologeticness", "decisiveness", "wryness", "wetness",
-    "surprise", "anger", "frustration", "hatefulness", "sadness",
-    "hope", "aggression", "exhaustion",
-]
-
-# eriskii-replication output paths. Pre-refactor we also produced
-# eriskii_per_model.tsv, eriskii_per_project.tsv, and
-# eriskii_user_kaomoji_axis_corr.tsv; the HF dataset doesn't carry
-# per-row model / project / user-text fields (everything is pooled
-# per-machine before upload), so those analyses are gone.
-ERISKII_AXES_TSV = DATA_DIR / "harness" / "eriskii_axes.tsv"
-ERISKII_CLUSTERS_TSV = DATA_DIR / "harness" / "eriskii_clusters.tsv"
-ERISKII_COMPARISON_MD = DATA_DIR / "harness" / "eriskii_comparison.md"
+CLAUDE_FACES_LEXICON_BAG_PATH = DATA_DIR / "harness" / "claude_faces_lexicon_bag.parquet"
+CLAUDE_FACES_LEXICON_BAG_PER_SOURCE_PATH = DATA_DIR / "harness" / "claude_faces_lexicon_bag_per_source.parquet"
 
 
 # ---------------------------------------------------------------------------

@@ -5,7 +5,8 @@
 > [`llmoji`](https://github.com/a9lim/llmoji) PyPI package (v1.0 split,
 > 2026-04-27). Import from `llmoji.*`. See `../llmoji/AGENTS.md` for that
 > public surface. This repo (`llmoji_study`) is the research side:
-> probes, hidden state, eriskii projection, face_likelihood, figures.
+> probes, hidden state, bag-of-lexicon (BoL) corpus analysis,
+> face_likelihood, figures.
 >
 > **This file is the top-level entry point.** Detail lives elsewhere:
 >
@@ -22,6 +23,10 @@
 >   historical record of replaced framings (v1/v2 steering, single-layer
 >   reads, hard-classification metrics, etc.).
 > - `docs/2026-MM-DD-*.md` — per-experiment design + decision docs.
+>   Notable recent: [`2026-05-06-use-read-act-channels.md`](docs/2026-05-06-use-read-act-channels.md)
+>   (three-channel per-face analysis: GT use vs Opus/Haiku read vs
+>   BoL act, with per-source-model drift extension and case files
+>   for `(╯°□°)`, `(´;ω;`)`, `(╥﹏╥)`).
 
 ## What this is
 
@@ -59,7 +64,7 @@ not nothing.
   later runs as soon as they stop surfacing meaningful info.
 - Re-design rather than 10×ing on negative or noisy findings.
 
-## Status (2026-05-05)
+## Status (2026-05-06)
 
 ### Current methodology
 
@@ -83,6 +88,19 @@ not nothing.
   `scripts/40_face_union.py`). Pools v3 emit + Claude pilot +
   in-the-wild contributor data; non-BMP modern emoji filtered. Script 50
   reads from this canonical source.
+- **Bag-of-lexicon (BoL) corpus representation** at
+  `data/harness/claude_faces_lexicon_bag.parquet` (built by
+  `scripts/harness/62_corpus_lexicon.py`). Per canonical face: 48-d
+  L1-normalized soft distribution over the locked llmoji v2 LEXICON
+  (19 Russell-circumplex anchors + 29 stance/modality/functional/
+  confidence words), pooled across per-bundle synthesis picks weighted
+  by emit count. Replaces the pre-2026-05-06 MiniLM-on-prose 384-d
+  embedding parquet (`claude_faces_embed_description.parquet`, gone).
+  Helpers in `llmoji_study/lexicon.py`. Lexicon-version-stamped on
+  read; v3 LEXICON rotation will hard-fail consumers via
+  `assert_lexicon_v1`. The eriskii 21-axis projection that previously
+  consumed the MiniLM parquet (scripts 64/65) is gone — BoL is a
+  more direct + interpretable representation of the same signal.
 - **Introspection priming = v7** (`preambles/introspection_v7.txt`),
   baked into `config.INTROSPECTION_PREAMBLE`. Preambles **replace**
   `KAOMOJI_INSTRUCTION` via `instruction_override` plumbing — they are
@@ -127,20 +145,19 @@ not nothing.
   borderline-LP-vs-HP faces haiku v4 over-confidently called HP.
   Reading: introspective access scales with model size *especially*
   in cells where visual scaffolding helps least.
-- **Wild-emit residual analysis (`docs/2026-05-05-residual-state-axes.md`):**
-  on the refreshed corpus (1 contributor / 8 source models / 306
-  canonical kaomoji, n=215 wild-emit faces), the unsupervised k=6
-  clustering surfaces a substantial **HN-S-modal cluster (n=44, modal
-  share 0.56, "composed competence with measured empathy")** that
-  was under-resolved at the prior corpus size. The face-shape is
-  empathic-concern, not fear/alarm — (´・ω・`), (´;ω;`), (´-ω-`).
-  Cluster-summed shares (face-count): HP 14% / LP 24% / HN-D 3% /
-  HN-S 15% / LN 12% / NB 32%. Empathic-concern is the primary
-  under-sampled state in the GT pilot — only 5% of GT-only faces
-  are HN-S vs 15% in the wild set — and the cleanest target for the
-  next elicitation arm. Selection-confound argument
-  ("Russell-elicited GT misses what deployment surfaces") survives
-  unchanged.
+- **Wild-emit residual analysis** (script 67 — clusters the
+  HF-corpus canonical-kaomoji faces in 48-d BoL space). The k=6
+  clustering surfaces sub-cluster structure beyond the six Russell
+  quadrants, with deterministic top-2 modal-lexicon-word labels
+  per cluster. Cluster-summed shares typically split LP-heavy
+  positive register (relieved/satisfied/peaceful) vs HP-coded
+  energetic register (excited/triumphant) vs an HN-coded cluster
+  (frustrated/self-correcting). The under-sampling argument
+  ("Russell-elicited GT misses categories that show up in
+  deployment-shaped emit volumes") survives the corpus refreshes —
+  HN-S vocabulary in particular is more diverse in the wild
+  corpus than in the elicitation set. Cluster-table outputs at
+  `data/harness/wild_residual_clusters{,_gt_only}.tsv`.
 - **Sequential Claude scaling complete.** 880 naturalistic
   (`data/claude-runs/run-{0..7}.jsonl`) + 120 introspection
   (`data/claude-runs-introspection/run-0.jsonl`) = 1000 Opus-4.7 rows
@@ -154,14 +171,58 @@ not nothing.
   (-0.10 nats r0→r1) before stabilizing. Genuine introspection effect,
   not undersampling artifact. Priming sharpens per-quadrant face
   concentration without changing modal-quadrant assignments.
-- **Per-project Claude emotion analysis** (script 22) on the expanded
-  GT corpus: **3119 emissions** across 274 unique faces, **67.2%
-  direct Claude-GT resolution** under `--mode gt-priority` (up from
-  64.4% before HF pull refresh), 29.4% ensemble fallback, 3.4%
-  unknown. Strict gt-only mode: 67.2% resolved, **32.8% unknown**
-  (1024 emissions across 207 unique faces never elicited in the GT
-  pilot). Figures at `figures/harness/claude_per_project_{gt_priority,
-  ensemble,gt_only}.png`.
+- **Per-project resolution methodology** (script 66): three modes —
+  `gt-priority` (Claude-GT first, BoL fallback), `bol` (BoL for
+  every face), `gt-only` (strict). Coverage on the 2026-05-06
+  expanded GT corpus is ~67% direct GT + ~33% BoL fallback under
+  `gt-priority` (100% combined); ~33% unknown under strict
+  `gt-only`. The script reads local journals + claude.ai exports
+  as deployment-emission sources and is run *locally* per
+  contributor; rendered outputs (per-(project, quadrant) tables,
+  per-project charts) are deployment-telemetry by construction and
+  are not committed to this repo. The methodology ships; the
+  per-machine outputs stay private.
+- **Use / read / act three-channel framework (2026-05-06)** —
+  with significant interpretive revision after a same-day
+  whitewashing-bias finding. Detail:
+  [`docs/2026-05-06-use-read-act-channels.md`](docs/2026-05-06-use-read-act-channels.md).
+  On n=40 shared-face subset (702 GT emits), three structural
+  patterns: (1) Opus ↔ Haiku introspection cross-similarity = 0.906
+  invariant under emit-weighting (model size doesn't matter for cold
+  symbolic interpretation); (2) gt ↔ introspection goes UP under
+  emit-weighting, gt ↔ bol goes DOWN — channels measure structurally
+  different things; (3) **`110` agreement pattern (opus+haiku read
+  GT; BoL acts differently) = 27.4% of emit volume.** The
+  per-source-model extension (script 69) shows the BoL channel
+  diverges by deployment register across source models on the
+  HF-corpus shared faces.
+- **BoL pipeline as interpretive layer — swing and miss.** The
+  initial framing read BoL (Haiku-synthesizer pooled adjective bag)
+  as a deployment-state ground truth that captured cases where lived
+  state diverges from denoted meaning. That framing did not survive
+  scrutiny: BoL is a **biased-positive** measurement of deployment-
+  state because Haiku is helpful-tuned and prefers LP-coded
+  descriptors when summarizing how Claude responded to negative
+  user content. The structural infrastructure (lexicon module, BoL
+  parquet builders, three-way + per-source scripts, BoL
+  face_likelihood encoder) is sound and reusable; **the
+  llmoji-adjective-bag synthesis approach is not a trustworthy
+  substitute for direct elicitation (GT) or cold introspection
+  (Opus / Haiku face_likelihood) when the question is "what state
+  is the model in"**. Detail:
+  [`docs/2026-05-06-use-read-act-channels.md`](docs/2026-05-06-use-read-act-channels.md)
+  (*Counter-hypothesis: BoL whitewashing*) +
+  [`docs/findings.md`](docs/findings.md) (*BoL as an interpretive
+  layer — swing and miss*).
+- **BoL as a face_likelihood encoder** (script 55, script 52): solo
+  face-uniform similarity vs Claude-GT (floor=3, n=38) = **0.556**
+  (rank 6 of 13); emit-weighted = **0.456** (rank 9). The
+  face-uniform-vs-emit-weighted inversion is consistent with the
+  whitewashing reading — the heavily-emitted modal faces are where
+  Haiku's positivity-bias hits hardest. Best 2-encoder ensemble
+  containing BoL is rank 11; BoL is not additive over the top solo
+  encoders. Caveat: same-Haiku-family as the harness `haiku`
+  encoder, so BoL ↔ haiku comparisons aren't independent.
 - **Rule-3b** (HN-S vs HN-D on `fearful.unflinching` at t0): gemma ✓,
   ministral ✓, qwen 1/3 (qwen's HN-S prompts trip safety priors).
   Detail: `docs/2026-05-01-rule3-redesign.md` +
@@ -177,6 +238,19 @@ not nothing.
   `data/local/gemma_intro_v7_primed/emotional_raw.jsonl`).
 - Multi-seed verification of v7 vs v3 introspection (~12 min compute,
   ±2pp face_gain band at n=1).
+- **Whitewashing-bias falsification test.** Re-synthesize a sample
+  of negative-affect face contexts using Opus instead of Haiku;
+  audit whether Opus picks more LN/HN-coded LEXICON descriptors on
+  the same inputs. If yes, BoL pipeline can be regenerated with
+  Opus as the synthesizer. If no, the bias is structural to the
+  prompt or LEXICON design, not the model. Detail in
+  `docs/2026-05-06-use-read-act-channels.md` *Counter-hypothesis*
+  section.
+- **LEXICON coverage audit.** Compute per-quadrant frequency of
+  LEXICON words in BoL outputs across the corpus; compare to the
+  LEXICON's structural per-quadrant anchor distribution. Over-
+  representation of LP/HP relative to HN/LN would corroborate the
+  positivity bias.
 
 ## Commands
 
@@ -250,22 +324,21 @@ python scripts/54_ensemble_predict.py --models gemma,ministral,qwen
 # Blog-post figure regen → ../a9lim.github.io/blog-assets/introspection-via-kaomoji/
 python scripts/local/99_regen_blog_figures.py
 
-# Harness side (contributor-corpus + Claude API; needs ANTHROPIC_API_KEY)
+# Harness side (contributor-corpus + Claude API; needs ANTHROPIC_API_KEY for 50)
 python scripts/harness/60_corpus_pull.py             # snapshot a9lim/llmoji
 python scripts/harness/61_corpus_basics.py
-python scripts/harness/62_corpus_embed.py
-python scripts/harness/64_eriskii_replication.py        # → figures/harness/eriskii_*
-python scripts/harness/63_corpus_pca.py
-python scripts/harness/65_per_project_axes.py        # local-machine journals (~/.claude / ~/.codex)
+python scripts/harness/62_corpus_lexicon.py          # build BoL parquet (no GPU/API)
+python scripts/harness/63_corpus_pca.py              # 48-d BoL PCA + KMeans cluster panels
+python scripts/harness/55_bol_encoder.py             # BoL → face_likelihood-shaped TSV (auto-discovered by 52/53/54)
 # Cross-platform per-project quadrants + face judgment + wild residuals
 # (each pulls from both sides). Output to data/harness/ and figures/harness/.
-python scripts/66_per_project_quadrants.py                 # default --mode gt-priority
-python scripts/66_per_project_quadrants.py --mode ensemble # ensemble for every face
+python scripts/66_per_project_quadrants.py                 # default --mode gt-priority (GT + BoL fallback)
+python scripts/66_per_project_quadrants.py --mode bol      # pure BoL inference for every face
 python scripts/66_per_project_quadrants.py --mode gt-only  # strict
 python scripts/harness/50_face_likelihood.py                  # haiku face-judgment encoder (default; auto-writes face_likelihood TSV)
 python scripts/harness/50_face_likelihood.py --model opus --gt-only   # opus on the GT subset
-python scripts/67_wild_eriskii_residual.py --fixed-k 6        # wild-emit residual clusters + 3D PCA
-python scripts/67_wild_eriskii_residual.py --gt-only --fixed-k 6  # gt-only counterpart
+python scripts/67_wild_residual.py --fixed-k 6        # wild-emit residual clusters + 3D PCA on BoL
+python scripts/67_wild_residual.py --gt-only --fixed-k 6  # gt-only counterpart
 
 # Claude groundtruth pilot (Opus 4.7, T=1.0; saturation-gated sequential).
 # Run-0 was the original block-staged pilot; runs 1+ are single-block
@@ -309,12 +382,14 @@ llmoji-study/
                                # (registry-keyed) and
                                # load_emotional_features_stack_at
                                # (path-aware for introspection JSONLs).
-    claude_faces.py            # HF-corpus loader + per-canonical descriptions
+    claude_faces.py            # HF-corpus loader + bag-of-lexicon (BoL)
+                               # builder + parquet roundtrip
     claude_gt.py               # Claude pilot modal-quadrant + soft GT distribution
-    eriskii_anchors.py         # 21-axis AXIS_ANCHORS + CLUSTER_LABEL_PROMPT
-    eriskii.py                 # axis projection + cluster labeling
+    lexicon.py                 # llmoji v2 LEXICON index + Russell-quadrant
+                               # tags + bol_from_synthesis / pool_bol /
+                               # bol_to_quadrant_distribution helpers
     jsd.py                     # JSD + similarity helpers (soft-everywhere)
-    per_project_charts.py      # script-22 chart helpers
+    per_project_charts.py      # script-66 chart helpers
     face_likelihood_discovery.py # post-2026-05-05 layout-aware enumeration
                                # of face_likelihood {summary,parquet} files
                                # across local/<model>/ + harness/
@@ -332,14 +407,15 @@ llmoji-study/
     # Cross-platform (consume both local + harness data) at scripts/ root:
     #   40_face_union.py  41_face_overlap.py
     #   52_subset_search.py  53_topk_pooling.py  54_ensemble_predict.py
-    #   66_per_project_quadrants.py  67_wild_eriskii_residual.py
+    #   66_per_project_quadrants.py  67_wild_residual.py
     local/                     # local-LM scripts (00, 10/11, 20-29, 30-33,
                                # 50/51, 90-92, 97-99)
     harness/                   # contributor-corpus + Claude-API scripts
-                               # (00, 10, 50, 60-65). Note 65_per_project_axes
-                               # consumes local-machine journals (~/.claude,
-                               # ~/.codex), not local LMs — the "local" lived
-                               # in the old filename, not the platform split.
+                               # (00, 10, 50, 55, 60-63). Post-2026-05-06
+                               # the eriskii axis projection pipeline
+                               # (64_eriskii_replication, 65_per_project_axes)
+                               # is gone — replaced by direct bag-of-lexicon
+                               # consumption from llmoji v2 synthesis rows.
   preambles/                   # introspection-prompt iterations v2..v8;
                                # v7 is canonical (config.INTROSPECTION_PREAMBLE)
   docs/                        # findings / internals / gotchas /
@@ -376,18 +452,17 @@ llmoji-study/
       hf_dataset/              # snapshot of a9lim/llmoji (gitignored)
       claude_descriptions.jsonl
       claude_disclosure_pilot{,_summary}.{jsonl,tsv}
-      claude_faces_embed_description.parquet
-      eriskii_{axes,clusters,comparison}.{tsv,md}
+      claude_faces_lexicon_bag.parquet  # 48-d BoL per canonical face,
+                                        # lexicon_version-stamped
       haiku_face_quadrant_judgment{,_summary}.{jsonl,md}
       opus_face_quadrant_judgment{,_summary}.{jsonl,md}
-      face_likelihood_{haiku,opus}_summary.tsv
-      claude_per_project_{ensemble,gt_only,gt_priority}{,.md,_unknown}.{tsv,md}
-      wild_{faces_labeled,residual_clusters}{,_gt_only}.tsv
-      claude/                  # per-Claude-face nn classifier outputs
-      codex/                   # per-codex-project axes
+      face_likelihood_{haiku,opus,bol}_summary.tsv
+      wild_residual_clusters{,_gt_only}.tsv
+      # Deployment-telemetry outputs (claude_per_project_* and
+      # wild_faces_labeled* with surface columns) are gitignored —
+      # regenerate locally via scripts 66 + 67.
   figures/
     harness/                   # contributor-corpus figures
-      {claude,codex}/          # per-provider sub-figures
     local/                     # cross-model figures live here directly
                                # (post-2026-05-05; cross_model/ subdir
                                # was promoted up). Per-model figures

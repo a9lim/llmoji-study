@@ -1,7 +1,7 @@
 # Cross-emit sanity check
 
 **Ground-truth floor:** total_emit_count ≥ 3
-**Encoders compared:** gemma, gemma_intro_v7_primed, gpt_oss_20b, granite, haiku, ministral, opus, qwen, rinna_bilingual_4b, rinna_bilingual_4b_jp, rinna_jp_3_6b, rinna_jp_3_6b_jp
+**Encoders compared:** bol, gemma, gemma_intro_v7_primed, gpt_oss_20b, granite, haiku, ministral, opus, qwen, rinna_bilingual_4b, rinna_bilingual_4b_jp, rinna_jp_3_6b, rinna_jp_3_6b_jp
 
 ## Partition counts (in GT subset)
 
@@ -19,6 +19,7 @@ Each cell: accuracy (n_correct/n) | κ.  **Bold cells** are cross-prediction (en
 
 | encoder | gemma_only | qwen_only | ministral_only | shared_2 | shared_3 |
 |---|---|---|---|---|---|
+| bol | 62% (5/8) | κ=0.52 | 29% (7/24) | κ=0.17 | 17% (1/6) | κ=0.03 | 40% (6/15) | κ=-0.05 | 38% (3/8) | κ=0.25 |
 | gemma | 80% (24/30) | κ=0.76 | **70% (30/43) | κ=0.63** | **26% (6/23) | κ=0.13** | 56% (9/16) | κ=0.38 | 78% (7/9) | κ=0.71 |
 | gemma_intro_v7_primed | 67% (20/30) | κ=0.59 | 60% (26/43) | κ=0.52 | 22% (5/23) | κ=0.08 | 50% (8/16) | κ=0.29 | 78% (7/9) | κ=0.71 |
 | gpt_oss_20b | 43% (13/30) | κ=0.28 | 44% (19/43) | κ=0.33 | 30% (7/23) | κ=0.15 | 44% (7/16) | κ=0.29 | 78% (7/9) | κ=0.71 |

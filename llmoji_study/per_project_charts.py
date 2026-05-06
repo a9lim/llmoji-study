@@ -19,8 +19,8 @@ QUADRANTS_SPLIT = ["HP", "LP", "HN-D", "HN-S", "LN", "NB"]
 
 
 def _use_cjk_font() -> None:
-    """Same fallback chain as
-    ``scripts/harness/64_eriskii_replication.py``; keep these in sync."""
+    """Same fallback chain as ``scripts/harness/63_corpus_pca.py`` /
+    ``llmoji_study/emotional_analysis.py`` — keep these in sync."""
     import matplotlib
     import matplotlib.font_manager as fm
 

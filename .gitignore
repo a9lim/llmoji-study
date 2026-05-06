@@ -44,3 +44,20 @@ data/local/phase_timing_smoke/
 # fix (2026-05-03). Kept locally during the fix verification, not
 # part of the experimental record.
 data/**/*.bak.*
+
+# === Privacy-sensitive outputs (post-2026-05-06) ===========================
+# Outputs derived from a contributor's local emission journal +
+# claude.ai exports + named-project breakdown. Kept regenerable via
+# the scripts (66_per_project_quadrants, 67_wild_residual,
+# 68_three_way_analysis with --include-local) but never committed —
+# the rendered tables, figures, and per-(face, surface) joins reveal
+# deployment telemetry that doesn't belong in a public repo.
+data/harness/empathic_concern_user_text_*.{md,tsv,jsonl}
+data/harness/claude_per_project_*.{md,tsv}
+data/harness/wild_faces_labeled*.tsv
+figures/harness/claude_per_project_*.png
+figures/harness/wild_faces_pca_3d*.html
+# Auto-regenerated cluster docs that bake in deployment-surface
+# categories from local data. Regen locally with script 67.
+docs/2026-MM-DD-residual-state-axes*.md
+docs/2026-??-??-residual-state-axes*.md
