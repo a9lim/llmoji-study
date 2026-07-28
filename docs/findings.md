@@ -20,7 +20,25 @@ summarized in [`previous-experiments.md`](previous-experiments.md).
   emit-weighted for deployment relevance.
 - **Claude-GT loader**:
   `claude_gt.load_claude_gt_distribution()`, with prompt-id based
-  remapping so old v3 rows read cleanly into the v4 9-cell taxonomy.
+  remapping so old v3 rows read cleanly into the nine-affect-cell evaluation
+  view.
+
+The canonical registry has 10 cells, including MR. The current
+face-likelihood/JSD headline artifacts below are a nine-affect-cell snapshot
+and exclude MR. They are not evidence about MR classification.
+
+## Claim boundary
+
+- The face-likelihood numbers measure agreement with collected Claude-GT
+  distributions on the reported overlap sets; they are not a universal
+  semantic ground truth for every kaomoji.
+- Prompt-grouped hidden-state classification shows that the tested activation
+  representation contains affect-cell information. It does not establish a
+  phenomenal emotional state.
+- A kaomoji face is a partial behavioral readout: face-only prediction is
+  materially weaker and more model-dependent than hidden-state prediction.
+- Single-model steering and introspection pilots are reported as pilots unless
+  explicitly replicated across model families.
 
 ## Best Face-Likelihood Ensembles
 
@@ -36,7 +54,7 @@ reports then score the winning subset over the broader 770-face union.
 The old `{gemma_v7primed, haiku}` and `{gemma_v7primed, opus}`
 headlines are superseded by the current artifact set: no current
 face-likelihood summary exists for `gemma_v7primed`, and the active
-9-cell subset search uses the discovered full summaries on disk.
+nine-affect-cell subset search uses the discovered full summaries on disk.
 
 Broader emitted lookup tables:
 

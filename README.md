@@ -33,10 +33,12 @@ Public writeup:
   bag-of-lexicon (BoL) representation over the locked 50-word
   `llmoji` v2 LEXICON. The old MiniLM-on-prose eriskii-parity pipeline
   is gone.
-- **Quadrants**: current split taxonomy is the 9-cell PAD registry:
-  `HP-D`, `HP-S`, `LP`, `NP`, `HN-D`, `HN-S`, `LN`, `NB`, `HB`.
-  `llmoji_experiment/quadrants.py` is the source of truth for ordering,
-  colors, and split handling.
+- **Quadrants**: the canonical workspace registry has 10 cells:
+  `HP-D`, `HP-S`, `LP`, `NP`, `HN-D`, `HN-S`, `LN`, `NB`, `HB`, and
+  `MR`. The currently published face-likelihood/JSD headline artifacts are a
+  nine-affect-cell snapshot and exclude MR; they must not be described as a
+  10-cell evaluation. The shared
+  `transformer_experiments.kaomoji.quadrants` module is the source of truth.
 
 ## Headline Findings
 
@@ -61,6 +63,9 @@ Public writeup:
   disagree on deployment meaning.
 
 Full numbers live in [`docs/findings.md`](docs/findings.md).
+The compact machine-readable headline record is
+[`data/summary/results.json`](data/summary/results.json); public figures are
+mapped in [`figures/README.md`](figures/README.md).
 
 ## Reproducing
 

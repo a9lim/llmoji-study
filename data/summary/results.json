@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "evidence_cutoff": "2026-05-15",
+  "status": "pilot-findings",
+  "taxonomy": {
+    "canonical_registry_cells": 10,
+    "canonical_registry": ["HP-D", "HP-S", "LP", "NP", "HN-D", "HN-S", "LN", "NB", "HB", "MR"],
+    "published_face_likelihood_cells": 9,
+    "published_face_likelihood_excludes": ["MR"]
+  },
+  "face_likelihood": {
+    "pooled_gt_overlap_floor_3": {
+      "evaluation_n": 102,
+      "best_ensemble": ["gemma", "ministral", "opus"],
+      "face_uniform_similarity": 0.733,
+      "emit_weighted_similarity": 0.881
+    },
+    "strict_claude_gt_overlap": {
+      "evaluation_n": 50,
+      "best_ensemble": ["gemma", "opus"],
+      "face_uniform_similarity": 0.708,
+      "emit_weighted_similarity": 0.781
+    },
+    "pooled_union": {
+      "evaluated_faces": 243,
+      "ensemble": ["gemma", "ministral", "opus"],
+      "face_uniform_similarity": 0.669,
+      "emit_weighted_similarity": 0.847
+    },
+    "strict_claude_gt_union": {
+      "evaluated_faces": 70,
+      "ensemble": ["gemma", "opus"],
+      "face_uniform_similarity": 0.717,
+      "emit_weighted_similarity": 0.786
+    }
+  },
+  "claude_gt_collection": {
+    "naturalistic_rows": 1360,
+    "introspection_rows": 120,
+    "total_rows": 1480
+  },
+  "prompt_grouped_hidden_to_quadrant_accuracy": {
+    "gemma": 0.992,
+    "qwen": 0.985,
+    "ministral": 0.984,
+    "granite": 0.98,
+    "gpt_oss_20b": 0.876
+  },
+  "prompt_grouped_face_to_quadrant_accuracy": {
+    "gemma": {"value": 0.806, "approximate": false},
+    "qwen": {"value": 0.785, "approximate": false},
+    "ministral": {"value": 0.43, "approximate": true},
+    "granite": {"value": 0.55, "approximate": true},
+    "gpt_oss_20b": {"value": 0.4, "approximate": true}
+  },
+  "limitations": [
+    "current face-likelihood headline artifacts exclude MR",
+    "Claude-GT is a collected reference distribution, not universal semantic ground truth",
+    "hidden-state predictiveness is functional evidence and does not establish phenomenology",
+    "self.other and steering findings are not yet cross-model replications"
+  ],
+  "sources": [
+    "docs/findings.md",
+    "data/harness/",
+    "data/local/",
+    "figures/harness/",
+    "figures/local/"
+  ]
+}

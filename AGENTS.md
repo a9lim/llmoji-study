@@ -64,6 +64,9 @@ Still-current dated docs:
 - **Evaluation**: soft-everywhere JSD similarity to Claude-GT. Report
   both face-uniform and emit-weighted similarity. Avoid argmax accuracy
   unless the question explicitly asks for a modal label.
+- **Published evaluation scope**: the registry is 10-cell, but the current
+  face-likelihood/JSD headline artifacts are still the nine-affect-cell
+  snapshot and exclude MR. Do not relabel those numbers as 10-cell results.
 - **Best current overlap ensemble**: `{gemma, ministral, opus}` at
   0.881 emit-weighted / 0.733 face-uniform on pooled-GT floor-3
   (`n=102` all-encoder overlap).
