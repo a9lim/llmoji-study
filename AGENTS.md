@@ -186,9 +186,9 @@ emotional states regardless of phenomenal-status uncertainty.
 ## Commands
 
 ```bash
-python --version  # system Python 3.12
-python -m pip install -e ..
-python -m pip install -e .
+python --version  # shared venv Python 3.12
+uv pip install -e ..
+uv pip install -e .
 ```
 
 Smoke hidden-state capture:
@@ -307,7 +307,7 @@ docs/
 
 ## Conventions
 
-- Use the machine's shared base Python 3.12 via plain `python`.
+- Use the shared venv Python 3.12 (`~/.venv`, `uv pip` installs) via plain `python`.
 - JSONL row files plus sidecar `.npz` files are the source of truth for
   local hidden-state data.
 - For structured config or parquet/jsonl data, use the repo helpers
